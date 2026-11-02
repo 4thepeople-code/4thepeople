@@ -13,52 +13,81 @@ type CloudinaryImage {
 }
 
 model User {
-  id              String       @id @default(auto()) @map("_id") @db.ObjectId
-  name            String
-  email           String       @unique
-  password        String?      // null until the invite is accepted
-  role            GlobalRole   @default(USER)
-  isActive        Boolean      @default(false)
-  inviteToken     String?      
-  inviteExpiresAt DateTime?
-  avatar          CloudinaryImage?
+  id                        String           @id @default(auto()) @map("_id") @db.ObjectId
+  name                      String
+  email                     String           @unique
+  password                  String? // null until the invite is accepted
+  role                      GlobalRole       @default(USER)
+  isActive                  Boolean          @default(false)
+  inviteToken               String?
+  inviteExpiresAt           DateTime?
+  avatar                    CloudinaryImage?
   passwordResetOtpHash      String?
   passwordResetOtpExpiresAt DateTime?
-  createdClubs    Club[]       @relation("ClubOwner")
-  memberships     Membership[]
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
+  createdClubs              Club[]           @relation("ClubOwner")
+  memberships               Membership[]
+  createdAt                 DateTime         @default(now())
+  updatedAt                 DateTime         @updatedAt
 }
 
 model Club {
-  id          String       @id @default(auto()) @map("_id") @db.ObjectId
+  id          String           @id @default(auto()) @map("_id") @db.ObjectId
   name        String
   description String?
+  collegeId   String?          @default("default-college")
+  isCentral   Boolean?         @default(false)
   logo        CloudinaryImage?
   coverImage  CloudinaryImage?
-  createdBy   User         @relation("ClubOwner", fields: [createdById], references: [id])
-  createdById String       @db.ObjectId
+  createdBy   User             @relation("ClubOwner", fields: [createdById], references: [id])
+  createdById String           @db.ObjectId
   members     Membership[]
   events      Event[]
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  departments ClubDepartment[]
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+}
+
+model Department {
+  id          String           @id @default(auto()) @map("_id") @db.ObjectId
+  name        String
+  shortCode   String
+  description String?
+  collegeId   String           @default("default-college")
+  clubs       ClubDepartment[]
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@unique([collegeId, name])
+  @@unique([collegeId, shortCode])
+}
+
+model ClubDepartment {
+  id           String     @id @default(auto()) @map("_id") @db.ObjectId
+  club         Club       @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  clubId       String     @db.ObjectId
+  department   Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  departmentId String     @db.ObjectId
+  createdAt    DateTime   @default(now())
+
+  @@unique([clubId, departmentId])
+  @@index([departmentId])
 }
 
 model Event {
-  id              String      @id @default(auto()) @map("_id") @db.ObjectId
-  club            Club        @relation(fields: [clubId], references: [id])
-  clubId          String      @db.ObjectId
+  id              String            @id @default(auto()) @map("_id") @db.ObjectId
+  club            Club              @relation(fields: [clubId], references: [id])
+  clubId          String            @db.ObjectId
   title           String
   description     String
   location        String
   startAt         DateTime
   endAt           DateTime?
-  status          EventStatus @default(UPCOMING)
+  status          EventStatus       @default(UPCOMING)
   coverImage      CloudinaryImage?
   gallery         CloudinaryImage[]
   registrationUrl String?
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
 
   @@index([clubId, startAt])
   @@index([clubId, status])

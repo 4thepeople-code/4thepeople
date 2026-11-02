@@ -5,16 +5,22 @@ const {
   getPublicClub,
 } = require('../controllers/clubController');
 const {
+  listDepartments,
+  getDepartment,
+} = require('../controllers/departmentController');
+const {
   listUpcomingEvents,
   listPastEvents,
   listAllUpcomingEvents,
   getPublicEvent,
 } = require('../controllers/eventController');
 const { validate } = require('../middleware/validate');
-const { clubParams, clubEventParams } = require('../validators/schemas');
+const { clubParams, departmentParams, clubEventParams } = require('../validators/schemas');
 
 // These routes are intentionally public: do not add authentication middleware.
 router.get('/clubs', listPublicClubs);
+router.get('/departments', listDepartments);
+router.get('/departments/:departmentId', validate({ params: departmentParams }), getDepartment);
 router.get('/events/upcoming', listAllUpcomingEvents);
 router.get('/clubs/:clubId/events/upcoming', validate({ params: clubParams }), listUpcomingEvents);
 router.get('/clubs/:clubId/events/past', validate({ params: clubParams }), listPastEvents);

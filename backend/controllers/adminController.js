@@ -1,6 +1,7 @@
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const { prisma } = require('../config/db');
+const { DEFAULT_COLLEGE_ID } = require('../config/college');
 const asyncHandler = require('../utils/asyncHandler');
 const { AppError } = require('../middleware/errorHandler');
 const { sendInviteEmail, sendDeletionVerificationCode } = require('../services/emailService');
@@ -198,7 +199,7 @@ exports.resendInvite = asyncHandler(async (req, res) => {
  * Admin-only route to create a club
  */
 exports.createClub = asyncHandler(async (req, res) => {
-  const { name, description } = req.body;
+  const { name, description, isCentral } = req.body;
 
   if (!name) {
     throw new AppError('Club name is required', 400);
@@ -208,6 +209,7 @@ exports.createClub = asyncHandler(async (req, res) => {
     data: {
       name: name.trim(),
       description: description ? description.trim() : null,
+      ...(isCentral !== undefined && { isCentral }),
       createdById: req.user.id,
     },
   });
@@ -225,16 +227,7 @@ exports.createClub = asyncHandler(async (req, res) => {
  */
 exports.updateClub = asyncHandler(async (req, res) => {
   const { clubId } = req.params;
-  const { name, description } = req.body;
-
-  // Check if club exists
-  const existingClub = await prisma.club.findUnique({
-    where: { id: clubId },
-  });
-
-  if (!existingClub) {
-    throw new AppError('Club not found', 404);
-  }
+  const { name, description, isCentral } = req.body;
 
   // Build update data only for fields that were provided
   const updateData = {};
@@ -252,18 +245,36 @@ exports.updateClub = asyncHandler(async (req, res) => {
       ? description.trim()
       : null;
   }
+  if (isCentral !== undefined) updateData.isCentral = isCentral;
 
   // Nothing to update
   if (Object.keys(updateData).length === 0) {
     throw new AppError(
-      'At least one field (name or description) is required',
+      'At least one club field is required',
       400
     );
   }
 
-  const updatedClub = await prisma.club.update({
-    where: { id: clubId },
-    data: updateData,
+  const updatedClub = await prisma.$transaction(async (tx) => {
+    const existingClub = await tx.club.findUnique({ where: { id: clubId } });
+    if (!existingClub) throw new AppError('Club not found', 404);
+
+    if (isCentral === true && existingClub.isCentral !== true) {
+      const departmentLinkCount = await tx.clubDepartment.count({
+        where: {
+          clubId,
+          department: { collegeId: DEFAULT_COLLEGE_ID },
+        },
+      });
+      if (departmentLinkCount > 0) {
+        throw new AppError('A club with department links cannot be marked central.', 409);
+      }
+    }
+
+    return tx.club.update({
+      where: { id: clubId },
+      data: updateData,
+    });
   });
 
   res.status(200).json({
@@ -938,4 +949,3 @@ exports.deleteAdminAvatar = asyncHandler(async (req, res) => {
     data: updatedUser,
   });
 });
-
