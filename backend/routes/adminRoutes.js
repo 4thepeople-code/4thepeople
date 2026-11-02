@@ -5,8 +5,16 @@ const { validate } = require('../middleware/validate');
 const { inviteLimiter, destructiveLimiter, uploadLimiter } = require('../middleware/rateLimiters');
 const {
   idParams, clubParams, managerInviteBody, createClubBody, updateClubBody,
+  departmentParams, createDepartmentBody, updateDepartmentBody, clubIdsBody, departmentIdsBody,
   membershipBody, existingManagerBody, deletionVerificationBody,
 } = require('../validators/schemas');
+const {
+  createDepartment,
+  updateDepartment,
+  deleteDepartment,
+  replaceDepartmentClubs,
+  replaceClubDepartments,
+} = require('../controllers/departmentController');
 const {
   createManager,
   resendInvite,
@@ -66,6 +74,13 @@ router.post('/create-club', validate({ body: createClubBody }), createClub);
 
 // PATCH /admin/clubs/:clubId
 router.patch('/clubs/:clubId', validate({ params: clubParams, body: updateClubBody }), updateClub);
+
+// Department management and club/department assignments
+router.post('/departments', validate({ body: createDepartmentBody }), createDepartment);
+router.patch('/departments/:departmentId', validate({ params: departmentParams, body: updateDepartmentBody }), updateDepartment);
+router.delete('/departments/:departmentId', validate({ params: departmentParams }), deleteDepartment);
+router.put('/departments/:departmentId/clubs', validate({ params: departmentParams, body: clubIdsBody }), replaceDepartmentClubs);
+router.put('/clubs/:clubId/departments', validate({ params: clubParams, body: departmentIdsBody }), replaceClubDepartments);
 
 // PATCH /admin/memberships/:membershipId
 router.patch('/memberships/:membershipId', validate({ params: idParams('membershipId'), body: membershipBody }), updateMembership);
