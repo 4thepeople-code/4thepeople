@@ -190,10 +190,21 @@ const PublicClubsListPage = () => {
                     isDark ? 'bg-gradient-to-t from-[#12141C] via-transparent to-transparent' : 'bg-gradient-to-t from-black/50 via-transparent to-transparent'
                   }`} />
 
-                  <div className="absolute top-3 left-3">
+                  <div className="absolute top-3 left-3 flex flex-wrap items-center gap-1.5 max-w-[85%]">
                     <span className="px-2.5 py-0.5 rounded-full bg-black/70 backdrop-blur-md border border-white/15 text-[10px] font-extrabold uppercase tracking-widest text-[#00F0FF]">
                       {club.category || 'CAMPUS CLUB'}
                     </span>
+                    {Array.isArray(club.departments) && club.departments.length > 0 && (
+                      club.departments.map((dept) => (
+                        <span
+                          key={dept.id || dept.shortCode || dept.name}
+                          className="px-2 py-0.5 rounded-full bg-cyan-500/20 backdrop-blur-md border border-cyan-400/30 text-[10px] font-bold uppercase tracking-wider text-cyan-200"
+                          title={dept.name}
+                        >
+                          {dept.shortCode || dept.name}
+                        </span>
+                      ))
+                    )}
                   </div>
                 </div>
 

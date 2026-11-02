@@ -6,6 +6,7 @@ const asyncHandler = require('../utils/asyncHandler');
 const { AppError } = require('../middleware/errorHandler');
 const { sendInviteEmail, sendDeletionVerificationCode } = require('../services/emailService');
 const { sanitizeUser } = require('../utils/sanitizeUser');
+const { clubDepartmentsSelect, getClubDepartments } = require('../utils/clubDepartments');
 const { uploadBuffer, deleteAsset, deleteAssetsBestEffort } = require('../utils/cloudinaryUpload');
 
 const deletionCodeExpiryMs = 10 * 60 * 1000;
@@ -587,13 +588,18 @@ exports.listClubs = asyncHandler(async (req, res) => {
       _count: {
         select: { members: true },
       },
+      departments: clubDepartmentsSelect,
     },
   });
+  const clubsWithDepartments = clubs.map((club) => ({
+    ...club,
+    departments: getClubDepartments(club),
+  }));
 
   res.status(200).json({
     success: true,
     message: 'Fetched all clubs',
-    data: clubs,
+    data: clubsWithDepartments,
   });
 });
 
@@ -618,17 +624,22 @@ exports.getClub = asyncHandler(async (req, res) => {
           },
         },
       },
+      departments: clubDepartmentsSelect,
     },
   });
 
   if (!club) {
     throw new AppError('Club not found', 404);
   }
+  const clubWithDepartments = {
+    ...club,
+    departments: getClubDepartments(club),
+  };
 
   res.status(200).json({
     success: true,
     message: `View club with ID ${clubId}`,
-    data: club,
+    data: clubWithDepartments,
   });
 });
 

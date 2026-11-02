@@ -2,10 +2,18 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Edit2, X, Building2, Upload, Trash2, Image as ImageIcon } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import adminApi from '../../api/adminApi';
+import {
+  useGetDepartmentsQuery,
+  useReplaceClubDepartmentsMutation,
+} from '../../api/apiSlice';
+import MultiSelect from '../common/MultiSelect';
+import { formatErrorMessage } from '../../utils/errorUtils';
 
 const EditClubModal = ({ isOpen, onClose, onSuccess, club }) => {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const [isCentral, setIsCentral] = useState(false);
+  const [selectedDepartmentIds, setSelectedDepartmentIds] = useState([]);
   const [logoFile, setLogoFile] = useState(null);
   const [logoPreview, setLogoPreview] = useState(null);
   const [existingLogoUrl, setExistingLogoUrl] = useState(null);
@@ -15,6 +23,23 @@ const EditClubModal = ({ isOpen, onClose, onSuccess, club }) => {
 
   const fileInputRef = useRef(null);
 
+  const { data: deptData } = useGetDepartmentsQuery();
+  const [replaceClubDepartments] = useReplaceClubDepartmentsMutation();
+
+  const departments = Array.isArray(deptData)
+    ? deptData
+    : Array.isArray(deptData?.data?.departments)
+    ? deptData.data.departments
+    : Array.isArray(deptData?.departments)
+    ? deptData.departments
+    : [];
+
+  const departmentOptions = departments.map((d) => ({
+    value: d.id,
+    label: d.name,
+    badge: d.shortCode,
+  }));
+
   useEffect(() => {
     if (club) {
       setName(club.name || '');
@@ -22,10 +47,24 @@ const EditClubModal = ({ isOpen, onClose, onSuccess, club }) => {
       setExistingLogoUrl(club.logo?.url || null);
       setLogoFile(null);
       setLogoPreview(null);
+      setIsCentral(Boolean(club.isCentral));
+      const currentDeptIds = Array.isArray(club.departments)
+        ? club.departments.map((d) => d.id || d)
+        : [];
+      setSelectedDepartmentIds(currentDeptIds);
+      setError('');
     }
-  }, [club]);
+  }, [club, isOpen]);
 
   if (!isOpen || !club) return null;
+
+  const handleCentralChange = (e) => {
+    const checked = e.target.checked;
+    setIsCentral(checked);
+    if (checked) {
+      setSelectedDepartmentIds([]);
+    }
+  };
 
   const handleFileChange = (e) => {
     const file = e.target.files[0];
@@ -50,7 +89,7 @@ const EditClubModal = ({ isOpen, onClose, onSuccess, club }) => {
       setLogoPreview(null);
       if (onSuccess) onSuccess();
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to remove club logo');
+      setError(formatErrorMessage(err, 'Failed to remove club logo'));
     } finally {
       setDeletingLogo(false);
     }
@@ -58,6 +97,7 @@ const EditClubModal = ({ isOpen, onClose, onSuccess, club }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (loading || deletingLogo) return;
     setError('');
 
     if (!name.trim()) {
@@ -67,10 +107,33 @@ const EditClubModal = ({ isOpen, onClose, onSuccess, club }) => {
 
     setLoading(true);
     try {
-      await adminApi.updateClub(club.id, {
-        name: name.trim(),
-        description: description.trim() || null,
-      });
+      if (isCentral) {
+        // Requirement: "On save for an existing club that has department links and is now marked central,
+        // first save the departments as an empty list, then update the club."
+        await replaceClubDepartments({
+          clubId: club.id,
+          departmentIds: [],
+        }).unwrap();
+
+        await adminApi.updateClub(club.id, {
+          name: name.trim(),
+          description: description.trim() || null,
+          isCentral: true,
+        });
+      } else {
+        // First update the club properties (isCentral: false)
+        await adminApi.updateClub(club.id, {
+          name: name.trim(),
+          description: description.trim() || null,
+          isCentral: false,
+        });
+
+        // Then replace club department links
+        await replaceClubDepartments({
+          clubId: club.id,
+          departmentIds: selectedDepartmentIds,
+        }).unwrap();
+      }
 
       if (logoFile) {
         const formData = new FormData();
@@ -81,7 +144,7 @@ const EditClubModal = ({ isOpen, onClose, onSuccess, club }) => {
       if (onSuccess) onSuccess();
       onClose();
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to update club details');
+      setError(formatErrorMessage(err, 'Failed to update club details'));
     } finally {
       setLoading(false);
     }
@@ -112,23 +175,23 @@ const EditClubModal = ({ isOpen, onClose, onSuccess, club }) => {
               </div>
               <div>
                 <h3 className="text-base font-semibold text-[#1C1B1F] font-serif">Edit Club Details</h3>
-                <p className="text-xs text-[#6B6966]">Update information and logo for {club.name}</p>
+                <p className="text-xs text-[#6B6966]">Update information, affiliation, and logo for {club.name}</p>
               </div>
             </div>
             <button
               onClick={onClose}
               disabled={loading || deletingLogo}
-              className="text-[#8E8B85] hover:text-[#1C1B1F] transition-colors"
+              className="text-[#8E8B85] hover:text-[#1C1B1F] transition-colors disabled:opacity-50"
             >
               <X className="w-4 h-4" />
             </button>
           </div>
 
           <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
-            {/* Scrollable Form Body - 2 Columns on Laptops, 1 Column on Mobile */}
+            {/* Scrollable Form Body */}
             <div className="p-5 sm:p-6 overflow-y-auto flex-1 space-y-4">
               {error && (
-                <div className="p-3 bg-[#FDF2F2] border border-[#F3CECE] rounded text-xs text-[#8B3A3A]">
+                <div className="p-3 bg-[#FDF2F2] border border-[#F3CECE] rounded text-xs text-[#8B3A3A] leading-relaxed">
                   {error}
                 </div>
               )}
@@ -164,7 +227,8 @@ const EditClubModal = ({ isOpen, onClose, onSuccess, club }) => {
                         <button
                           type="button"
                           onClick={() => fileInputRef.current?.click()}
-                          className="px-2.5 py-1 bg-white hover:bg-[#F2F0EC] text-[#1C1B1F] text-xs font-medium rounded border border-[#E7E5E4] transition-colors flex items-center gap-1.5"
+                          disabled={loading || deletingLogo}
+                          className="px-2.5 py-1 bg-white hover:bg-[#F2F0EC] text-[#1C1B1F] text-xs font-medium rounded border border-[#E7E5E4] transition-colors flex items-center gap-1.5 disabled:opacity-50"
                         >
                           <Upload className="w-3.5 h-3.5 text-[#B08D57]" />
                           {logoPreview || existingLogoUrl ? 'Change' : 'Upload'}
@@ -174,7 +238,7 @@ const EditClubModal = ({ isOpen, onClose, onSuccess, club }) => {
                           <button
                             type="button"
                             onClick={handleDeleteLogo}
-                            disabled={deletingLogo}
+                            disabled={deletingLogo || loading}
                             className="px-2.5 py-1 bg-[#FDF2F2] hover:bg-[#F9E2E2] text-[#8B3A3A] text-xs font-medium rounded border border-[#F3CECE] transition-colors flex items-center gap-1 disabled:opacity-50"
                           >
                             {deletingLogo ? (
@@ -196,7 +260,7 @@ const EditClubModal = ({ isOpen, onClose, onSuccess, club }) => {
                 {/* Club Name */}
                 <div>
                   <label className="block text-xs font-medium text-[#6B6966] mb-1.5">
-                    Club Name
+                    Club Name <span className="text-[#8B3A3A]">*</span>
                   </label>
                   <div className="relative">
                     <Building2 className="w-4 h-4 text-[#8E8B85] absolute left-3 top-1/2 -translate-y-1/2" />
@@ -206,9 +270,45 @@ const EditClubModal = ({ isOpen, onClose, onSuccess, club }) => {
                       placeholder="e.g. Robotics Club"
                       value={name}
                       onChange={(e) => setName(e.target.value)}
-                      className="w-full pl-9 pr-4 py-2 bg-white border border-[#D8D7DC] focus:border-[#B08D57] rounded text-[#1C1B1F] text-sm focus:outline-none h-[42px]"
+                      disabled={loading || deletingLogo}
+                      className="w-full pl-9 pr-4 py-2 bg-white border border-[#D8D7DC] focus:border-[#B08D57] rounded text-[#1C1B1F] text-sm focus:outline-none h-[42px] disabled:bg-[#F7F6F2]"
                     />
                   </div>
+                </div>
+
+                {/* Central Club Option - Spanning both columns */}
+                <div className="md:col-span-2 p-3 bg-[#FAF9F7] border border-[#E7E5E4] rounded-lg">
+                  <label className="flex items-start gap-3 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={isCentral}
+                      onChange={handleCentralChange}
+                      disabled={loading || deletingLogo}
+                      className="mt-0.5 w-4 h-4 text-[#B08D57] border-[#D8D7DC] rounded focus:ring-[#B08D57] accent-[#B08D57]"
+                    />
+                    <div>
+                      <span className="text-xs font-semibold text-[#1C1B1F]">
+                        Central club (Institution-wide / no department)
+                      </span>
+                      <p className="text-[11px] text-[#8E8B85] mt-0.5">
+                        When enabled, any existing department links are cleared because central clubs belong to no department.
+                      </p>
+                    </div>
+                  </label>
+                </div>
+
+                {/* Department Affiliation Multi-Select - Spanning both columns */}
+                <div className="md:col-span-2">
+                  <MultiSelect
+                    label="Department Affiliation"
+                    options={departmentOptions}
+                    selectedValues={selectedDepartmentIds}
+                    onChange={setSelectedDepartmentIds}
+                    disabled={isCentral || loading || deletingLogo}
+                    disabledNote="Central clubs belong to no department."
+                    placeholder={isCentral ? "Disabled for central clubs" : "Select one or more academic departments..."}
+                    searchPlaceholder="Search departments..."
+                  />
                 </div>
 
                 {/* Description - Spanning both columns on desktop */}
@@ -221,7 +321,8 @@ const EditClubModal = ({ isOpen, onClose, onSuccess, club }) => {
                     placeholder="Describe the club's objective..."
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
-                    className="w-full p-3 bg-white border border-[#D8D7DC] focus:border-[#B08D57] rounded text-[#1C1B1F] text-sm focus:outline-none resize-none"
+                    disabled={loading || deletingLogo}
+                    className="w-full p-3 bg-white border border-[#D8D7DC] focus:border-[#B08D57] rounded text-[#1C1B1F] text-sm focus:outline-none resize-none disabled:bg-[#F7F6F2]"
                   />
                 </div>
               </div>
@@ -233,19 +334,19 @@ const EditClubModal = ({ isOpen, onClose, onSuccess, club }) => {
                 type="button"
                 onClick={onClose}
                 disabled={loading || deletingLogo}
-                className="px-4 py-2 bg-[#F2F0EC] hover:bg-[#E7E5E4] text-[#38373A] text-xs font-medium rounded border border-[#E7E5E4] transition-colors"
+                className="px-4 py-2 bg-[#F2F0EC] hover:bg-[#E7E5E4] text-[#38373A] text-xs font-medium rounded border border-[#E7E5E4] transition-colors disabled:opacity-50"
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                disabled={loading || deletingLogo}
-                className="px-4 py-2 bg-[#B08D57] hover:bg-[#997847] text-white text-xs font-medium rounded transition-colors flex items-center gap-2 disabled:opacity-50"
+                disabled={loading || deletingLogo || !name.trim()}
+                className="px-4 py-2 bg-[#B08D57] hover:bg-[#997847] text-white text-xs font-medium rounded transition-colors flex items-center gap-2 disabled:opacity-50 cursor-pointer"
               >
                 {loading && (
                   <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                 )}
-                Save Changes
+                <span>{loading ? 'Saving Changes...' : 'Save Changes'}</span>
               </button>
             </div>
           </form>
@@ -256,4 +357,3 @@ const EditClubModal = ({ isOpen, onClose, onSuccess, club }) => {
 };
 
 export default EditClubModal;
-

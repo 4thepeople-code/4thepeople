@@ -85,7 +85,19 @@ const ClubsPage = () => {
             </div>
           )}
           <div>
-            <p className="font-semibold text-[#1C1B1F] text-xs sm:text-sm">{club.name}</p>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <p className="font-semibold text-[#1C1B1F] text-xs sm:text-sm">{club.name}</p>
+              {club.isCentral && (
+                <span className="px-1.5 py-0.2 rounded text-[10px] font-semibold bg-amber-50 text-amber-800 border border-amber-200 uppercase tracking-wider">
+                  Central
+                </span>
+              )}
+              {Array.isArray(club.departments) && club.departments.map((d) => (
+                <span key={d.id || d.shortCode} className="px-1.5 py-0.2 rounded text-[10px] font-semibold bg-[#FAF9F7] text-[#B08D57] border border-[#E7E5E4] uppercase tracking-wider">
+                  {d.shortCode || d.name}
+                </span>
+              ))}
+            </div>
             <p className="text-xs text-[#8E8B85] font-normal truncate max-w-xs">
               {club.description || 'No description provided'}
             </p>

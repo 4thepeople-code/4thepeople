@@ -29,6 +29,12 @@ const AdminSidebar = ({ mobileOpen, setMobileOpen, onOpenInviteManager }) => {
         { label: 'Create Club', path: '/admin/clubs/create' },
       ],
     },
+    {
+      title: 'Departments',
+      items: [
+        { label: 'All Departments', path: '/admin/departments' },
+      ],
+    },
   ];
 
   return (

@@ -14,6 +14,8 @@ export const ClubCard = ({ club, onClick }) => {
   const initials = club.name ? club.name.slice(0, 2).toUpperCase() : 'CL';
   const memberCountText = club.memberCount !== undefined ? `${club.memberCount} Members` : 'Active Club';
 
+  const departments = Array.isArray(club.departments) ? club.departments : [];
+
   return (
     <div
       onClick={onClick}
@@ -52,6 +54,21 @@ export const ClubCard = ({ club, onClick }) => {
             CLUB
           </span>
         </div>
+
+        {/* Department Tags (Only shown when club has departments, leaving layout unchanged when none) */}
+        {departments.length > 0 && (
+          <div className="absolute top-[10px] right-[10px] flex flex-wrap gap-1 justify-end max-w-[65%] z-10">
+            {departments.map((dept) => (
+              <span
+                key={dept.id || dept.shortCode || dept.name}
+                className="px-[8px] py-[3px] bg-[#FFFFFF]/95 backdrop-blur-xs rounded-[4px] text-[10px] leading-[12px] font-semibold text-[#7848F4] shadow-xs uppercase tracking-wider truncate max-w-[100px]"
+                title={dept.name}
+              >
+                {dept.shortCode || dept.name}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Club Title (top: 275px, left: 20px, right: 19.67px, height: 38px, font-size: 16px, line-height: 19px) */}
