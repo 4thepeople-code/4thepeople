@@ -10,6 +10,8 @@ import PublicHomePage from './pages/public/PublicHomePage';
 import PublicClubsListPage from './pages/public/PublicClubsListPage';
 import PublicClubDetailPage from './pages/public/PublicClubDetailPage';
 import PublicEventDetailPage from './pages/public/PublicEventDetailPage';
+import PublicDepartmentsListPage from './pages/public/PublicDepartmentsListPage';
+import PublicDepartmentDetailPage from './pages/public/PublicDepartmentDetailPage';
 
 // Dedicated Login & Auth Pages
 import Login from './pages/Login';
@@ -28,6 +30,7 @@ import UserDetailsPage from './pages/admin/UserDetailsPage';
 import ClubsPage from './pages/admin/ClubsPage';
 import CreateClubPage from './pages/admin/CreateClubPage';
 import ClubDetailsPage from './pages/admin/ClubDetailsPage';
+import AdminDepartmentsPage from './pages/admin/AdminDepartmentsPage';
 
 // Manager Pages
 import ManagerDashboard from './pages/manager/ManagerDashboard';
@@ -50,6 +53,8 @@ function App() {
                 <Route path="/clubs" element={<PublicClubsListPage />} />
                 <Route path="/clubs/:clubId" element={<PublicClubDetailPage />} />
                 <Route path="/clubs/:clubId/events/:eventId" element={<PublicEventDetailPage />} />
+                <Route path="/departments" element={<PublicDepartmentsListPage />} />
+                <Route path="/departments/:departmentId" element={<PublicDepartmentDetailPage />} />
 
                 {/* Dedicated Login & Auth Routes */}
                 <Route path="/accept-invite/:token" element={<AcceptInvitePage />} />
@@ -73,6 +78,7 @@ function App() {
                   <Route path="clubs" element={<ClubsPage />} />
                   <Route path="clubs/create" element={<CreateClubPage />} />
                   <Route path="clubs/:clubId" element={<ClubDetailsPage />} />
+                  <Route path="departments" element={<AdminDepartmentsPage />} />
                 </Route>
 
                 {/* Protected Manager Portal Routes */}

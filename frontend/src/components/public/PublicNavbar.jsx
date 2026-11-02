@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+// eslint-disable-next-line no-unused-vars
 import { motion, AnimatePresence } from 'framer-motion';
 import { Sparkles, Compass, Menu, X, ArrowUpRight, LogIn, Sun, Moon } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
@@ -90,6 +91,17 @@ const PublicNavbar = () => {
             >
               Clubs Directory
             </Link>
+
+            <Link
+              to="/departments"
+              className={`transition-colors ${
+                location.pathname.startsWith('/departments')
+                  ? isDark ? 'text-[#00F0FF]' : 'text-cyan-600 font-extrabold'
+                  : isDark ? 'text-gray-300 hover:text-[#00F0FF]' : 'text-slate-600 hover:text-cyan-600'
+              }`}
+            >
+              Departments
+            </Link>
           </nav>
 
           {/* Right Action, Theme Toggle & Portal Links */}
@@ -179,9 +191,11 @@ const PublicNavbar = () => {
                 to="/"
                 onClick={() => setMobileMenuOpen(false)}
                 className={`block py-2 px-3 rounded-lg font-semibold transition-colors ${
-                  isDark
-                    ? 'text-gray-200 hover:bg-white/5 hover:text-[#00F0FF]'
-                    : 'text-slate-700 hover:bg-slate-100 hover:text-cyan-600'
+                  location.pathname === '/'
+                    ? isDark ? 'text-[#00F0FF] bg-white/5' : 'text-cyan-600 bg-slate-100 font-bold'
+                    : isDark
+                      ? 'text-gray-200 hover:bg-white/5 hover:text-[#00F0FF]'
+                      : 'text-slate-700 hover:bg-slate-100 hover:text-cyan-600'
                 }`}
               >
                 Home
@@ -207,12 +221,27 @@ const PublicNavbar = () => {
                 to="/clubs"
                 onClick={() => setMobileMenuOpen(false)}
                 className={`block py-2 px-3 rounded-lg font-semibold transition-colors ${
-                  isDark
-                    ? 'text-gray-200 hover:bg-white/5 hover:text-[#00F0FF]'
-                    : 'text-slate-700 hover:bg-slate-100 hover:text-cyan-600'
+                  location.pathname.startsWith('/clubs')
+                    ? isDark ? 'text-[#00F0FF] bg-white/5' : 'text-cyan-600 bg-slate-100 font-bold'
+                    : isDark
+                      ? 'text-gray-200 hover:bg-white/5 hover:text-[#00F0FF]'
+                      : 'text-slate-700 hover:bg-slate-100 hover:text-cyan-600'
                 }`}
               >
                 Clubs Directory
+              </Link>
+              <Link
+                to="/departments"
+                onClick={() => setMobileMenuOpen(false)}
+                className={`block py-2 px-3 rounded-lg font-semibold transition-colors ${
+                  location.pathname.startsWith('/departments')
+                    ? isDark ? 'text-[#00F0FF] bg-white/5' : 'text-cyan-600 bg-slate-100 font-bold'
+                    : isDark
+                      ? 'text-gray-200 hover:bg-white/5 hover:text-[#00F0FF]'
+                      : 'text-slate-700 hover:bg-slate-100 hover:text-cyan-600'
+                }`}
+              >
+                Departments
               </Link>
               <Link
                 to="/login"
@@ -267,4 +296,3 @@ const PublicNavbar = () => {
 };
 
 export default PublicNavbar;
-

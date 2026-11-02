@@ -1,4 +1,5 @@
 const { prisma } = require('../config/db');
+const { clubDepartmentsSelect, getClubDepartments } = require('../utils/clubDepartments');
 const asyncHandler = require('../utils/asyncHandler');
 const { AppError } = require('../middleware/errorHandler');
 
@@ -12,6 +13,8 @@ const publicClubFields = {
   coverImage: true,
   createdAt: true,
   updatedAt: true,
+  isCentral: true,
+  departments: clubDepartmentsSelect,
 };
 
 /**
@@ -23,10 +26,14 @@ exports.listPublicClubs = asyncHandler(async (req, res) => {
     select: publicClubFields,
     orderBy: { createdAt: 'desc' },
   });
+  const responseClubs = clubs.map(({ isCentral, departments, ...club }) => ({
+    ...club,
+    departments: getClubDepartments({ isCentral, departments }),
+  }));
 
   res.status(200).json({
     success: true,
-    clubs,
+    clubs: responseClubs,
   });
 });
 
@@ -50,9 +57,13 @@ exports.getPublicClub = asyncHandler(async (req, res) => {
   if (!club) {
     throw new AppError('Club not found', 404);
   }
+  const { isCentral, departments, ...publicClub } = club;
 
   res.status(200).json({
     success: true,
-    club,
+    club: {
+      ...publicClub,
+      departments: getClubDepartments({ isCentral, departments }),
+    },
   });
 });

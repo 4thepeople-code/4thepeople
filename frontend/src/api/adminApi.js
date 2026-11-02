@@ -137,6 +137,42 @@ export const adminApi = {
     const res = await api.delete(`/admin/memberships/${membershipId}`);
     return res.data;
   },
+
+  // Departments
+  getAllDepartments: async () => {
+    const res = await api.get('/departments');
+    return res.data;
+  },
+
+  getDepartment: async (departmentId) => {
+    const res = await api.get(`/departments/${departmentId}`);
+    return res.data;
+  },
+
+  createDepartment: async (data) => {
+    const res = await api.post('/admin/departments', data);
+    return res.data;
+  },
+
+  updateDepartment: async (departmentId, data) => {
+    const res = await api.patch(`/admin/departments/${departmentId}`, data);
+    return res.data;
+  },
+
+  deleteDepartment: async (departmentId) => {
+    const res = await api.delete(`/admin/departments/${departmentId}`);
+    return res.data;
+  },
+
+  replaceDepartmentClubs: async (departmentId, clubIds) => {
+    const res = await api.put(`/admin/departments/${departmentId}/clubs`, { clubIds });
+    return res.data;
+  },
+
+  replaceClubDepartments: async (clubId, departmentIds) => {
+    const res = await api.put(`/admin/clubs/${clubId}/departments`, { departmentIds });
+    return res.data;
+  },
 };
 
 export default adminApi;

@@ -202,6 +202,30 @@ const ClubDetailsPage = () => {
         </div>
 
         <div className="space-y-1 text-xs">
+          <span className="font-medium text-[#6B6966]">Affiliation</span>
+          <div>
+            {club?.isCentral ? (
+              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-50 text-amber-800 border border-amber-200">
+                Central Club (Campus-wide / No department)
+              </span>
+            ) : Array.isArray(club?.departments) && club.departments.length > 0 ? (
+              <div className="flex flex-wrap gap-1.5 items-center">
+                {club.departments.map((d) => (
+                  <span
+                    key={d.id || d.shortCode}
+                    className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-[#FAF9F7] text-[#B08D57] border border-[#E7E5E4]"
+                  >
+                    {d.name} ({d.shortCode})
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <span className="text-xs text-[#8E8B85]">No department affiliation</span>
+            )}
+          </div>
+        </div>
+
+        <div className="space-y-1 text-xs">
           <span className="font-medium text-[#6B6966]">Description</span>
           <p className="text-xs sm:text-sm text-[#1C1B1F] leading-relaxed">
             {club?.description || 'No description available for this club.'}
