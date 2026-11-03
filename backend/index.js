@@ -1,29 +1,30 @@
-const express = require("express");
-const cors = require("cors");
-const dotenv = require("dotenv");
-const cookieParser = require("cookie-parser");
+const express = require('express');
+const cors = require('cors');
+const dotenv = require('dotenv');
+const cookieParser = require('cookie-parser');
 
 dotenv.config();
 
 const app = express();
 
-const { connectDB } = require("./config/db");
-const { errorHandler } = require("./middleware/errorHandler");
-const { responseFormatter } = require("./middleware/responseFormatter");
-const { startEventStatusJob } = require("./services/eventStatusJob");
+const { errorHandler } = require('./middleware/errorHandler');
+const { responseFormatter } = require('./middleware/responseFormatter');
+const { resolveCollege } = require('./middleware/resolveCollege');
+const { startEventStatusJob } = require('./services/eventStatusJob');
 
-// Connect to MongoDB Database via Prisma
-connectDB();
-startEventStatusJob();
+if (process.env.NODE_ENV !== 'test') {
+  startEventStatusJob();
+}
 
 // Routers
-const authRouter = require("./routes/authRoutes");
-const adminRouter = require("./routes/adminRoutes");
-const mediaRouter = require("./routes/mediaRoutes");
-const inviteRouter = require("./routes/inviteRoutes");
-const clubRouter = require("./routes/clubRoutes");
-const managerRouter = require("./routes/managerRoutes");
-const publicRouter = require("./routes/publicRoutes");
+const authRouter = require('./routes/authRoutes');
+const adminRouter = require('./routes/adminRoutes');
+const mediaRouter = require('./routes/mediaRoutes');
+const inviteRouter = require('./routes/inviteRoutes');
+const clubRouter = require('./routes/clubRoutes');
+const managerRouter = require('./routes/managerRoutes');
+const publicRouter = require('./routes/publicRoutes');
+const platformAuthRouter = require('./platform/platformAuthRoutes');
 
 app.set('trust proxy', 1);
 
@@ -32,37 +33,44 @@ app.use(cookieParser());
 app.use(express.json());
 app.use(responseFormatter);
 
+// Dynamic Multi-tenant Subdomain Resolution Middleware
+app.use(resolveCollege);
 
-app.use(cors({
-  origin: process.env.FRONTEND_URL,
-  credentials: true
-}))
+app.use(
+  cors({
+    origin: process.env.FRONTEND_URL,
+    credentials: true,
+  })
+);
 
 // Base route
-app.get("/", (req, res) => {
-  res.status(200).json({ success: true, message: "Club Event Manager API is running..." });
+app.get('/', (req, res) => {
+  res.status(200).json({ success: true, message: 'Club Event Manager API is running...' });
 });
 
-// API Routes
-app.use("/auth", authRouter);
-app.use("/api/auth", authRouter); // Alias for flexibility
+// Platform Super-Administration Routes (/api/platform/auth/*)
+app.use('/api/platform/auth', platformAuthRouter);
 
-app.use("/admin", mediaRouter);
-app.use("/api/admin", mediaRouter); // Alias for flexibility
-app.use("/admin", adminRouter);
-app.use("/api/admin", adminRouter); // Alias for flexibility
+// College Tenant API Routes
+app.use('/auth', authRouter);
+app.use('/api/auth', authRouter);
 
-app.use("/invite", inviteRouter);
-app.use("/api/invite", inviteRouter); // Alias for flexibility
+app.use('/admin', mediaRouter);
+app.use('/api/admin', mediaRouter);
+app.use('/admin', adminRouter);
+app.use('/api/admin', adminRouter);
 
-app.use("/club", clubRouter);
-app.use("/api/club", clubRouter); // Alias for flexibility
+app.use('/invite', inviteRouter);
+app.use('/api/invite', inviteRouter);
 
-app.use("/manager", managerRouter);
-app.use("/api/manager", managerRouter); // Alias for flexibility
+app.use('/club', clubRouter);
+app.use('/api/club', clubRouter);
+
+app.use('/manager', managerRouter);
+app.use('/api/manager', managerRouter);
 
 // Public club browsing routes: GET /clubs and GET /clubs/:clubId
-app.use("/", publicRouter);
+app.use('/', publicRouter);
 
 // 404 Handler for unhandled endpoints
 app.use((req, res, next) => {
@@ -73,6 +81,10 @@ app.use((req, res, next) => {
 app.use(errorHandler);
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`Server Running at http://localhost:${PORT}`);
-});
+if (process.env.NODE_ENV !== 'test') {
+  app.listen(PORT, () => {
+    console.log(`Server Running at http://localhost:${PORT}`);
+  });
+}
+
+module.exports = app;

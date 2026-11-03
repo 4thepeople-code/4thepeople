@@ -1,31 +1,57 @@
 const jwt = require('jsonwebtoken');
-const { prisma } = require('../config/db');
+const { withTenant } = require('../config/db');
 const { AppError } = require('./errorHandler');
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 /**
- * Verifies JWT token and attaches user payload to req.user
+ * Extracts and verifies JWT token for college users.
+ * Enforces:
+ * 1. Cryptographic signature against JWT_SECRET.
+ * 2. Token type must be 'college' (platform tokens rejected).
+ * 3. Tenant cross-boundary check: decoded.collegeId MUST match req.collegeId.
  */
 const authenticateToken = (req, res, next) => {
+  let token = null;
+
   const authHeader = req.headers['authorization'];
-  if (!authHeader) {
-    return next(new AppError('Authentication required', 401));
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    token = authHeader.split(' ')[1];
+  } else if (req.cookies && (req.cookies.yuva_token || req.cookies.token)) {
+    token = req.cookies.yuva_token || req.cookies.token;
   }
 
-  const token = authHeader.split(' ')[1];
   if (!token) {
     return next(new AppError('Authentication required', 401));
   }
 
   const jwtSecret = process.env.JWT_SECRET || process.env.JWT_SECRET_TOKEN;
+  if (!jwtSecret && process.env.NODE_ENV === 'production') {
+    return next(new Error('JWT_SECRET configuration missing in production'));
+  }
+  const effectiveSecret = jwtSecret || 'dev_insecure_jwt_secret_fallback_do_not_use_in_prod';
 
   try {
-    const decoded = jwt.verify(token, jwtSecret);
-    // Standardize user object shape in req.user
+    const decoded = jwt.verify(token, effectiveSecret);
+
+    // Reject platform admin tokens on college routes
+    if (decoded.type === 'platform' || decoded.platformAdminId) {
+      return next(new AppError('Access denied: Platform token cannot authenticate college routes', 403));
+    }
+
+    // Tenant boundary check: if request is on a college subdomain, enforce token matches collegeId
+    if (req.collegeId && decoded.collegeId && decoded.collegeId !== req.collegeId) {
+      return next(new AppError('Access denied: Token belongs to a different college tenant', 403));
+    }
+
     req.user = {
       ...decoded,
-      id: decoded.id || decoded.userId,
+      id: decoded.userId || decoded.id,
       userId: decoded.userId || decoded.id,
+      collegeId: decoded.collegeId,
+      role: decoded.role,
     };
+
     next();
   } catch (error) {
     return next(new AppError('Invalid authentication token', 401));
@@ -33,10 +59,9 @@ const authenticateToken = (req, res, next) => {
 };
 
 /**
- * Middleware requiring user to have GlobalRole ADMIN
+ * Middleware requiring the user to have role COLLEGE_ADMIN (or legacy ADMIN).
  */
 const requireAdmin = (req, res, next) => {
-  // Ensure user is authenticated first
   if (!req.user) {
     return authenticateToken(req, res, (err) => {
       if (err) return next(err);
@@ -47,19 +72,19 @@ const requireAdmin = (req, res, next) => {
 };
 
 const checkAdminRole = (req, res, next) => {
-  if (req.user.role !== 'ADMIN') {
-    return next(new AppError('Access denied', 403));
+  if (req.user.role !== 'COLLEGE_ADMIN' && req.user.role !== 'ADMIN') {
+    return next(new AppError('Access denied: User is not an admin', 403));
   }
   next();
 };
 
 /**
  * Middleware requiring the authenticated user to be a MANAGER of the specified club.
- * Extracts clubId from req.params.clubId (or req.params.id / custom paramName).
+ * Extracts clubId from req.params.clubId (or req.params.id).
+ * Queries under withTenant using PostgreSQL RLS.
  */
 const requireClubManager = (paramName = 'clubId') => {
   return async (req, res, next) => {
-    // 1. Authenticate token if req.user is not yet populated
     if (!req.user) {
       let authErr = null;
       authenticateToken(req, res, (err) => {
@@ -72,42 +97,45 @@ const requireClubManager = (paramName = 'clubId') => {
       return next(new AppError('Authentication required', 401));
     }
 
-    // 2. Extract clubId from params
     const clubId = req.params[paramName] || req.params.clubId || req.params.id;
     if (!clubId) {
       return next(new AppError(`Club ID parameter '${paramName}' missing in route`, 400));
     }
 
-    // 3. Validate MongoDB ObjectIds before sending them to Prisma.
-    if (!/^[a-fA-F0-9]{24}$/.test(clubId)) {
-      return next(new AppError('Invalid club ID', 400));
+    // Verify UUID format for PostgreSQL primary key
+    if (!UUID_REGEX.test(clubId)) {
+      return next(new AppError('Invalid club ID (must be a valid UUID)', 400));
     }
 
-    // 4. Check that the requested club exists, then verify a manager membership.
+    const tenantId = req.collegeId || req.user.collegeId;
+    if (!tenantId) {
+      return next(new AppError('Tenant context required for club verification', 400));
+    }
+
     try {
-      const club = await prisma.club.findUnique({
-        where: { id: clubId },
-        select: { id: true },
+      await withTenant(tenantId, async (tx) => {
+        const club = await tx.club.findUnique({
+          where: { id: clubId },
+          select: { id: true },
+        });
+
+        if (!club) {
+          throw new AppError('Club not found', 404);
+        }
+
+        const userId = req.user.userId || req.user.id;
+        const membership = await tx.membership.findFirst({
+          where: {
+            userId: userId,
+            clubId: clubId,
+            role: 'MANAGER',
+          },
+        });
+
+        if (!membership) {
+          throw new AppError('Access denied: You do not have manager permissions for this club', 403);
+        }
       });
-
-      if (!club) {
-        return next(new AppError('Club not found', 404));
-      }
-
-      const userId = req.user.id || req.user.userId;
-      const membership = await prisma.membership.findFirst({
-        where: {
-          userId: userId,
-          clubId: clubId,
-          role: 'MANAGER',
-        },
-      });
-
-      if (!membership) {
-        return next(
-          new AppError('Access denied: You do not have manager permissions for this club', 403)
-        );
-      }
 
       next();
     } catch (error) {
@@ -129,13 +157,14 @@ const requireAdminOrClubManager = (paramName = 'clubId') => {
 };
 
 const checkAdminOrClubManager = (req, res, next, paramName) => {
-  if (req.user.role === 'ADMIN') return next();
+  if (req.user.role === 'COLLEGE_ADMIN' || req.user.role === 'ADMIN') return next();
   requireClubManager(paramName)(req, res, next);
 };
 
 module.exports = {
   authenticateToken,
   requireAdmin,
+  requireCollegeAdmin: requireAdmin,
   requireClubManager,
   requireAdminOrClubManager,
 };
