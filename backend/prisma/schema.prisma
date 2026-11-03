@@ -228,6 +228,9 @@ model DeletionVerification {
   @@map("deletion_verifications")
 }
 
+// NOTE: SQL migrations (001_init.sql / 002_rls.sql) own this view definition.
+// Prisma must never create, alter, or manage this view. It is declared here
+// as a read-only view model for type generation and querying via Prisma Client.
 view EventsWithStatus {
   id                 String    @unique @db.Uuid
   collegeId          String    @map("college_id") @db.Uuid
