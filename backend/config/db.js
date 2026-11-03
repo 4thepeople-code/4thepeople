@@ -1,15 +1,9 @@
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const { withTenant } = require('./tenantContext');
 
-
-const connectDB = async () => {
-    try {
-        await prisma.$connect();
-        console.log("Database Connected...");
-    }   catch (error) {     
-        console.error("Database Connection Failed:", error);
-        process.exit(1); 
-    }
-};
-
-module.exports = { connectDB, prisma };
+/**
+ * Main application database module.
+ * In accordance with Phase 1 multi-tenant architecture, this module
+ * exports ONLY withTenant(). Controllers must not execute un-scoped
+ * global Prisma queries.
+ */
+module.exports = { withTenant };

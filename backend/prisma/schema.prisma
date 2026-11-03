@@ -1,139 +1,282 @@
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["views"]
 }
 
 datasource db {
-  provider = "mongodb"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
-type CloudinaryImage {
-  url      String
-  publicId String
+model College {
+  id                     String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name                   String
+  slug                   String                 @unique(map: "uq_colleges_slug")
+  createdAt              DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt              DateTime               @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  club_departments       ClubDepartment[]
+  clubs                  Club[]
+  deletion_verifications DeletionVerification[]
+  departments            Department[]
+  event_gallery_images   EventGalleryImage[]
+  event_registrations    EventRegistration[]
+  events                 Event[]
+  memberships            Membership[]
+  users                  User[]
+
+  @@map("colleges")
+}
+
+model PlatformAdmin {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name         String
+  email        String   @unique @db.Citext
+  passwordHash String   @map("password_hash")
+  totpSecret   String?  @map("totp_secret")
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@map("platform_admins")
 }
 
 model User {
-  id                        String           @id @default(auto()) @map("_id") @db.ObjectId
+  id                        String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  collegeId                 String                 @map("college_id") @db.Uuid
   name                      String
-  email                     String           @unique
-  password                  String? // null until the invite is accepted
-  role                      GlobalRole       @default(USER)
-  isActive                  Boolean          @default(false)
-  inviteToken               String?
-  inviteExpiresAt           DateTime?
-  avatar                    CloudinaryImage?
-  passwordResetOtpHash      String?
-  passwordResetOtpExpiresAt DateTime?
-  createdClubs              Club[]           @relation("ClubOwner")
+  email                     String                 @db.Citext
+  passwordHash              String?                @map("password_hash")
+  role                      UserRole               @default(USER)
+  isActive                  Boolean                @default(false) @map("is_active")
+  inviteTokenHash           String?                @map("invite_token_hash")
+  inviteExpiresAt           DateTime?              @map("invite_expires_at") @db.Timestamptz(6)
+  passwordResetOtpHash      String?                @map("password_reset_otp_hash")
+  passwordResetOtpExpiresAt DateTime?              @map("password_reset_otp_expires_at") @db.Timestamptz(6)
+  passwordResetAttempts     Int                    @default(0) @map("password_reset_attempts")
+  avatarUrl                 String?                @map("avatar_url")
+  avatarPublicId            String?                @map("avatar_public_id")
+  legacyMongoId             String?                @unique @map("legacy_mongo_id")
+  createdAt                 DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt                 DateTime               @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  createdClubs              Club[]                 @relation("ClubCreator")
+  deletionVerifications     DeletionVerification[] @relation("DeletionVerificationAdmin")
+  eventRegistrations        EventRegistration[]
   memberships               Membership[]
-  createdAt                 DateTime         @default(now())
-  updatedAt                 DateTime         @updatedAt
-}
+  college                   College                @relation(fields: [collegeId], references: [id], onUpdate: NoAction, map: "users_college_id_fkey")
 
-model Club {
-  id          String           @id @default(auto()) @map("_id") @db.ObjectId
-  name        String
-  description String?
-  collegeId   String?          @default("default-college")
-  isCentral   Boolean?         @default(false)
-  logo        CloudinaryImage?
-  coverImage  CloudinaryImage?
-  createdBy   User             @relation("ClubOwner", fields: [createdById], references: [id])
-  createdById String           @db.ObjectId
-  members     Membership[]
-  events      Event[]
-  departments ClubDepartment[]
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
+  @@unique([collegeId, email], map: "uq_users_college_email")
+  @@unique([collegeId, id], map: "uq_users_college_id")
+  @@index([collegeId, isActive], map: "idx_users_college_active")
+  @@map("users")
 }
 
 model Department {
-  id          String           @id @default(auto()) @map("_id") @db.ObjectId
-  name        String
-  shortCode   String
-  description String?
-  collegeId   String           @default("default-college")
-  clubs       ClubDepartment[]
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
+  id            String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  collegeId     String           @map("college_id") @db.Uuid
+  name          String
+  shortCode     String           @map("short_code")
+  description   String?
+  legacyMongoId String?          @unique @map("legacy_mongo_id")
+  createdAt     DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  clubs         ClubDepartment[]
+  college       College          @relation(fields: [collegeId], references: [id], onUpdate: NoAction, map: "departments_college_id_fkey")
 
-  @@unique([collegeId, name])
-  @@unique([collegeId, shortCode])
+  @@unique([collegeId, name], map: "uq_departments_college_name")
+  @@unique([collegeId, shortCode], map: "uq_departments_college_short_code")
+  @@unique([collegeId, id], map: "uq_departments_college_id")
+  @@map("departments")
+}
+
+model Club {
+  id                 String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  collegeId          String           @map("college_id") @db.Uuid
+  name               String
+  description        String?
+  clubType           ClubType         @default(DEPARTMENTAL) @map("club_type")
+  logoUrl            String?          @map("logo_url")
+  logoPublicId       String?          @map("logo_public_id")
+  coverImageUrl      String?          @map("cover_image_url")
+  coverImagePublicId String?          @map("cover_image_public_id")
+  createdByUserId    String           @map("created_by_user_id") @db.Uuid
+  legacyMongoId      String?          @unique @map("legacy_mongo_id")
+  createdAt          DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  departments        ClubDepartment[]
+  college            College          @relation(fields: [collegeId], references: [id], onUpdate: NoAction, map: "clubs_college_id_fkey")
+  createdBy          User             @relation("ClubCreator", fields: [collegeId, createdByUserId], references: [collegeId, id], onUpdate: NoAction, map: "fk_clubs_creator")
+  events             Event[]
+  members            Membership[]
+
+  @@unique([collegeId, name], map: "uq_clubs_college_name")
+  @@unique([collegeId, id], map: "uq_clubs_college_id")
+  @@index([collegeId, createdAt(sort: Desc)], map: "idx_clubs_college_created")
+  @@index([collegeId, clubType], map: "idx_clubs_college_type")
+  @@map("clubs")
 }
 
 model ClubDepartment {
-  id           String     @id @default(auto()) @map("_id") @db.ObjectId
-  club         Club       @relation(fields: [clubId], references: [id], onDelete: Cascade)
-  clubId       String     @db.ObjectId
-  department   Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
-  departmentId String     @db.ObjectId
-  createdAt    DateTime   @default(now())
+  id            String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  collegeId     String     @map("college_id") @db.Uuid
+  clubId        String     @map("club_id") @db.Uuid
+  departmentId  String     @map("department_id") @db.Uuid
+  legacyMongoId String?    @unique @map("legacy_mongo_id")
+  createdAt     DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  colleges      College    @relation(fields: [collegeId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  club          Club       @relation(fields: [collegeId, clubId], references: [collegeId, id], onDelete: Cascade, onUpdate: NoAction, map: "fk_club_departments_club")
+  department    Department @relation(fields: [collegeId, departmentId], references: [collegeId, id], onDelete: Cascade, onUpdate: NoAction, map: "fk_club_departments_dept")
 
-  @@unique([clubId, departmentId])
-  @@index([departmentId])
-}
-
-model Event {
-  id              String            @id @default(auto()) @map("_id") @db.ObjectId
-  club            Club              @relation(fields: [clubId], references: [id])
-  clubId          String            @db.ObjectId
-  title           String
-  description     String
-  location        String
-  startAt         DateTime
-  endAt           DateTime?
-  status          EventStatus       @default(UPCOMING)
-  coverImage      CloudinaryImage?
-  gallery         CloudinaryImage[]
-  registrationUrl String?
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
-
-  @@index([clubId, startAt])
-  @@index([clubId, status])
+  @@unique([clubId, departmentId], map: "uq_club_departments_pair")
+  @@unique([collegeId, id], map: "uq_club_departments_college_id")
+  @@index([collegeId, departmentId], map: "idx_club_departments_college_dept")
+  @@map("club_departments")
 }
 
 model Membership {
-  id       String   @id @default(auto()) @map("_id") @db.ObjectId
-  user     User     @relation(fields: [userId], references: [id])
-  userId   String   @db.ObjectId
-  club     Club     @relation(fields: [clubId], references: [id])
-  clubId   String   @db.ObjectId
-  role     ClubRole @default(MEMBER)
-  joinedAt DateTime @default(now())
+  id            String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  collegeId     String         @map("college_id") @db.Uuid
+  userId        String         @map("user_id") @db.Uuid
+  clubId        String         @map("club_id") @db.Uuid
+  role          MembershipRole @default(MEMBER)
+  legacyMongoId String?        @unique @map("legacy_mongo_id")
+  joinedAt      DateTime       @default(now()) @map("joined_at") @db.Timestamptz(6)
+  club          Club           @relation(fields: [collegeId, clubId], references: [collegeId, id], onDelete: Cascade, onUpdate: NoAction, map: "fk_memberships_club")
+  user          User           @relation(fields: [collegeId, userId], references: [collegeId, id], onDelete: Cascade, onUpdate: NoAction, map: "fk_memberships_user")
+  colleges      College        @relation(fields: [collegeId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
-  @@unique([userId, clubId])
+  @@unique([userId, clubId], map: "uq_memberships_user_club")
+  @@unique([collegeId, id], map: "uq_memberships_college_id")
+  @@index([collegeId, clubId, role], map: "idx_memberships_college_club_role")
+  @@index([collegeId, userId], map: "idx_memberships_college_user")
+  @@map("memberships")
+}
+
+model Event {
+  id                 String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  collegeId          String              @map("college_id") @db.Uuid
+  clubId             String              @map("club_id") @db.Uuid
+  title              String
+  description        String
+  location           String
+  startAt            DateTime            @map("start_at") @db.Timestamptz(6)
+  endAt              DateTime?           @map("end_at") @db.Timestamptz(6)
+  cancelledAt        DateTime?           @map("cancelled_at") @db.Timestamptz(6)
+  capacity           Int?
+  registeredCount    Int                 @default(0) @map("registered_count")
+  coverImageUrl      String?             @map("cover_image_url")
+  coverImagePublicId String?             @map("cover_image_public_id")
+  registrationUrl    String?             @map("registration_url")
+  legacyMongoId      String?             @unique @map("legacy_mongo_id")
+  createdAt          DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime            @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  gallery            EventGalleryImage[]
+  registrations      EventRegistration[]
+  colleges           College             @relation(fields: [collegeId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  club               Club                @relation(fields: [collegeId, clubId], references: [collegeId, id], onDelete: Cascade, onUpdate: NoAction, map: "fk_events_club")
+
+  @@unique([collegeId, id], map: "uq_events_college_id")
+  @@index([collegeId, startAt], map: "idx_events_college_start_at")
+  @@index([collegeId, clubId, startAt(sort: Desc)], map: "idx_events_college_club_start")
+  @@map("events")
+}
+
+model EventGalleryImage {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  collegeId     String   @map("college_id") @db.Uuid
+  eventId       String   @map("event_id") @db.Uuid
+  imageUrl      String   @map("image_url")
+  imagePublicId String   @map("image_public_id")
+  position      Int      @default(0)
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  colleges      College  @relation(fields: [collegeId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  event         Event    @relation(fields: [collegeId, eventId], references: [collegeId, id], onDelete: Cascade, onUpdate: NoAction, map: "fk_event_gallery_event")
+
+  @@unique([eventId, imagePublicId], map: "uq_event_gallery_event_public_id")
+  @@index([collegeId, eventId, position], map: "idx_event_gallery_college_event_pos")
+  @@map("event_gallery_images")
+}
+
+model EventRegistration {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  collegeId    String   @map("college_id") @db.Uuid
+  eventId      String   @map("event_id") @db.Uuid
+  userId       String   @map("user_id") @db.Uuid
+  registeredAt DateTime @default(now()) @map("registered_at") @db.Timestamptz(6)
+  colleges     College  @relation(fields: [collegeId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  event        Event    @relation(fields: [collegeId, eventId], references: [collegeId, id], onDelete: Cascade, onUpdate: NoAction, map: "fk_registrations_event")
+  user         User     @relation(fields: [collegeId, userId], references: [collegeId, id], onDelete: Cascade, onUpdate: NoAction, map: "fk_registrations_user")
+
+  @@unique([userId, eventId], map: "uq_event_registrations_user_event")
+  @@index([collegeId, eventId], map: "idx_event_registrations_college_event")
+  @@index([collegeId, userId], map: "idx_event_registrations_college_user")
+  @@map("event_registrations")
 }
 
 model DeletionVerification {
-  id         String           @id @default(auto()) @map("_id") @db.ObjectId
-  adminId    String           @db.ObjectId
-  targetType DeleteTargetType
-  targetId   String           @db.ObjectId
-  codeHash   String
-  expiresAt  DateTime
-  consumed   Boolean          @default(false)
-  createdAt  DateTime         @default(now())
+  id         String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  collegeId  String         @map("college_id") @db.Uuid
+  adminId    String         @map("admin_id") @db.Uuid
+  targetType DeletionTarget @map("target_type")
+  targetId   String         @map("target_id") @db.Uuid
+  codeHash   String         @map("code_hash")
+  expiresAt  DateTime       @map("expires_at") @db.Timestamptz(6)
+  consumed   Boolean        @default(false)
+  createdAt  DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  colleges   College        @relation(fields: [collegeId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  admin      User           @relation("DeletionVerificationAdmin", fields: [collegeId, adminId], references: [collegeId, id], onDelete: Cascade, onUpdate: NoAction, map: "fk_del_verif_admin")
+
+  @@map("deletion_verifications")
 }
 
-enum GlobalRole {
-  ADMIN
+view EventsWithStatus {
+  id                 String    @unique @db.Uuid
+  collegeId          String    @map("college_id") @db.Uuid
+  clubId             String    @map("club_id") @db.Uuid
+  title              String
+  description        String
+  location           String
+  startAt            DateTime  @map("start_at") @db.Timestamptz(6)
+  endAt              DateTime? @map("end_at") @db.Timestamptz(6)
+  capacity           Int?
+  registeredCount    Int       @map("registered_count")
+  cancelledAt        DateTime? @map("cancelled_at") @db.Timestamptz(6)
+  coverImageUrl      String?   @map("cover_image_url")
+  coverImagePublicId String?   @map("cover_image_public_id")
+  registrationUrl    String?   @map("registration_url")
+  legacyMongoId      String?   @map("legacy_mongo_id")
+  createdAt          DateTime  @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime  @map("updated_at") @db.Timestamptz(6)
+  status             String
+
+  @@map("events_with_status")
+}
+
+enum ClubType {
+  CENTRAL
+  DEPARTMENTAL
+
+  @@map("club_type_enum")
+}
+
+enum UserRole {
+  COLLEGE_ADMIN
   USER
+
+  @@map("user_role_enum")
 }
 
-enum ClubRole {
+enum MembershipRole {
   MANAGER
   MEMBER
+
+  @@map("membership_role_enum")
 }
 
-enum DeleteTargetType {
+enum DeletionTarget {
   USER
   CLUB
+
+  @@map("deletion_target_enum")
 }
 
-enum EventStatus {
-  UPCOMING
-  ONGOING
-  COMPLETED
-  CANCELLED
-}
+

@@ -7,6 +7,8 @@
     "dev": "nodemon index.js",
     "backfill:clubs": "node scripts/backfillClubFields.js",
     "postinstall": "prisma generate",
+    "lint": "node ../frontend/node_modules/eslint/bin/eslint.js .",
+    "test:phase1": "node tests/phase1_tenant_layer.test.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
