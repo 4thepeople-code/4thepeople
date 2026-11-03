@@ -1,9 +1,10 @@
 -- ============================================================================
 -- 001_init.sql
 -- Initial PostgreSQL schema for 4thepeople multi-tenant architecture
+-- Run as: migrator
 -- ============================================================================
 
--- Extensions
+-- Extensions (created by bootstrap or if privileges allow)
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 CREATE EXTENSION IF NOT EXISTS "citext";
 
@@ -294,7 +295,45 @@ CREATE TABLE event_registrations (
         REFERENCES users(college_id, id) ON DELETE CASCADE
 );
 
+-- Restored index on (college_id, event_id)
+CREATE INDEX idx_event_registrations_college_event ON event_registrations (college_id, event_id);
 CREATE INDEX idx_event_registrations_college_user ON event_registrations (college_id, user_id);
+
+-- Enforce: Atomically increment registered_count and raise exception when capacity is reached
+CREATE OR REPLACE FUNCTION handle_registration_insert()
+RETURNS TRIGGER AS $$
+DECLARE
+    v_capacity INTEGER;
+    v_registered_count INTEGER;
+BEGIN
+    -- Lock the event row FOR UPDATE to serialize concurrent registration inserts
+    SELECT capacity, registered_count
+    INTO v_capacity, v_registered_count
+    FROM events
+    WHERE id = NEW.event_id AND college_id = NEW.college_id
+    FOR UPDATE;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Event % not found in college %', NEW.event_id, NEW.college_id
+            USING ERRCODE = 'foreign_key_violation';
+    END IF;
+
+    IF v_capacity IS NOT NULL AND v_registered_count >= v_capacity THEN
+        RAISE EXCEPTION 'Event capacity reached (% / %)', v_registered_count, v_capacity
+            USING ERRCODE = 'check_violation';
+    END IF;
+
+    UPDATE events
+    SET registered_count = registered_count + 1
+    WHERE id = NEW.event_id;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_handle_registration_insert
+BEFORE INSERT ON event_registrations
+FOR EACH ROW EXECUTE FUNCTION handle_registration_insert();
 
 -- Enforce: Keep registered_count synchronized when registrations are deleted or moved
 CREATE OR REPLACE FUNCTION maintain_event_registration_count()

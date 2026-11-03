@@ -1,37 +1,8 @@
 -- ============================================================================
 -- 002_rls.sql
 -- Multi-tenant Row-Level Security (RLS) & Role Privileges
--- Roles: migrator (owner), app_user (NOBYPASSRLS), platform_ops (BYPASSRLS)
+-- Run as: migrator (schema owner)
 -- ============================================================================
-
--- Ensure roles exist (passwords managed externally via environment variables)
-DO $$
-BEGIN
-    IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'migrator') THEN
-        CREATE ROLE migrator WITH LOGIN NOCREATEDB NOCREATEROLE NOBYPASSRLS;
-    END IF;
-    IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'app_user') THEN
-        CREATE ROLE app_user WITH LOGIN NOCREATEDB NOCREATEROLE NOBYPASSRLS;
-    END IF;
-    IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'platform_ops') THEN
-        CREATE ROLE platform_ops WITH LOGIN NOCREATEDB NOCREATEROLE BYPASSRLS;
-    END IF;
-END
-$$;
-
--- Transfer table & view ownership to migrator
-ALTER TABLE colleges OWNER TO migrator;
-ALTER TABLE platform_admins OWNER TO migrator;
-ALTER TABLE users OWNER TO migrator;
-ALTER TABLE departments OWNER TO migrator;
-ALTER TABLE clubs OWNER TO migrator;
-ALTER TABLE club_departments OWNER TO migrator;
-ALTER TABLE memberships OWNER TO migrator;
-ALTER TABLE events OWNER TO migrator;
-ALTER TABLE event_gallery_images OWNER TO migrator;
-ALTER TABLE event_registrations OWNER TO migrator;
-ALTER TABLE deletion_verifications OWNER TO migrator;
-ALTER VIEW events_with_status OWNER TO migrator;
 
 -- Schema usage
 GRANT USAGE ON SCHEMA public TO app_user, platform_ops;

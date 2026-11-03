@@ -1,3 +1,18 @@
+-- ============================================================================
+-- seed_test_data.sql
+-- Run as: platform_ops (or superuser)
+-- ============================================================================
+
+-- Database name safety guard
+DO $$
+BEGIN
+    IF current_database() NOT LIKE '%test%' AND current_database() NOT LIKE '%yuva_db%' THEN
+        RAISE EXCEPTION 'Safety guard: refusing to seed test data into non-test database "%"', current_database()
+            USING ERRCODE = 'check_violation';
+    END IF;
+END
+$$;
+
 DO $$
 DECLARE
     v_col_a UUID;
@@ -62,13 +77,13 @@ BEGIN
     INSERT INTO memberships (college_id, user_id, club_id, role)
     VALUES (v_col_b, v_user_b, v_club_b, 'MANAGER');
 
-    -- 7. Events
+    -- 7. Events (capacity 100 on A, capacity 2 on B for capacity testing)
     INSERT INTO events (college_id, club_id, title, description, location, start_at, capacity)
     VALUES (v_col_a, v_club_a, 'Hackathon 2026', 'Code all night', 'Lab 1', now() + INTERVAL '1 day', 100)
     RETURNING id INTO v_event_a;
 
     INSERT INTO events (college_id, club_id, title, description, location, start_at, capacity)
-    VALUES (v_col_b, v_club_b, 'RoboWars 2026', 'Bot battles', 'Arena', now() + INTERVAL '2 days', 50)
+    VALUES (v_col_b, v_club_b, 'RoboWars 2026', 'Bot battles', 'Arena', now() + INTERVAL '2 days', 2)
     RETURNING id INTO v_event_b;
 
     -- 8. Event Gallery
@@ -78,12 +93,9 @@ BEGIN
     INSERT INTO event_gallery_images (college_id, event_id, image_url, image_public_id, position)
     VALUES (v_col_b, v_event_b, 'https://res.cloudinary.com/demo/image/upload/robo1.jpg', 'robo1_pub', 0);
 
-    -- 9. Event Registrations
+    -- 9. Event Registrations (1 registration on Event A)
     INSERT INTO event_registrations (college_id, event_id, user_id)
     VALUES (v_col_a, v_event_a, v_user_a);
-
-    INSERT INTO event_registrations (college_id, event_id, user_id)
-    VALUES (v_col_b, v_event_b, v_user_b);
 
     -- 10. Deletion Verifications
     INSERT INTO deletion_verifications (college_id, admin_id, target_type, target_id, code_hash, expires_at)
