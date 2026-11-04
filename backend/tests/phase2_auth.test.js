@@ -1,6 +1,6 @@
-require('dotenv').config();
+process.env.NODE_ENV = 'test';
 
-// Strict requirement: TEST_DATABASE_URL and TEST_PLATFORM_DATABASE_URL must be explicitly provided.
+// Strict requirement: TEST_DATABASE_URL, TEST_PLATFORM_DATABASE_URL, and TOTP_ENCRYPTION_KEY must be explicitly provided.
 // Refuse to run or fallback to DATABASE_URL / PLATFORM_DATABASE_URL.
 if (!process.env.TEST_DATABASE_URL) {
   console.error('\n❌ FATAL: TEST_DATABASE_URL environment variable is required to run Phase 2 tests.');
@@ -11,6 +11,12 @@ if (!process.env.TEST_DATABASE_URL) {
 if (!process.env.TEST_PLATFORM_DATABASE_URL) {
   console.error('\n❌ FATAL: TEST_PLATFORM_DATABASE_URL environment variable is required to run Phase 2 tests.');
   console.error('Refusing to run tests or fallback to PLATFORM_DATABASE_URL.\n');
+  process.exit(1);
+}
+
+if (!process.env.TOTP_ENCRYPTION_KEY) {
+  console.error('\n❌ FATAL: TOTP_ENCRYPTION_KEY environment variable is required to run Phase 2 tests.');
+  console.error('Refusing to run tests without TOTP_ENCRYPTION_KEY.\n');
   process.exit(1);
 }
 

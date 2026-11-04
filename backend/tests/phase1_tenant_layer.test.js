@@ -1,4 +1,4 @@
-require('dotenv').config();
+process.env.NODE_ENV = 'test';
 
 // Strict requirement: TEST_DATABASE_URL must be explicitly provided. No fallback to DATABASE_URL.
 if (!process.env.TEST_DATABASE_URL) {

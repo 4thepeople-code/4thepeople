@@ -1,7 +1,9 @@
 const dotenv = require('dotenv');
 const { BrevoClient } = require('@getbrevo/brevo');
 
-dotenv.config();
+if (process.env.NODE_ENV !== 'test') {
+  dotenv.config();
+}
 
 /**
  * Brevo transactional email client

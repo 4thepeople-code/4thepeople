@@ -15,7 +15,10 @@ const usedTotpCache = new Map();
  * Derives a 32-byte key from environment for AES-256-GCM.
  */
 function getEncryptionKey() {
-  const secret = process.env.TOTP_ENCRYPTION_KEY || 'dev_totp_encryption_key_do_not_use_in_prod_1234567890';
+  const secret = process.env.TOTP_ENCRYPTION_KEY;
+  if (!secret) {
+    throw new Error('TOTP_ENCRYPTION_KEY environment variable is required');
+  }
   return crypto.createHash('sha256').update(secret).digest();
 }
 
