@@ -30,7 +30,16 @@ const managerRouter = require('./routes/managerRoutes');
 const publicRouter = require('./routes/publicRoutes');
 const platformAuthRouter = require('./platform/platformAuthRoutes');
 
-app.set('trust proxy', 1);
+const trustProxySetting = process.env.TRUST_PROXY_HOPS !== undefined
+  ? (/^\d+$/.test(process.env.TRUST_PROXY_HOPS)
+      ? parseInt(process.env.TRUST_PROXY_HOPS, 10)
+      : process.env.TRUST_PROXY_HOPS === 'true'
+        ? true
+        : process.env.TRUST_PROXY_HOPS === 'false'
+          ? false
+          : process.env.TRUST_PROXY_HOPS)
+  : 1;
+app.set('trust proxy', trustProxySetting);
 
 // Shared Proxy Secret Guard (enforce trusted reverse proxy boundary)
 app.use(validateProxySharedSecret);

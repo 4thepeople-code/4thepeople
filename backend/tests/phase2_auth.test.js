@@ -153,6 +153,19 @@ async function runPhase2Tests() {
   console.log(`  Current Database : ${dbMeta.current_database}`);
   console.log(`  Current User     : ${dbMeta.current_user}`);
 
+  let endpointType = 'Direct Database Endpoint';
+  try {
+    const parsedUrl = new URL(process.env.TEST_DATABASE_URL);
+    if (parsedUrl.hostname.includes('-pooler') || parsedUrl.searchParams.get('pgbouncer') === 'true') {
+      endpointType = 'PgBouncer Pooler Endpoint (pgbouncer=true)';
+    }
+  } catch {
+    if (process.env.TEST_DATABASE_URL.includes('-pooler') || process.env.TEST_DATABASE_URL.includes('pgbouncer=true')) {
+      endpointType = 'PgBouncer Pooler Endpoint (pgbouncer=true)';
+    }
+  }
+  console.log(`  Endpoint Type    : ${endpointType}`);
+
   assert.strictEqual(
     dbMeta.current_database,
     'yuva_test',
