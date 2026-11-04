@@ -15,8 +15,8 @@ const inviteToken = z.string().regex(/^[a-fA-F0-9]{64}$/, 'Invalid invitation to
 const idParams = (key) => z.object({ [key]: z.union([uuid, objectId]) });
 const clubParams = z.object({ clubId: uuid });
 const departmentParams = z.object({ departmentId: uuid });
-const eventParams = idParams('eventId');
-const clubEventParams = z.object({ clubId: uuid, eventId: z.union([uuid, objectId]) });
+const eventParams = z.object({ eventId: uuid });
+const clubEventParams = z.object({ clubId: uuid, eventId: uuid });
 
 const loginBody = z.object({ email, password });
 const forgotPasswordBody = z.object({ email });
@@ -28,32 +28,45 @@ const createClubBody = z.object({
   name: clubName,
   description: description.nullable().optional(),
   isCentral: z.boolean().optional(),
-  clubType: z.enum(['DEPARTMENTAL', 'CENTRAL']).optional(),
+  departmentId: uuid.nullable().optional(),
+  departments: z.array(uuid).optional(),
 });
 const updateClubBody = z.object({
   name: clubName.optional(),
   description: description.nullable().optional(),
   isCentral: z.boolean().optional(),
-  clubType: z.enum(['DEPARTMENTAL', 'CENTRAL']).optional(),
+  departmentId: uuid.nullable().optional(),
+  departments: z.array(uuid).optional(),
 }).refine((value) => Object.keys(value).length > 0, 'At least one club field is required');
+
 const createDepartmentBody = z.object({
   name: departmentName,
   shortCode: departmentShortCode,
-  description: description.optional(),
+  description: description.nullable().optional(),
 });
 const updateDepartmentBody = z.object({
   name: departmentName.optional(),
   shortCode: departmentShortCode.optional(),
   description: description.nullable().optional(),
 }).refine((value) => Object.keys(value).length > 0, 'At least one department field is required');
+
 const clubIdsBody = z.object({
-  clubIds: z.array(uuid).transform((ids) => [...new Set(ids)]),
+  clubIds: z.array(uuid),
 });
 const departmentIdsBody = z.object({
-  departmentIds: z.array(uuid).transform((ids) => [...new Set(ids)]),
+  departmentIds: z.array(uuid),
 });
-const membershipBody = z.object({ role: z.enum(['MANAGER', 'MEMBER', 'USER']) });
-const existingManagerBody = z.object({ userId: uuid });
+
+const membershipBody = z.object({
+  role: z.enum(['MANAGER', 'MEMBER']).optional(),
+  department: z.string().trim().max(100).optional(),
+}).refine((value) => Object.keys(value).length > 0, 'At least one membership field is required');
+
+const existingManagerBody = z.object({
+  userId: uuid,
+  department: z.string().trim().max(100).optional(),
+});
+
 const acceptInviteBody = z.object({ password });
 const createEventBody = z.object({
   title: text('title', 200),
@@ -80,5 +93,5 @@ module.exports = {
   loginBody, forgotPasswordBody, resetPasswordBody, deletionVerificationBody, adminRegisterBody, managerInviteBody,
   createClubBody, updateClubBody, createDepartmentBody, updateDepartmentBody, clubIdsBody, departmentIdsBody,
   membershipBody, existingManagerBody, acceptInviteBody, createEventBody, updateEventBody,
-  publicIdParams: z.object({ eventId: objectId, publicId: z.string().min(1).max(500) }),
+  publicIdParams: z.object({ eventId: uuid, publicId: z.string().min(1).max(500) }),
 };

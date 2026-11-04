@@ -1,29 +1,15 @@
-const { prisma } = require('../config/db');
+const { withTenant } = require('../config/db');
 const asyncHandler = require('../utils/asyncHandler');
 const { AppError } = require('../middleware/errorHandler');
 const { deleteAssetsBestEffort } = require('../utils/cloudinaryUpload');
 
-const objectIdPattern = /^[a-fA-F0-9]{24}$/;
+const UUID_REGEX = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 const eventStatuses = ['UPCOMING', 'ONGOING', 'COMPLETED', 'CANCELLED'];
 
-const publicEventFields = {
-  id: true,
-  clubId: true,
-  title: true,
-  description: true,
-  location: true,
-  startAt: true,
-  endAt: true,
-  status: true,
-  coverImage: true,
-  gallery: true,
-  registrationUrl: true,
-  createdAt: true,
-  updatedAt: true,
-};
-
-const validateObjectId = (value, label) => {
-  if (!objectIdPattern.test(value)) throw new AppError(`Invalid ${label}`, 400);
+const validateUUID = (value, label) => {
+  if (!value || !UUID_REGEX.test(value)) {
+    throw new AppError(`Invalid ${label} (must be a valid UUID)`, 400);
+  }
 };
 
 const requiredText = (value, label) => {
@@ -46,30 +32,76 @@ const validDateRange = (startAt, endAt) => {
   if (endAt <= startAt) throw new AppError('endAt must be after startAt', 400);
 };
 
-const ensureClubExists = async (clubId) => {
-  validateObjectId(clubId, 'club ID');
-  const club = await prisma.club.findUnique({
-    where: { id: clubId },
+const ensureClubExists = async (tx, tenantId, clubId) => {
+  validateUUID(clubId, 'club ID');
+  const club = await tx.club.findFirst({
+    where: { id: clubId, collegeId: tenantId },
     select: { id: true, name: true, description: true },
   });
   if (!club) throw new AppError('Club not found', 404);
   return club;
 };
 
-// Checks the event independently of URL values, preventing cross-club access.
-const getEventForClub = async (clubId, eventId) => {
-  validateObjectId(eventId, 'event ID');
-  const event = await prisma.event.findUnique({
-    where: { id: eventId },
-    select: publicEventFields,
-  });
-  if (!event) throw new AppError('Event not found', 404);
-  if (event.clubId !== clubId) throw new AppError('Event does not belong to this club', 404);
-  return event;
+/**
+ * Serializes an event row (or EventsWithStatus view row) into the canonical frontend format.
+ * Formats coverImage and gallery as { url, publicId } objects and exposes computed status.
+ */
+const serializeEvent = (event, gallery = null) => {
+  if (!event) return null;
+
+  const coverImage = (event.coverImageUrl || event.coverImagePublicId)
+    ? { url: event.coverImageUrl || null, publicId: event.coverImagePublicId || null }
+    : (event.coverImage || null);
+
+  const formattedGallery = Array.isArray(gallery)
+    ? gallery.map((img) => ({
+        id: img.id,
+        url: img.imageUrl || img.url,
+        publicId: img.imagePublicId || img.publicId,
+        position: img.position || 0,
+      }))
+    : (Array.isArray(event.gallery)
+        ? event.gallery.map((img) => ({
+            id: img.id,
+            url: img.imageUrl || img.url,
+            publicId: img.imagePublicId || img.publicId,
+            position: img.position || 0,
+          }))
+        : []);
+
+  return {
+    id: event.id,
+    clubId: event.clubId,
+    title: event.title,
+    description: event.description,
+    location: event.location,
+    startAt: event.startAt,
+    endAt: event.endAt || null,
+    cancelledAt: event.cancelledAt || null,
+    capacity: event.capacity ?? null,
+    registeredCount: event.registeredCount ?? 0,
+    status: event.status, // Computed from events_with_status view
+    coverImage,
+    gallery: formattedGallery,
+    registrationUrl: event.registrationUrl || null,
+    createdAt: event.createdAt,
+    updatedAt: event.updatedAt,
+    ...(event.club ? { club: { id: event.club.id, name: event.club.name, description: event.club.description } } : {}),
+  };
 };
 
+/**
+ * POST /manager/clubs/:clubId/events
+ * Creates an event for the specified club.
+ */
 exports.createEvent = asyncHandler(async (req, res) => {
+  if (!req.collegeId) {
+    throw new AppError('Tenant context required: request must be routed through a college subdomain', 400);
+  }
+
   const { clubId } = req.params;
+  validateUUID(clubId, 'club ID');
+
   const body = req.body;
   if (!body || Array.isArray(body) || typeof body !== 'object') {
     throw new AppError('Event data must be an object', 400);
@@ -79,25 +111,48 @@ exports.createEvent = asyncHandler(async (req, res) => {
   const endAt = body.endAt == null ? null : validDate(body.endAt, 'endAt');
   if (endAt) validDateRange(startAt, endAt);
 
-  const event = await prisma.event.create({
-    data: {
-      clubId,
-      title: requiredText(body.title, 'title'),
-      description: requiredText(body.description, 'description'),
-      location: requiredText(body.location, 'location'),
-      startAt,
-      endAt,
-      status: 'UPCOMING',
-      registrationUrl: body.registrationUrl ? body.registrationUrl.trim() : null,
-    },
-    select: publicEventFields,
+  const eventWithStatus = await withTenant(req.collegeId, async (tx) => {
+    await ensureClubExists(tx, req.collegeId, clubId);
+
+    const created = await tx.event.create({
+      data: {
+        collegeId: req.collegeId,
+        clubId,
+        title: requiredText(body.title, 'title'),
+        description: requiredText(body.description, 'description'),
+        location: requiredText(body.location, 'location'),
+        startAt,
+        endAt,
+        registrationUrl: body.registrationUrl ? body.registrationUrl.trim() : null,
+      },
+    });
+
+    // Read computed status from events_with_status view
+    return await tx.eventsWithStatus.findUnique({
+      where: { id: created.id },
+    });
   });
 
-  res.status(201).json({ success: true, message: 'Event created successfully', event });
+  res.status(201).json({
+    success: true,
+    message: 'Event created successfully',
+    event: serializeEvent(eventWithStatus),
+  });
 });
 
+/**
+ * PATCH /manager/clubs/:clubId/events/:eventId
+ * Updates an event for the specified club.
+ */
 exports.updateEvent = asyncHandler(async (req, res) => {
+  if (!req.collegeId) {
+    throw new AppError('Tenant context required: request must be routed through a college subdomain', 400);
+  }
+
   const { clubId, eventId } = req.params;
+  validateUUID(clubId, 'club ID');
+  validateUUID(eventId, 'event ID');
+
   const body = req.body;
   if (!body || Array.isArray(body) || typeof body !== 'object') {
     throw new AppError('Update data must be an object', 400);
@@ -109,122 +164,319 @@ exports.updateEvent = asyncHandler(async (req, res) => {
   const unexpected = fields.find((field) => !allowedFields.includes(field));
   if (unexpected) throw new AppError(`Field '${unexpected}' cannot be updated`, 400);
 
-  const event = await getEventForClub(clubId, eventId);
   const data = {};
   ['title', 'description', 'location'].forEach((field) => {
     if (body[field] !== undefined) data[field] = requiredText(body[field], field);
   });
-  if (body.status !== undefined) {
-    if (typeof body.status !== 'string' || !eventStatuses.includes(body.status)) {
-      throw new AppError(`status must be one of: ${eventStatuses.join(', ')}`, 400);
-    }
-    data.status = body.status;
-  }
   if (body.registrationUrl !== undefined) {
     data.registrationUrl = body.registrationUrl ? body.registrationUrl.trim() : null;
   }
 
-  const startAt = body.startAt === undefined ? event.startAt : validDate(body.startAt, 'startAt');
-  const endAt = body.endAt === undefined
-    ? event.endAt
-    : body.endAt === null
-      ? null
-      : validDate(body.endAt, 'endAt');
-  if (body.startAt !== undefined || body.endAt !== undefined) {
-    if (endAt) validDateRange(startAt, endAt);
-    data.startAt = startAt;
-    data.endAt = endAt;
+  // Handle status update: if client cancels, set cancelledAt
+  if (body.status !== undefined) {
+    if (typeof body.status !== 'string' || !eventStatuses.includes(body.status)) {
+      throw new AppError(`status must be one of: ${eventStatuses.join(', ')}`, 400);
+    }
+    if (body.status === 'CANCELLED') {
+      data.cancelledAt = new Date();
+    }
+    // Never write directly to an events.status column
   }
 
-  const updatedEvent = await prisma.event.update({
-    where: { id: eventId }, data, select: publicEventFields,
+  const eventWithStatus = await withTenant(req.collegeId, async (tx) => {
+    const existing = await tx.event.findFirst({
+      where: { id: eventId, clubId, collegeId: req.collegeId },
+    });
+    if (!existing) throw new AppError('Event not found', 404);
+
+    const startAt = body.startAt === undefined ? existing.startAt : validDate(body.startAt, 'startAt');
+    const endAt = body.endAt === undefined
+      ? existing.endAt
+      : body.endAt === null
+        ? null
+        : validDate(body.endAt, 'endAt');
+    if (body.startAt !== undefined || body.endAt !== undefined) {
+      if (endAt) validDateRange(startAt, endAt);
+      data.startAt = startAt;
+      data.endAt = endAt;
+    }
+
+    await tx.event.update({
+      where: { id: eventId },
+      data,
+    });
+
+    const gallery = await tx.eventGalleryImage.findMany({
+      where: { eventId, collegeId: req.collegeId },
+      orderBy: { position: 'asc' },
+    });
+
+    const viewRow = await tx.eventsWithStatus.findUnique({
+      where: { id: eventId },
+    });
+
+    return { viewRow, gallery };
   });
-  res.status(200).json({ success: true, message: 'Event updated successfully', event: updatedEvent });
+
+  res.status(200).json({
+    success: true,
+    message: 'Event updated successfully',
+    event: serializeEvent(eventWithStatus.viewRow, eventWithStatus.gallery),
+  });
 });
 
+/**
+ * PATCH /manager/clubs/:clubId/events/:eventId/cancel
+ * Cancels an event by setting cancelledAt.
+ */
 exports.cancelEvent = asyncHandler(async (req, res) => {
+  if (!req.collegeId) {
+    throw new AppError('Tenant context required: request must be routed through a college subdomain', 400);
+  }
+
   const { clubId, eventId } = req.params;
-  await getEventForClub(clubId, eventId);
-  const event = await prisma.event.update({
-    where: { id: eventId }, data: { status: 'CANCELLED' }, select: publicEventFields,
+  validateUUID(clubId, 'club ID');
+  validateUUID(eventId, 'event ID');
+
+  const eventWithStatus = await withTenant(req.collegeId, async (tx) => {
+    const existing = await tx.event.findFirst({
+      where: { id: eventId, clubId, collegeId: req.collegeId },
+    });
+    if (!existing) throw new AppError('Event not found', 404);
+
+    await tx.event.update({
+      where: { id: eventId },
+      data: { cancelledAt: new Date() },
+    });
+
+    const viewRow = await tx.eventsWithStatus.findUnique({
+      where: { id: eventId },
+    });
+
+    const gallery = await tx.eventGalleryImage.findMany({
+      where: { eventId, collegeId: req.collegeId },
+      orderBy: { position: 'asc' },
+    });
+
+    return { viewRow, gallery };
   });
-  res.status(200).json({ success: true, message: 'Event cancelled successfully', event });
+
+  res.status(200).json({
+    success: true,
+    message: 'Event cancelled successfully',
+    event: serializeEvent(eventWithStatus.viewRow, eventWithStatus.gallery),
+  });
 });
 
+/**
+ * GET /manager/clubs/:clubId/events
+ * Lists all events for a managed club.
+ */
 exports.listManagedClubEvents = asyncHandler(async (req, res) => {
+  if (!req.collegeId) {
+    throw new AppError('Tenant context required: request must be routed through a college subdomain', 400);
+  }
+
   const { clubId } = req.params;
-  const events = await prisma.event.findMany({
-    where: { clubId },
-    select: publicEventFields,
-    orderBy: { startAt: 'desc' },
+  validateUUID(clubId, 'club ID');
+
+  const events = await withTenant(req.collegeId, async (tx) => {
+    await ensureClubExists(tx, req.collegeId, clubId);
+
+    return await tx.eventsWithStatus.findMany({
+      where: { clubId, collegeId: req.collegeId },
+      orderBy: { startAt: 'desc' },
+    });
   });
-  res.status(200).json({ success: true, events });
+
+  res.status(200).json({
+    success: true,
+    events: events.map((e) => serializeEvent(e)),
+  });
 });
 
 /**
  * DELETE /admin/events/:eventId
- * Admins and managers of the event's club are authorized by the route middleware.
+ * Deletes an event and its assets.
  */
 exports.deleteEvent = asyncHandler(async (req, res) => {
-  const { eventId } = req.params;
-  const event = await prisma.event.findUnique({ where: { id: eventId } });
-
-  if (!event) {
-    throw new AppError('Event not found', 404);
+  if (!req.collegeId) {
+    throw new AppError('Tenant context required: request must be routed through a college subdomain', 400);
   }
 
-  await deleteAssetsBestEffort(
-    [event.coverImage?.publicId, ...(event.gallery || []).map((image) => image.publicId)],
-    `event ${eventId}`
-  );
+  const { eventId } = req.params;
+  validateUUID(eventId, 'event ID');
 
-  const deletedEvent = await prisma.event.delete({ where: { id: eventId } });
+  // 1. Fetch event and images inside transaction
+  const eventDetails = await withTenant(req.collegeId, async (tx) => {
+    const event = await tx.event.findFirst({
+      where: { id: eventId, collegeId: req.collegeId },
+      include: {
+        gallery: {
+          select: { imagePublicId: true },
+        },
+      },
+    });
+    if (!event) throw new AppError('Event not found', 404);
+    return event;
+  });
+
+  // 2. Perform Cloudinary cleanup OUTSIDE transaction
+  const assetPublicIds = [];
+  if (eventDetails.coverImagePublicId) assetPublicIds.push(eventDetails.coverImagePublicId);
+  if (Array.isArray(eventDetails.gallery)) {
+    eventDetails.gallery.forEach((img) => {
+      if (img.imagePublicId) assetPublicIds.push(img.imagePublicId);
+    });
+  }
+
+  if (assetPublicIds.length > 0) {
+    await deleteAssetsBestEffort(assetPublicIds, `event ${eventId}`);
+  }
+
+  // 3. Delete event inside transaction
+  const deletedEvent = await withTenant(req.collegeId, async (tx) => {
+    return await tx.event.delete({
+      where: { id: eventId },
+    });
+  });
+
   res.status(200).json({
     success: true,
     message: 'Event deleted successfully',
-    data: deletedEvent,
+    data: serializeEvent(deletedEvent),
   });
 });
 
+/**
+ * GET /clubs/:clubId/events/upcoming
+ * Public endpoint to list upcoming and ongoing events for a club.
+ */
 exports.listUpcomingEvents = asyncHandler(async (req, res) => {
+  if (!req.collegeId) {
+    throw new AppError('Tenant context required: request must be routed through a college subdomain', 400);
+  }
+
   const { clubId } = req.params;
-  await ensureClubExists(clubId);
-  const events = await prisma.event.findMany({
-    where: { clubId, status: { in: ['UPCOMING', 'ONGOING'] } },
-    select: publicEventFields, orderBy: { startAt: 'asc' },
-  });
-  res.status(200).json({ success: true, events });
-});
 
-exports.listPastEvents = asyncHandler(async (req, res) => {
-  const { clubId } = req.params;
-  await ensureClubExists(clubId);
-  const events = await prisma.event.findMany({
-    where: { clubId, status: 'COMPLETED' },
-    select: publicEventFields, orderBy: { startAt: 'desc' },
-  });
-  res.status(200).json({ success: true, events });
-});
+  const events = await withTenant(req.collegeId, async (tx) => {
+    await ensureClubExists(tx, req.collegeId, clubId);
 
-exports.listAllUpcomingEvents = asyncHandler(async (req, res) => {
-  const events = await prisma.event.findMany({
-    where: { status: { in: ['UPCOMING', 'ONGOING'] } },
-    select: {
-      ...publicEventFields,
-      club: { select: { id: true, name: true } },
-    },
-    orderBy: { startAt: 'asc' },
+    return await tx.eventsWithStatus.findMany({
+      where: {
+        clubId,
+        collegeId: req.collegeId,
+        status: { in: ['UPCOMING', 'ONGOING'] },
+      },
+      orderBy: { startAt: 'asc' },
+    });
   });
-  res.status(200).json({ success: true, events });
-});
 
-exports.getPublicEvent = asyncHandler(async (req, res) => {
-  const { clubId, eventId } = req.params;
-  const club = await ensureClubExists(clubId);
-  const event = await getEventForClub(clubId, eventId);
   res.status(200).json({
     success: true,
-    event,
-    club: { id: club.id, name: club.name, description: club.description },
+    events: events.map((e) => serializeEvent(e)),
+  });
+});
+
+/**
+ * GET /clubs/:clubId/events/past
+ * Public endpoint to list completed events for a club.
+ */
+exports.listPastEvents = asyncHandler(async (req, res) => {
+  if (!req.collegeId) {
+    throw new AppError('Tenant context required: request must be routed through a college subdomain', 400);
+  }
+
+  const { clubId } = req.params;
+
+  const events = await withTenant(req.collegeId, async (tx) => {
+    await ensureClubExists(tx, req.collegeId, clubId);
+
+    return await tx.eventsWithStatus.findMany({
+      where: {
+        clubId,
+        collegeId: req.collegeId,
+        status: 'COMPLETED',
+      },
+      orderBy: { startAt: 'desc' },
+    });
+  });
+
+  res.status(200).json({
+    success: true,
+    events: events.map((e) => serializeEvent(e)),
+  });
+});
+
+/**
+ * GET /events/upcoming
+ * Public endpoint to list all upcoming and ongoing events for the current college.
+ */
+exports.listAllUpcomingEvents = asyncHandler(async (req, res) => {
+  if (!req.collegeId) {
+    throw new AppError('Tenant context required: request must be routed through a college subdomain', 400);
+  }
+
+  const events = await withTenant(req.collegeId, async (tx) => {
+    const list = await tx.eventsWithStatus.findMany({
+      where: {
+        collegeId: req.collegeId,
+        status: { in: ['UPCOMING', 'ONGOING'] },
+      },
+      orderBy: { startAt: 'asc' },
+    });
+
+    const clubIds = [...new Set(list.map((e) => e.clubId))];
+    const clubs = await tx.club.findMany({
+      where: { id: { in: clubIds }, collegeId: req.collegeId },
+      select: { id: true, name: true, description: true },
+    });
+    const clubMap = new Map(clubs.map((c) => [c.id, c]));
+
+    return list.map((e) => {
+      const club = clubMap.get(e.clubId);
+      return serializeEvent({ ...e, club });
+    });
+  });
+
+  res.status(200).json({ success: true, events });
+});
+
+/**
+ * GET /clubs/:clubId/events/:eventId
+ * Public endpoint to get details of a specific event.
+ */
+exports.getPublicEvent = asyncHandler(async (req, res) => {
+  if (!req.collegeId) {
+    throw new AppError('Tenant context required: request must be routed through a college subdomain', 400);
+  }
+
+  const { clubId, eventId } = req.params;
+  validateUUID(clubId, 'club ID');
+  validateUUID(eventId, 'event ID');
+
+  const result = await withTenant(req.collegeId, async (tx) => {
+    const club = await ensureClubExists(tx, req.collegeId, clubId);
+
+    const event = await tx.eventsWithStatus.findFirst({
+      where: { id: eventId, clubId, collegeId: req.collegeId },
+    });
+    if (!event) throw new AppError('Event not found', 404);
+
+    const gallery = await tx.eventGalleryImage.findMany({
+      where: { eventId, collegeId: req.collegeId },
+      orderBy: { position: 'asc' },
+    });
+
+    return {
+      event: serializeEvent(event, gallery),
+      club: { id: club.id, name: club.name, description: club.description },
+    };
+  });
+
+  res.status(200).json({
+    success: true,
+    event: result.event,
+    club: result.club,
   });
 });

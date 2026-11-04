@@ -51,6 +51,12 @@ const FIXTURE_EMAILS = {
 async function cleanupFixtures(collegeA, collegeB) {
   if (collegeA && collegeA.id) {
     await withTenant(collegeA.id, async (tx) => {
+      await tx.eventGalleryImage.deleteMany({
+        where: { collegeId: collegeA.id, event: { title: { startsWith: 'P3B ' } } },
+      });
+      await tx.event.deleteMany({
+        where: { collegeId: collegeA.id, title: { startsWith: 'P3B ' } },
+      });
       await tx.membership.deleteMany({
         where: { collegeId: collegeA.id, user: { email: { endsWith: '@example.test' } } },
       });
@@ -65,6 +71,12 @@ async function cleanupFixtures(collegeA, collegeB) {
 
   if (collegeB && collegeB.id) {
     await withTenant(collegeB.id, async (tx) => {
+      await tx.eventGalleryImage.deleteMany({
+        where: { collegeId: collegeB.id, event: { title: { startsWith: 'P3B ' } } },
+      });
+      await tx.event.deleteMany({
+        where: { collegeId: collegeB.id, title: { startsWith: 'P3B ' } },
+      });
       await tx.membership.deleteMany({
         where: { collegeId: collegeB.id, user: { email: { endsWith: '@example.test' } } },
       });
@@ -767,15 +779,477 @@ async function runPhase3bTests() {
     }
 
     // -------------------------------------------------------------------------
+    // TEST 10: Event Creation & Validation (/manager/clubs/:clubId/events)
+    // -------------------------------------------------------------------------
+    console.log('\n[TEST 10] Testing Event Creation & Validation (/manager/clubs/:clubId/events)...');
+    let createdEventA1;
+    {
+      const startAt = new Date(Date.now() + 86400000 * 2).toISOString();
+      const endAt = new Date(Date.now() + 86400000 * 3).toISOString();
+
+      // 1. Success case
+      const createRes = await makeRequest({
+        method: 'POST',
+        path: `/manager/clubs/${clubA1.id}/events`,
+        host: 'lbrce.localhost',
+        token: tokenManagerA,
+        body: {
+          title: 'P3B Upcoming Hackathon',
+          description: 'A 24-hour coding challenge',
+          location: 'Main Auditorium',
+          startAt,
+          endAt,
+          registrationUrl: 'https://example.com/register',
+        },
+      });
+      assert.strictEqual(createRes.status, 201, 'FAIL: POST /manager/clubs/:clubId/events must return 201');
+      const ev = createRes.body.event || createRes.body.data?.event || createRes.body.data;
+      assert.ok(ev.id, 'FAIL: Event must have an ID');
+      assert.strictEqual(ev.title, 'P3B Upcoming Hackathon');
+      assert.strictEqual(ev.status, 'UPCOMING', 'FAIL: Newly created future event must have status UPCOMING');
+      createdEventA1 = ev;
+      totalRowsChecked += 1;
+
+      // Verify in database via eventsWithStatus view
+      await withTenant(collegeA.id, async (tx) => {
+        const dbEvent = await tx.eventsWithStatus.findUnique({ where: { id: ev.id } });
+        assert.ok(dbEvent, 'FAIL: Event must be queryable via eventsWithStatus view');
+        assert.strictEqual(dbEvent.status, 'UPCOMING');
+        totalRowsChecked += 1;
+      });
+
+      // 2. Negative case: endAt before startAt -> 400
+      const invalidDateRes = await makeRequest({
+        method: 'POST',
+        path: `/manager/clubs/${clubA1.id}/events`,
+        host: 'lbrce.localhost',
+        token: tokenManagerA,
+        body: {
+          title: 'P3B Invalid Dates Event',
+          description: 'Invalid dates',
+          location: 'Hall B',
+          startAt: endAt,
+          endAt: startAt,
+        },
+      });
+      assert.strictEqual(invalidDateRes.status, 400, 'FAIL: endAt before startAt must return 400');
+
+      // 3. Negative case: Manager A trying to create event in Club A2 (not managed by Manager A) -> 403
+      const forbiddenCreateRes = await makeRequest({
+        method: 'POST',
+        path: `/manager/clubs/${clubA2.id}/events`,
+        host: 'lbrce.localhost',
+        token: tokenManagerA,
+        body: {
+          title: 'P3B Unauthorized Event',
+          description: 'Manager A does not manage Club A2',
+          location: 'Hall C',
+          startAt,
+          endAt,
+        },
+      });
+      assert.strictEqual(forbiddenCreateRes.status, 403, 'FAIL: Manager must be forbidden from creating event in unmanaged club');
+      console.log('  ✔ Event creation and validation rules verified.');
+    }
+
+    // -------------------------------------------------------------------------
+    // TEST 11: Event Update & Authorization (/manager/clubs/:clubId/events/:eventId)
+    // -------------------------------------------------------------------------
+    console.log('\n[TEST 11] Testing Event Update & Authorization (/manager/clubs/:clubId/events/:eventId)...');
+    {
+      const updateRes = await makeRequest({
+        method: 'PATCH',
+        path: `/manager/clubs/${clubA1.id}/events/${createdEventA1.id}`,
+        host: 'lbrce.localhost',
+        token: tokenManagerA,
+        body: {
+          title: 'P3B Updated Hackathon Title',
+          location: 'Auditorium Block B',
+        },
+      });
+      assert.strictEqual(updateRes.status, 200, 'FAIL: PATCH /manager/clubs/:clubId/events/:eventId must return 200');
+      const ev = updateRes.body.event || updateRes.body.data?.event || updateRes.body.data;
+      assert.strictEqual(ev.title, 'P3B Updated Hackathon Title');
+      assert.strictEqual(ev.location, 'Auditorium Block B');
+      assert.strictEqual(ev.status, 'UPCOMING');
+      totalRowsChecked += 1;
+
+      // Negative: Non-whitelisted field
+      const badFieldRes = await makeRequest({
+        method: 'PATCH',
+        path: `/manager/clubs/${clubA1.id}/events/${createdEventA1.id}`,
+        host: 'lbrce.localhost',
+        token: tokenManagerA,
+        body: {
+          arbitraryField: 'not_allowed',
+        },
+      });
+      assert.strictEqual(badFieldRes.status, 400, 'FAIL: Updating non-whitelisted fields must return 400');
+
+      // Negative: Regular user cannot update
+      const unauthUpdateRes = await makeRequest({
+        method: 'PATCH',
+        path: `/manager/clubs/${clubA1.id}/events/${createdEventA1.id}`,
+        host: 'lbrce.localhost',
+        token: tokenUserA,
+        body: {
+          title: 'Hacked Title',
+        },
+      });
+      assert.strictEqual(unauthUpdateRes.status, 403, 'FAIL: Regular user cannot update club events');
+      console.log('  ✔ Event update and authorization verified.');
+    }
+
+    // -------------------------------------------------------------------------
+    // TEST 12: Event Status View & Cancellation Lifecycle
+    // -------------------------------------------------------------------------
+    console.log('\n[TEST 12] Testing Event Status View & Cancellation Lifecycle...');
+    let ongoingEventA1, pastEventA1, cancelledEventA1;
+    {
+      // 1. Verify events table in PostgreSQL has NO status column
+      const [colCheck] = await prisma.$queryRaw`
+        SELECT COUNT(*)::int AS has_status_col
+        FROM information_schema.columns
+        WHERE table_name = 'events' AND column_name = 'status';
+      `;
+      assert.strictEqual(colCheck.has_status_col, 0, 'FAIL: events table must NOT have a physical "status" column');
+      console.log('    Verified: physical events table has no status column (status is dynamically computed in PostgreSQL).');
+
+      // 2. Cancel createdEventA1 via cancel endpoint
+      const cancelRes = await makeRequest({
+        method: 'PATCH',
+        path: `/manager/clubs/${clubA1.id}/events/${createdEventA1.id}/cancel`,
+        host: 'lbrce.localhost',
+        token: tokenManagerA,
+      });
+      assert.strictEqual(cancelRes.status, 200, 'FAIL: PATCH /manager/clubs/:clubId/events/:eventId/cancel must return 200');
+      const ev = cancelRes.body.event || cancelRes.body.data?.event || cancelRes.body.data;
+      assert.strictEqual(ev.status, 'CANCELLED');
+      assert.ok(ev.cancelledAt, 'FAIL: cancelledAt must be populated');
+      cancelledEventA1 = ev;
+      totalRowsChecked += 1;
+
+      // Verify directly from events_with_status view
+      await withTenant(collegeA.id, async (tx) => {
+        const viewRow = await tx.eventsWithStatus.findUnique({ where: { id: createdEventA1.id } });
+        assert.strictEqual(viewRow.status, 'CANCELLED');
+        assert.ok(viewRow.cancelledAt);
+        totalRowsChecked += 1;
+      });
+
+      // 3. Seed an ongoing event (startAt in past, endAt in future)
+      await withTenant(collegeA.id, async (tx) => {
+        ongoingEventA1 = await tx.event.create({
+          data: {
+            collegeId: collegeA.id,
+            clubId: clubA1.id,
+            title: 'P3B Ongoing Workshop',
+            description: 'Currently in progress',
+            location: 'Lab 1',
+            startAt: new Date(Date.now() - 3600000), // 1 hour ago
+            endAt: new Date(Date.now() + 7200000),   // 2 hours from now
+          },
+        });
+
+        const ongoingView = await tx.eventsWithStatus.findUnique({ where: { id: ongoingEventA1.id } });
+        assert.strictEqual(ongoingView.status, 'ONGOING', 'FAIL: Event running now must have computed status ONGOING');
+        totalRowsChecked += 1;
+      });
+
+      // 4. Seed a past event (startAt in past, endAt in past)
+      await withTenant(collegeA.id, async (tx) => {
+        pastEventA1 = await tx.event.create({
+          data: {
+            collegeId: collegeA.id,
+            clubId: clubA1.id,
+            title: 'P3B Past Seminar',
+            description: 'Completed seminar',
+            location: 'Seminar Hall',
+            startAt: new Date(Date.now() - 86400000 * 5),
+            endAt: new Date(Date.now() - 86400000 * 4),
+          },
+        });
+
+        const pastView = await tx.eventsWithStatus.findUnique({ where: { id: pastEventA1.id } });
+        assert.strictEqual(pastView.status, 'COMPLETED', 'FAIL: Event in past must have computed status COMPLETED');
+        totalRowsChecked += 1;
+      });
+
+      console.log('  ✔ Event computed statuses (UPCOMING, ONGOING, COMPLETED, CANCELLED) verified via view.');
+    }
+
+    // -------------------------------------------------------------------------
+    // TEST 13: Event Filtering: Upcoming vs Past
+    // -------------------------------------------------------------------------
+    console.log('\n[TEST 13] Testing Event Filtering: Upcoming vs Past...');
+    let upcomingEventA1_2;
+    {
+      // Create a second active upcoming event
+      const createUpcomingRes = await makeRequest({
+        method: 'POST',
+        path: `/manager/clubs/${clubA1.id}/events`,
+        host: 'lbrce.localhost',
+        token: tokenManagerA,
+        body: {
+          title: 'P3B Future Conference',
+          description: 'Conference next week',
+          location: 'Convention Center',
+          startAt: new Date(Date.now() + 86400000 * 7).toISOString(),
+          endAt: new Date(Date.now() + 86400000 * 8).toISOString(),
+        },
+      });
+      assert.strictEqual(createUpcomingRes.status, 201);
+      upcomingEventA1_2 = createUpcomingRes.body.event || createUpcomingRes.body.data?.event || createUpcomingRes.body.data;
+      totalRowsChecked += 1;
+
+      // 1. GET /clubs/:clubId/events/upcoming
+      const upcomingRes = await makeRequest({
+        path: `/clubs/${clubA1.id}/events/upcoming`,
+        host: 'lbrce.localhost',
+      });
+      assert.strictEqual(upcomingRes.status, 200, 'FAIL: GET /clubs/:clubId/events/upcoming must return 200');
+      const upcomingList = upcomingRes.body.events || upcomingRes.body.data?.events || upcomingRes.body.data;
+      assert.ok(Array.isArray(upcomingList), 'FAIL: upcoming events must be an array');
+      const upcomingIds = upcomingList.map((e) => e.id);
+      assert.ok(upcomingIds.includes(ongoingEventA1.id), 'FAIL: upcoming list should include ongoing event');
+      assert.ok(upcomingIds.includes(upcomingEventA1_2.id), 'FAIL: upcoming list should include future event');
+      assert.ok(!upcomingIds.includes(pastEventA1.id), 'FAIL: upcoming list must NOT include past event');
+      assert.ok(!upcomingIds.includes(cancelledEventA1.id), 'FAIL: upcoming list must NOT include cancelled event');
+      totalRowsChecked += upcomingList.length;
+
+      // 2. GET /clubs/:clubId/events/past
+      const pastRes = await makeRequest({
+        path: `/clubs/${clubA1.id}/events/past`,
+        host: 'lbrce.localhost',
+      });
+      assert.strictEqual(pastRes.status, 200, 'FAIL: GET /clubs/:clubId/events/past must return 200');
+      const pastList = pastRes.body.events || pastRes.body.data?.events || pastRes.body.data;
+      assert.ok(Array.isArray(pastList), 'FAIL: past events must be an array');
+      const pastIds = pastList.map((e) => e.id);
+      assert.ok(pastIds.includes(pastEventA1.id), 'FAIL: past list must include past event');
+      assert.ok(!pastIds.includes(upcomingEventA1_2.id), 'FAIL: past list must NOT include upcoming event');
+      assert.ok(!pastIds.includes(cancelledEventA1.id), 'FAIL: past list must NOT include cancelled event');
+      totalRowsChecked += pastList.length;
+
+      // 3. GET /events/upcoming (all upcoming across clubs for the college)
+      const allUpcomingRes = await makeRequest({
+        path: '/events/upcoming',
+        host: 'lbrce.localhost',
+      });
+      assert.strictEqual(allUpcomingRes.status, 200, 'FAIL: GET /events/upcoming must return 200');
+      const allUpcomingList = allUpcomingRes.body.events || allUpcomingRes.body.data?.events || allUpcomingRes.body.data;
+      assert.ok(Array.isArray(allUpcomingList));
+      const allUpcomingIds = allUpcomingList.map((e) => e.id);
+      assert.ok(allUpcomingIds.includes(upcomingEventA1_2.id));
+      assert.ok(!allUpcomingIds.includes(pastEventA1.id));
+      totalRowsChecked += allUpcomingList.length;
+
+      console.log('  ✔ Upcoming and past event filters correctly segregate events by computed status.');
+    }
+
+    // -------------------------------------------------------------------------
+    // TEST 14: Manager Club Events List (/manager/clubs/:clubId/events) & RBAC
+    // -------------------------------------------------------------------------
+    console.log('\n[TEST 14] Testing Manager Club Events List (/manager/clubs/:clubId/events)...');
+    {
+      // 1. Manager A lists events of managed Club A1
+      const mgrListRes = await makeRequest({
+        path: `/manager/clubs/${clubA1.id}/events`,
+        host: 'lbrce.localhost',
+        token: tokenManagerA,
+      });
+      assert.strictEqual(mgrListRes.status, 200, 'FAIL: GET /manager/clubs/:clubId/events must return 200');
+      const mgrEvents = mgrListRes.body.events || mgrListRes.body.data?.events || mgrListRes.body.data;
+      assert.ok(Array.isArray(mgrEvents));
+      const mgrEventIds = mgrEvents.map((e) => e.id);
+      assert.ok(mgrEventIds.includes(cancelledEventA1.id));
+      assert.ok(mgrEventIds.includes(pastEventA1.id));
+      assert.ok(mgrEventIds.includes(upcomingEventA1_2.id));
+      totalRowsChecked += mgrEvents.length;
+
+      // 2. Manager A attempts to list events of Club A2 (not managed by Manager A) -> 403
+      const forbiddenListRes = await makeRequest({
+        path: `/manager/clubs/${clubA2.id}/events`,
+        host: 'lbrce.localhost',
+        token: tokenManagerA,
+      });
+      assert.strictEqual(forbiddenListRes.status, 403, 'FAIL: Accessing events of unmanaged club must return 403');
+
+      // 3. Admin A lists events of Club A1 -> Admin permitted (requireAdminOrClubManager)
+      const adminListRes = await makeRequest({
+        path: `/manager/clubs/${clubA1.id}/events`,
+        host: 'lbrce.localhost',
+        token: tokenAdminA,
+      });
+      assert.strictEqual(adminListRes.status, 200, 'FAIL: Admin must be permitted to list club events');
+      totalRowsChecked += 1;
+
+      console.log('  ✔ Manager club event listing and RBAC verified.');
+    }
+
+    // -------------------------------------------------------------------------
+    // TEST 15: Public Single Event Details (/clubs/:clubId/events/:eventId)
+    // -------------------------------------------------------------------------
+    console.log('\n[TEST 15] Testing Public Single Event Details (/clubs/:clubId/events/:eventId)...');
+    {
+      const publicEventRes = await makeRequest({
+        path: `/clubs/${clubA1.id}/events/${upcomingEventA1_2.id}`,
+        host: 'lbrce.localhost',
+      });
+      assert.strictEqual(publicEventRes.status, 200, 'FAIL: GET /clubs/:clubId/events/:eventId must return 200');
+      const evData = publicEventRes.body.event || publicEventRes.body.data?.event;
+      const clubData = publicEventRes.body.club || publicEventRes.body.data?.club;
+      assert.ok(evData, 'FAIL: Event details must be present');
+      assert.strictEqual(evData.id, upcomingEventA1_2.id);
+      assert.strictEqual(evData.status, 'UPCOMING');
+      assert.ok(clubData, 'FAIL: Club details must be present');
+      assert.strictEqual(clubData.id, clubA1.id);
+      totalRowsChecked += 2;
+
+      // Non-existent event UUID -> 404
+      const notFoundRes = await makeRequest({
+        path: `/clubs/${clubA1.id}/events/00000000-0000-0000-0000-000000000000`,
+        host: 'lbrce.localhost',
+      });
+      assert.strictEqual(notFoundRes.status, 404, 'FAIL: Non-existent event must return 404');
+      console.log('  ✔ Public single event details endpoint verified.');
+    }
+
+    // -------------------------------------------------------------------------
+    // TEST 16: Event Deletion (/admin/events/:eventId) & RBAC
+    // -------------------------------------------------------------------------
+    console.log('\n[TEST 16] Testing Event Deletion (/admin/events/:eventId) & RBAC...');
+    {
+      // 1. Manager A deletes upcomingEventA1_2 from Club A1 (which Manager A manages)
+      const deleteRes = await makeRequest({
+        method: 'DELETE',
+        path: `/admin/events/${upcomingEventA1_2.id}`,
+        host: 'lbrce.localhost',
+        token: tokenManagerA,
+      });
+      assert.strictEqual(deleteRes.status, 200, 'FAIL: DELETE /admin/events/:eventId must return 200');
+
+      // Verify deleted from DB
+      await withTenant(collegeA.id, async (tx) => {
+        const check = await tx.event.findUnique({ where: { id: upcomingEventA1_2.id } });
+        assert.strictEqual(check, null, 'FAIL: Deleted event must no longer exist in database');
+        totalRowsChecked += 1;
+      });
+
+      // 2. Create an event in Club A2
+      let clubA2Event;
+      await withTenant(collegeA.id, async (tx) => {
+        clubA2Event = await tx.event.create({
+          data: {
+            collegeId: collegeA.id,
+            clubId: clubA2.id,
+            title: 'P3B Club A2 Special Event',
+            description: 'Event in club A2',
+            location: 'Hall 5',
+            startAt: new Date(Date.now() + 86400000),
+            endAt: new Date(Date.now() + 86400000 * 2),
+          },
+        });
+      });
+
+      // 3. Manager A attempts to delete event in Club A2 -> 403 Forbidden
+      const forbiddenDeleteRes = await makeRequest({
+        method: 'DELETE',
+        path: `/admin/events/${clubA2Event.id}`,
+        host: 'lbrce.localhost',
+        token: tokenManagerA,
+      });
+      assert.strictEqual(forbiddenDeleteRes.status, 403, 'FAIL: Manager cannot delete event from unmanaged club');
+
+      // 4. Admin A deletes event in Club A2 -> 200 OK
+      const adminDeleteRes = await makeRequest({
+        method: 'DELETE',
+        path: `/admin/events/${clubA2Event.id}`,
+        host: 'lbrce.localhost',
+        token: tokenAdminA,
+      });
+      assert.strictEqual(adminDeleteRes.status, 200, 'FAIL: Admin can delete any event in college');
+      totalRowsChecked += 1;
+
+      console.log('  ✔ Event deletion and RBAC permissions verified.');
+    }
+
+    // -------------------------------------------------------------------------
+    // TEST 17: Cross-Tenant Event Isolation
+    // -------------------------------------------------------------------------
+    console.log('\n[TEST 17] Testing Cross-Tenant Event Isolation...');
+    {
+      // 1. Seed an event in College B
+      let eventB1;
+      await withTenant(collegeB.id, async (tx) => {
+        eventB1 = await tx.event.create({
+          data: {
+            collegeId: collegeB.id,
+            clubId: clubB1.id,
+            title: 'P3B College B Private Event',
+            description: 'College B only',
+            location: 'VRSEC Tech Center',
+            startAt: new Date(Date.now() + 86400000),
+            endAt: new Date(Date.now() + 86400000 * 2),
+          },
+        });
+      });
+
+      // 2. Try to access College B event via College A host -> 404
+      const crossTenantGetRes = await makeRequest({
+        path: `/clubs/${clubB1.id}/events/${eventB1.id}`,
+        host: 'lbrce.localhost',
+      });
+      assert.strictEqual(crossTenantGetRes.status, 404, 'FAIL: College B event must return 404 when requested under College A host');
+
+      // 3. Manager A tries to create event in College B's club on College A host -> 404
+      const crossTenantCreateRes = await makeRequest({
+        method: 'POST',
+        path: `/manager/clubs/${clubB1.id}/events`,
+        host: 'lbrce.localhost',
+        token: tokenManagerA,
+        body: {
+          title: 'P3B Infiltrating Event',
+          description: 'Cross-tenant leak attempt',
+          location: 'Nowhere',
+          startAt: new Date(Date.now() + 86400000).toISOString(),
+        },
+      });
+      assert.ok(
+        crossTenantCreateRes.status === 404 || crossTenantCreateRes.status === 403,
+        `FAIL: Cross-tenant event creation must be rejected with 404 or 403, got ${crossTenantCreateRes.status}`
+      );
+
+      // 4. College A admin tries to delete College B's event on College A host -> 404
+      const crossTenantDeleteRes = await makeRequest({
+        method: 'DELETE',
+        path: `/admin/events/${eventB1.id}`,
+        host: 'lbrce.localhost',
+        token: tokenAdminA,
+      });
+      assert.strictEqual(crossTenantDeleteRes.status, 404, 'FAIL: College B event must return 404 when deleted from College A host');
+
+      // 5. Query College B event from College B host -> 200 OK
+      const colBGetRes = await makeRequest({
+        path: `/clubs/${clubB1.id}/events/${eventB1.id}`,
+        host: 'vrsec.localhost',
+      });
+      assert.strictEqual(colBGetRes.status, 200, 'FAIL: College B event must be accessible under College B host');
+      totalRowsChecked += 1;
+
+      console.log('  ✔ Complete cross-tenant event isolation verified (RLS prevents cross-college event access).');
+    }
+
+    // -------------------------------------------------------------------------
     // Final Assertions & Row Count Verification
     // -------------------------------------------------------------------------
     console.log('\n[SUMMARY] Non-Vacuous Row Count Assertion:');
     console.log(`  Total database rows and API items checked across Phase 3b: ${totalRowsChecked}`);
-    assert.ok(totalRowsChecked >= 10, `FAIL: Expected at least 10 rows checked, got ${totalRowsChecked}`);
+    assert.ok(totalRowsChecked >= 25, `FAIL: Expected at least 25 rows checked, got ${totalRowsChecked}`);
     console.log('  ✔ Verified non-vacuous assertion: total rows checked > 0.');
 
     console.log('\n======================================================================');
-    console.log('ALL PHASE 3B MILESTONE 1 TESTS PASSED SUCCESSFULLY (0 FAILURES)');
+    console.log('ALL PHASE 3B MILESTONES 1 & 2 TESTS PASSED SUCCESSFULLY (0 FAILURES)');
     console.log('======================================================================');
   } finally {
     if (server) {

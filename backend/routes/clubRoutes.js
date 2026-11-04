@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { authenticateToken, requireClubManager } = require('../middleware/authMiddleware');
 const asyncHandler = require('../utils/asyncHandler');
-const { prisma } = require('../config/db');
+const { withTenant } = require('../config/db');
 const { AppError } = require('../middleware/errorHandler');
 const { validate } = require('../middleware/validate');
 const { clubParams } = require('../validators/schemas');
@@ -17,18 +17,23 @@ router.get(
   authenticateToken,
   requireClubManager('clubId'),
   asyncHandler(async (req, res) => {
+    if (!req.collegeId) {
+      throw new AppError('Tenant context required: request must be routed through a college subdomain', 400);
+    }
     const { clubId } = req.params;
-    const club = await prisma.club.findUnique({
-      where: { id: clubId },
-      include: {
-        members: {
-          include: {
-            user: {
-              select: { id: true, name: true, email: true, role: true },
+    const club = await withTenant(req.collegeId, async (tx) => {
+      return await tx.club.findFirst({
+        where: { id: clubId, collegeId: req.collegeId },
+        include: {
+          members: {
+            include: {
+              user: {
+                select: { id: true, name: true, email: true, role: true },
+              },
             },
           },
         },
-      },
+      });
     });
 
     if (!club) {
