@@ -15,8 +15,8 @@ dotenv.config();
 let brevo;
 
 /**
- * Validates that the active database host in test environment is strictly local or Neon dev.
- * Throws an error if tests are attempting to run against an unauthorized database host.
+ * Validates that the active database in test environment has database name strictly equal to 'yuva_test'.
+ * Throws an error if tests are attempting to run against an unauthorized database.
  */
 const verifyTestDatabaseHost = () => {
   const dbUrl = process.env.TEST_DATABASE_URL || process.env.DATABASE_URL;
@@ -24,20 +24,19 @@ const verifyTestDatabaseHost = () => {
     throw new Error('Test environment error: No database URL configured in TEST_DATABASE_URL or DATABASE_URL');
   }
 
-  let host = '';
+  let dbName = '';
   try {
     const parsed = new URL(dbUrl);
-    host = parsed.hostname.toLowerCase();
+    dbName = parsed.pathname.replace(/^\//, '').split('?')[0].toLowerCase();
   } catch {
-    const match = dbUrl.match(/@([^:/]+)/);
-    host = match ? match[1].toLowerCase() : '';
+    const match = dbUrl.match(/\/([^/?]+)(\?|$)/);
+    dbName = match ? match[1].toLowerCase() : '';
   }
 
-  const isLocal = host === '127.0.0.1' || host === 'localhost';
-  const isNeonDev = host.endsWith('.neon.tech') && (host.includes('dev') || host.includes('ep-withered-bird-ao71e632'));
-
-  if (!isLocal && !isNeonDev) {
-    throw new Error(`Safety violation: emailService test stub refused to execute. Database host '${host}' is neither local (127.0.0.1/localhost) nor a Neon dev endpoint (*.neon.tech).`);
+  if (dbName !== 'yuva_test') {
+    throw new Error(
+      `Safety violation: emailService test stub refused to execute. Database name '${dbName}' is not strictly 'yuva_test'.`
+    );
   }
   return true;
 };

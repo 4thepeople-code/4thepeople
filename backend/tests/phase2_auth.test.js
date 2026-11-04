@@ -851,21 +851,21 @@ async function runPhase2Tests() {
     console.log('  ✔ Cookie-authenticated state-changing requests without Origin or Referer strictly blocked (HTTP 403).');
 
     // -------------------------------------------------------------------------
-    // Test 16: EmailService Host Guard (Requirement 7)
+    // Test 16: EmailService Safety Guard (Strictly 'yuva_test' Database Name)
     // -------------------------------------------------------------------------
-    console.log('\n[TEST 16] Testing emailService Stub Database Host Safety Guard (Requirement 7)...');
-    // Local / Neon dev passes
+    console.log('\n[TEST 16] Testing emailService Stub Database Safety Guard (yuva_test DB Name Guard)...');
+    // yuva_test passes
     assert.doesNotThrow(() => verifyTestDatabaseHost());
 
-    // Unauthorized external production host must throw
+    // Unauthorized database name (e.g. live_db, yuva_prod) must strictly throw
     const originalDbUrl = process.env.TEST_DATABASE_URL;
-    process.env.TEST_DATABASE_URL = 'postgresql://user:pass@production-database.aws.company.com:5432/live_db';
+    process.env.TEST_DATABASE_URL = 'postgresql://user:pass@ep-dev-branch.neon.tech:5432/live_db';
     assert.throws(
       () => verifyTestDatabaseHost(),
       /Safety violation: emailService test stub refused to execute/
     );
     process.env.TEST_DATABASE_URL = originalDbUrl; // Restore
-    console.log('  ✔ emailService safety guard strictly throws if test database host is external.');
+    console.log('  ✔ emailService safety guard strictly throws if test database name is not yuva_test.');
 
     // -------------------------------------------------------------------------
     // Test 17: Token Isolation & RLS Boundary Checks
