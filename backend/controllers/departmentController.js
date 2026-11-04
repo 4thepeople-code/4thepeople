@@ -1,12 +1,7 @@
-const { prisma } = require('../config/db');
-const { DEFAULT_COLLEGE_ID } = require('../config/college');
+const { withTenant } = require('../config/db');
 const asyncHandler = require('../utils/asyncHandler');
 const { AppError } = require('../middleware/errorHandler');
-
-const departmentWhere = (departmentId) => ({
-  id: departmentId,
-  collegeId: DEFAULT_COLLEGE_ID,
-});
+const { serializeClub } = require('../utils/clubDepartments');
 
 const throwDuplicateDepartmentError = (error) => {
   if (error.code === 'P2002') {
@@ -15,18 +10,28 @@ const throwDuplicateDepartmentError = (error) => {
   throw error;
 };
 
+/**
+ * POST /admin/departments
+ * Admin creates a new academic department within their college tenant.
+ */
 exports.createDepartment = asyncHandler(async (req, res) => {
+  if (!req.collegeId) {
+    throw new AppError('Tenant context required: request must be routed through a college subdomain', 400);
+  }
+
   const { name, shortCode, description } = req.body;
 
   let department;
   try {
-    department = await prisma.department.create({
-      data: {
-        name: name.trim(),
-        shortCode: shortCode.trim().toUpperCase(),
-        description: description ?? null,
-        collegeId: DEFAULT_COLLEGE_ID,
-      },
+    department = await withTenant(req.collegeId, async (tx) => {
+      return await tx.department.create({
+        data: {
+          collegeId: req.collegeId,
+          name: name.trim(),
+          shortCode: shortCode.trim().toUpperCase(),
+          description: description ? description.trim() : null,
+        },
+      });
     });
   } catch (error) {
     throwDuplicateDepartmentError(error);
@@ -39,7 +44,15 @@ exports.createDepartment = asyncHandler(async (req, res) => {
   });
 });
 
+/**
+ * PATCH /admin/departments/:departmentId
+ * Admin updates department details within their college tenant.
+ */
 exports.updateDepartment = asyncHandler(async (req, res) => {
+  if (!req.collegeId) {
+    throw new AppError('Tenant context required: request must be routed through a college subdomain', 400);
+  }
+
   const { departmentId } = req.params;
   const { name, shortCode, description } = req.body;
   const data = {};
@@ -49,15 +62,15 @@ exports.updateDepartment = asyncHandler(async (req, res) => {
 
   let department;
   try {
-    department = await prisma.$transaction(async (tx) => {
+    department = await withTenant(req.collegeId, async (tx) => {
       const existing = await tx.department.findFirst({
-        where: departmentWhere(departmentId),
+        where: { id: departmentId, collegeId: req.collegeId },
         select: { id: true },
       });
       if (!existing) throw new AppError('Department not found', 404);
 
-      return tx.department.update({
-        where: departmentWhere(departmentId),
+      return await tx.department.update({
+        where: { id: departmentId },
         data,
       });
     });
@@ -72,12 +85,20 @@ exports.updateDepartment = asyncHandler(async (req, res) => {
   });
 });
 
+/**
+ * DELETE /admin/departments/:departmentId
+ * Deletes a department and removes its club relationships within the tenant.
+ */
 exports.deleteDepartment = asyncHandler(async (req, res) => {
+  if (!req.collegeId) {
+    throw new AppError('Tenant context required: request must be routed through a college subdomain', 400);
+  }
+
   const { departmentId } = req.params;
 
-  await prisma.$transaction(async (tx) => {
+  await withTenant(req.collegeId, async (tx) => {
     const department = await tx.department.findFirst({
-      where: departmentWhere(departmentId),
+      where: { id: departmentId, collegeId: req.collegeId },
       select: { id: true },
     });
     if (!department) throw new AppError('Department not found', 404);
@@ -85,10 +106,10 @@ exports.deleteDepartment = asyncHandler(async (req, res) => {
     await tx.clubDepartment.deleteMany({
       where: {
         departmentId,
-        department: { collegeId: DEFAULT_COLLEGE_ID },
+        collegeId: req.collegeId,
       },
     });
-    await tx.department.delete({ where: departmentWhere(departmentId) });
+    await tx.department.delete({ where: { id: departmentId } });
   });
 
   res.status(200).json({
@@ -98,45 +119,66 @@ exports.deleteDepartment = asyncHandler(async (req, res) => {
   });
 });
 
+/**
+ * PUT /admin/departments/:departmentId/clubs
+ * Replaces the list of clubs associated with a department.
+ */
 exports.replaceDepartmentClubs = asyncHandler(async (req, res) => {
+  if (!req.collegeId) {
+    throw new AppError('Tenant context required: request must be routed through a college subdomain', 400);
+  }
+
   const { departmentId } = req.params;
   const { clubIds } = req.body;
 
-  await prisma.$transaction(async (tx) => {
-    const department = await tx.department.findFirst({
-      where: departmentWhere(departmentId),
-      select: { id: true },
-    });
-    if (!department) throw new AppError('Department not found', 404);
+  try {
+    await withTenant(req.collegeId, async (tx) => {
+      const department = await tx.department.findFirst({
+        where: { id: departmentId, collegeId: req.collegeId },
+        select: { id: true },
+      });
+      if (!department) throw new AppError('Department not found', 404);
 
-    const clubs = clubIds.length
-      ? await tx.club.findMany({
+      const clubs = clubIds && clubIds.length
+        ? await tx.club.findMany({
+          where: {
+            id: { in: clubIds },
+            collegeId: req.collegeId,
+          },
+          select: { id: true, clubType: true },
+        })
+        : [];
+
+      if (clubs.length !== (clubIds ? clubIds.length : 0)) {
+        throw new AppError('One or more clubs do not exist for this college.', 400);
+      }
+      if (clubs.some((club) => club.clubType === 'CENTRAL')) {
+        throw new AppError('Central clubs cannot be linked to a department.', 409);
+      }
+
+      await tx.clubDepartment.deleteMany({
         where: {
-          id: { in: clubIds },
-          collegeId: DEFAULT_COLLEGE_ID,
+          departmentId,
+          collegeId: req.collegeId,
         },
-        select: { id: true, isCentral: true },
-      })
-      : [];
-    if (clubs.length !== clubIds.length) {
-      throw new AppError('One or more clubs do not exist for this college.', 400);
-    }
-    if (clubs.some((club) => club.isCentral === true)) {
+      });
+
+      for (const club of clubs) {
+        await tx.clubDepartment.create({
+          data: {
+            collegeId: req.collegeId,
+            departmentId,
+            clubId: club.id,
+          },
+        });
+      }
+    });
+  } catch (err) {
+    if (err.message && err.message.includes('check_violation')) {
       throw new AppError('Central clubs cannot be linked to a department.', 409);
     }
-
-    await tx.clubDepartment.deleteMany({
-      where: {
-        departmentId,
-        department: { collegeId: DEFAULT_COLLEGE_ID },
-      },
-    });
-    for (const club of clubs) {
-      await tx.clubDepartment.create({
-        data: { departmentId, clubId: club.id },
-      });
-    }
-  });
+    throw err;
+  }
 
   res.status(200).json({
     success: true,
@@ -145,45 +187,66 @@ exports.replaceDepartmentClubs = asyncHandler(async (req, res) => {
   });
 });
 
+/**
+ * PUT /admin/clubs/:clubId/departments
+ * Replaces the list of departments associated with a club.
+ */
 exports.replaceClubDepartments = asyncHandler(async (req, res) => {
+  if (!req.collegeId) {
+    throw new AppError('Tenant context required: request must be routed through a college subdomain', 400);
+  }
+
   const { clubId } = req.params;
   const { departmentIds } = req.body;
 
-  await prisma.$transaction(async (tx) => {
-    const club = await tx.club.findFirst({
-      where: { id: clubId, collegeId: DEFAULT_COLLEGE_ID },
-      select: { id: true, isCentral: true },
+  try {
+    await withTenant(req.collegeId, async (tx) => {
+      const club = await tx.club.findFirst({
+        where: { id: clubId, collegeId: req.collegeId },
+        select: { id: true, clubType: true },
+      });
+      if (!club) throw new AppError('Club not found', 404);
+      if (club.clubType === 'CENTRAL' && departmentIds && departmentIds.length > 0) {
+        throw new AppError('Central clubs cannot be linked to a department.', 409);
+      }
+
+      const departments = departmentIds && departmentIds.length
+        ? await tx.department.findMany({
+          where: {
+            id: { in: departmentIds },
+            collegeId: req.collegeId,
+          },
+          select: { id: true },
+        })
+        : [];
+
+      if (departments.length !== (departmentIds ? departmentIds.length : 0)) {
+        throw new AppError('One or more departments do not exist for this college.', 400);
+      }
+
+      await tx.clubDepartment.deleteMany({
+        where: {
+          clubId,
+          collegeId: req.collegeId,
+        },
+      });
+
+      for (const department of departments) {
+        await tx.clubDepartment.create({
+          data: {
+            collegeId: req.collegeId,
+            clubId,
+            departmentId: department.id,
+          },
+        });
+      }
     });
-    if (!club) throw new AppError('Club not found', 404);
-    if (club.isCentral === true && departmentIds.length > 0) {
+  } catch (err) {
+    if (err.message && err.message.includes('check_violation')) {
       throw new AppError('Central clubs cannot be linked to a department.', 409);
     }
-
-    const departments = departmentIds.length
-      ? await tx.department.findMany({
-        where: {
-          id: { in: departmentIds },
-          collegeId: DEFAULT_COLLEGE_ID,
-        },
-        select: { id: true },
-      })
-      : [];
-    if (departments.length !== departmentIds.length) {
-      throw new AppError('One or more departments do not exist for this college.', 400);
-    }
-
-    await tx.clubDepartment.deleteMany({
-      where: {
-        clubId,
-        department: { collegeId: DEFAULT_COLLEGE_ID },
-      },
-    });
-    for (const department of departments) {
-      await tx.clubDepartment.create({
-        data: { clubId, departmentId: department.id },
-      });
-    }
-  });
+    throw err;
+  }
 
   res.status(200).json({
     success: true,
@@ -192,16 +255,32 @@ exports.replaceClubDepartments = asyncHandler(async (req, res) => {
   });
 });
 
+/**
+ * GET /departments
+ * Lists departments for the current college with pagination.
+ */
 exports.listDepartments = asyncHandler(async (req, res) => {
-  const departments = await prisma.department.findMany({
-    where: { collegeId: DEFAULT_COLLEGE_ID },
-    include: {
-      clubs: {
-        where: { club: { isCentral: false } },
-        select: { clubId: true },
+  if (!req.collegeId) {
+    throw new AppError('Tenant context required: request must be routed through a college subdomain', 400);
+  }
+
+  const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+  const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 50));
+  const skip = (page - 1) * limit;
+
+  const departments = await withTenant(req.collegeId, async (tx) => {
+    return await tx.department.findMany({
+      where: { collegeId: req.collegeId },
+      include: {
+        clubs: {
+          where: { club: { clubType: { not: 'CENTRAL' } } },
+          select: { clubId: true },
+        },
       },
-    },
-    orderBy: { name: 'asc' },
+      orderBy: { name: 'asc' },
+      take: limit,
+      skip,
+    });
   });
 
   res.status(200).json({
@@ -216,28 +295,42 @@ exports.listDepartments = asyncHandler(async (req, res) => {
   });
 });
 
+/**
+ * GET /departments/:departmentId
+ * Retrieves a single department and its associated clubs.
+ */
 exports.getDepartment = asyncHandler(async (req, res) => {
+  if (!req.collegeId) {
+    throw new AppError('Tenant context required: request must be routed through a college subdomain', 400);
+  }
+
   const { departmentId } = req.params;
-  const department = await prisma.department.findFirst({
-    where: departmentWhere(departmentId),
-    include: {
-      clubs: {
-        where: { club: { isCentral: false } },
-        select: {
-          club: {
-            select: {
-              id: true,
-              name: true,
-              description: true,
-              logo: true,
-              coverImage: true,
-              createdAt: true,
-              updatedAt: true,
+
+  const department = await withTenant(req.collegeId, async (tx) => {
+    return await tx.department.findFirst({
+      where: { id: departmentId, collegeId: req.collegeId },
+      include: {
+        clubs: {
+          where: { club: { clubType: { not: 'CENTRAL' } } },
+          select: {
+            club: {
+              select: {
+                id: true,
+                name: true,
+                description: true,
+                clubType: true,
+                logoUrl: true,
+                logoPublicId: true,
+                coverImageUrl: true,
+                coverImagePublicId: true,
+                createdAt: true,
+                updatedAt: true,
+              },
             },
           },
         },
       },
-    },
+    });
   });
 
   if (!department) throw new AppError('Department not found', 404);
@@ -248,7 +341,7 @@ exports.getDepartment = asyncHandler(async (req, res) => {
     data: {
       department: {
         ...department,
-        clubs: department.clubs.map(({ club }) => club),
+        clubs: department.clubs.map(({ club }) => serializeClub(club)),
       },
     },
   });

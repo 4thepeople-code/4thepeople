@@ -1,35 +1,53 @@
-const { prisma } = require('../config/db');
-const { clubDepartmentsSelect, getClubDepartments } = require('../utils/clubDepartments');
+const { withTenant } = require('../config/db');
+const { clubDepartmentsSelect, serializeClub } = require('../utils/clubDepartments');
 const asyncHandler = require('../utils/asyncHandler');
 const { AppError } = require('../middleware/errorHandler');
 
-// Fields that may be shown to unauthenticated visitors. Keep user and
-// membership relations out of public responses.
-const publicClubFields = {
+const UUID_REGEX = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+
+/**
+ * Public fields exposed to unauthenticated visitors.
+ * Internal fields (created_by_user_id, legacy_mongo_id) are omitted.
+ */
+const publicClubSelect = {
   id: true,
+  collegeId: true,
   name: true,
   description: true,
-  logo: true,
-  coverImage: true,
+  clubType: true,
+  logoUrl: true,
+  logoPublicId: true,
+  coverImageUrl: true,
+  coverImagePublicId: true,
   createdAt: true,
   updatedAt: true,
-  isCentral: true,
   departments: clubDepartmentsSelect,
 };
 
 /**
  * GET /clubs
- * Returns the public directory of clubs.
+ * Returns the public directory of clubs for the resolved college tenant.
  */
 exports.listPublicClubs = asyncHandler(async (req, res) => {
-  const clubs = await prisma.club.findMany({
-    select: publicClubFields,
-    orderBy: { createdAt: 'desc' },
+  if (!req.collegeId) {
+    throw new AppError('Tenant context required: request must be routed through a college subdomain', 400);
+  }
+
+  const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+  const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 50));
+  const skip = (page - 1) * limit;
+
+  const clubs = await withTenant(req.collegeId, async (tx) => {
+    return await tx.club.findMany({
+      where: { collegeId: req.collegeId },
+      select: publicClubSelect,
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+      skip,
+    });
   });
-  const responseClubs = clubs.map(({ isCentral, departments, ...club }) => ({
-    ...club,
-    departments: getClubDepartments({ isCentral, departments }),
-  }));
+
+  const responseClubs = clubs.map(serializeClub);
 
   res.status(200).json({
     success: true,
@@ -39,31 +57,35 @@ exports.listPublicClubs = asyncHandler(async (req, res) => {
 
 /**
  * GET /clubs/:clubId
- * Returns public information for one club.
+ * Returns public information for one club within the resolved college tenant.
  */
 exports.getPublicClub = asyncHandler(async (req, res) => {
+  if (!req.collegeId) {
+    throw new AppError('Tenant context required: request must be routed through a college subdomain', 400);
+  }
+
   const { clubId } = req.params;
 
-  // Prisma's MongoDB connector expects ObjectId values for this field.
-  if (!/^[a-fA-F0-9]{24}$/.test(clubId)) {
+  if (!UUID_REGEX.test(clubId)) {
     throw new AppError('Invalid club ID', 400);
   }
 
-  const club = await prisma.club.findUnique({
-    where: { id: clubId },
-    select: publicClubFields,
+  const club = await withTenant(req.collegeId, async (tx) => {
+    return await tx.club.findFirst({
+      where: {
+        id: clubId,
+        collegeId: req.collegeId,
+      },
+      select: publicClubSelect,
+    });
   });
 
   if (!club) {
     throw new AppError('Club not found', 404);
   }
-  const { isCentral, departments, ...publicClub } = club;
 
   res.status(200).json({
     success: true,
-    club: {
-      ...publicClub,
-      departments: getClubDepartments({ isCentral, departments }),
-    },
+    club: serializeClub(club),
   });
 });

@@ -10,6 +10,7 @@
     "lint": "eslint .",
     "test:phase1": "node tests/phase1_tenant_layer.test.js",
     "test:phase2": "node tests/phase2_auth.test.js",
+    "test:phase3a": "node tests/phase3a.test.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

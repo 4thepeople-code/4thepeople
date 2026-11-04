@@ -1,12 +1,11 @@
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
-const { prisma } = require('../config/db');
-const { DEFAULT_COLLEGE_ID } = require('../config/college');
+const { withTenant } = require('../config/db');
 const asyncHandler = require('../utils/asyncHandler');
 const { AppError } = require('../middleware/errorHandler');
 const { sendInviteEmail, sendDeletionVerificationCode } = require('../services/emailService');
 const { sanitizeUser } = require('../utils/sanitizeUser');
-const { clubDepartmentsSelect, getClubDepartments } = require('../utils/clubDepartments');
+const { clubDepartmentsSelect, getClubDepartments, serializeClub } = require('../utils/clubDepartments');
 const { uploadBuffer, deleteAsset, deleteAssetsBestEffort } = require('../utils/cloudinaryUpload');
 
 const deletionCodeExpiryMs = 10 * 60 * 1000;
@@ -200,25 +199,45 @@ exports.resendInvite = asyncHandler(async (req, res) => {
  * Admin-only route to create a club
  */
 exports.createClub = asyncHandler(async (req, res) => {
-  const { name, description, isCentral } = req.body;
+  if (!req.collegeId) {
+    throw new AppError('Tenant context required: request must be routed through a college subdomain', 400);
+  }
 
-  if (!name) {
+  const { name, description, isCentral, clubType } = req.body;
+
+  if (!name || !name.trim()) {
     throw new AppError('Club name is required', 400);
   }
 
-  const club = await prisma.club.create({
-    data: {
-      name: name.trim(),
-      description: description ? description.trim() : null,
-      ...(isCentral !== undefined && { isCentral }),
-      createdById: req.user.id,
-    },
-  });
+  const resolvedClubType = clubType === 'CENTRAL' || isCentral === true ? 'CENTRAL' : 'DEPARTMENTAL';
+
+  let createdClub;
+  try {
+    createdClub = await withTenant(req.collegeId, async (tx) => {
+      return await tx.club.create({
+        data: {
+          collegeId: req.collegeId,
+          name: name.trim(),
+          description: description ? description.trim() : null,
+          clubType: resolvedClubType,
+          createdByUserId: req.user.id,
+        },
+        include: {
+          departments: clubDepartmentsSelect,
+        },
+      });
+    });
+  } catch (error) {
+    if (error.code === 'P2002') {
+      throw new AppError('A club with this name already exists for this college.', 409);
+    }
+    throw error;
+  }
 
   res.status(201).json({
     success: true,
     message: 'Club created successfully',
-    data: club,
+    data: serializeClub(createdClub),
   });
 });
 
@@ -227,8 +246,12 @@ exports.createClub = asyncHandler(async (req, res) => {
  * Admin-only route to update a club
  */
 exports.updateClub = asyncHandler(async (req, res) => {
+  if (!req.collegeId) {
+    throw new AppError('Tenant context required: request must be routed through a college subdomain', 400);
+  }
+
   const { clubId } = req.params;
-  const { name, description, isCentral } = req.body;
+  const { name, description, isCentral, clubType } = req.body;
 
   // Build update data only for fields that were provided
   const updateData = {};
@@ -237,51 +260,67 @@ exports.updateClub = asyncHandler(async (req, res) => {
     if (!name.trim()) {
       throw new AppError('Club name cannot be empty', 400);
     }
-
     updateData.name = name.trim();
   }
 
   if (description !== undefined) {
-    updateData.description = description
-      ? description.trim()
-      : null;
+    updateData.description = description ? description.trim() : null;
   }
-  if (isCentral !== undefined) updateData.isCentral = isCentral;
+
+  if (clubType !== undefined) {
+    updateData.clubType = clubType;
+  } else if (isCentral !== undefined) {
+    updateData.clubType = isCentral ? 'CENTRAL' : 'DEPARTMENTAL';
+  }
 
   // Nothing to update
   if (Object.keys(updateData).length === 0) {
-    throw new AppError(
-      'At least one club field is required',
-      400
-    );
+    throw new AppError('At least one club field is required', 400);
   }
 
-  const updatedClub = await prisma.$transaction(async (tx) => {
-    const existingClub = await tx.club.findUnique({ where: { id: clubId } });
-    if (!existingClub) throw new AppError('Club not found', 404);
+  let updatedClub;
+  try {
+    updatedClub = await withTenant(req.collegeId, async (tx) => {
+      const existingClub = await tx.club.findFirst({
+        where: { id: clubId, collegeId: req.collegeId },
+      });
+      if (!existingClub) throw new AppError('Club not found', 404);
 
-    if (isCentral === true && existingClub.isCentral !== true) {
-      const departmentLinkCount = await tx.clubDepartment.count({
-        where: {
-          clubId,
-          department: { collegeId: DEFAULT_COLLEGE_ID },
+      const targetIsCentral = updateData.clubType === 'CENTRAL';
+      if (targetIsCentral && existingClub.clubType !== 'CENTRAL') {
+        const departmentLinkCount = await tx.clubDepartment.count({
+          where: {
+            clubId,
+            collegeId: req.collegeId,
+          },
+        });
+        if (departmentLinkCount > 0) {
+          throw new AppError('A club with department links cannot be marked central.', 409);
+        }
+      }
+
+      return await tx.club.update({
+        where: { id: clubId },
+        data: updateData,
+        include: {
+          departments: clubDepartmentsSelect,
         },
       });
-      if (departmentLinkCount > 0) {
-        throw new AppError('A club with department links cannot be marked central.', 409);
-      }
-    }
-
-    return tx.club.update({
-      where: { id: clubId },
-      data: updateData,
     });
-  });
+  } catch (error) {
+    if (error.code === 'P2002') {
+      throw new AppError('A club with this name already exists for this college.', 409);
+    }
+    if (error.message && error.message.includes('check_violation')) {
+      throw new AppError('Central clubs cannot be linked to a department.', 409);
+    }
+    throw error;
+  }
 
   res.status(200).json({
     success: true,
     message: 'Club updated successfully',
-    data: updatedClub,
+    data: serializeClub(updatedClub),
   });
 });
 
@@ -583,23 +622,35 @@ exports.getClubManagers = asyncHandler(async (req, res) => {
  * Admin-only route to list clubs with their member counts
  */
 exports.listClubs = asyncHandler(async (req, res) => {
-  const clubs = await prisma.club.findMany({
-    include: {
-      _count: {
-        select: { members: true },
+  if (!req.collegeId) {
+    throw new AppError('Tenant context required: request must be routed through a college subdomain', 400);
+  }
+
+  const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+  const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 50));
+  const skip = (page - 1) * limit;
+
+  const clubs = await withTenant(req.collegeId, async (tx) => {
+    return await tx.club.findMany({
+      where: { collegeId: req.collegeId },
+      include: {
+        _count: {
+          select: { members: true },
+        },
+        departments: clubDepartmentsSelect,
       },
-      departments: clubDepartmentsSelect,
-    },
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+      skip,
+    });
   });
-  const clubsWithDepartments = clubs.map((club) => ({
-    ...club,
-    departments: getClubDepartments(club),
-  }));
+
+  const serializedClubs = clubs.map(serializeClub);
 
   res.status(200).json({
     success: true,
     message: 'Fetched all clubs',
-    data: clubsWithDepartments,
+    data: serializedClubs,
   });
 });
 
@@ -608,38 +659,42 @@ exports.listClubs = asyncHandler(async (req, res) => {
  * Admin-only route to view a club and all of its members
  */
 exports.getClub = asyncHandler(async (req, res) => {
+  if (!req.collegeId) {
+    throw new AppError('Tenant context required: request must be routed through a college subdomain', 400);
+  }
+
   const { clubId } = req.params;
-  const club = await prisma.club.findUnique({
-    where: { id: clubId },
-    include: {
-      members: {
-        select: {
-          role: true,
-          joinedAt: true,
-          user: {
-            select: {
-              name: true,
-              email: true,
+
+  const club = await withTenant(req.collegeId, async (tx) => {
+    return await tx.club.findFirst({
+      where: { id: clubId, collegeId: req.collegeId },
+      include: {
+        members: {
+          select: {
+            role: true,
+            joinedAt: true,
+            user: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+              },
             },
           },
         },
+        departments: clubDepartmentsSelect,
       },
-      departments: clubDepartmentsSelect,
-    },
+    });
   });
 
   if (!club) {
     throw new AppError('Club not found', 404);
   }
-  const clubWithDepartments = {
-    ...club,
-    departments: getClubDepartments(club),
-  };
 
   res.status(200).json({
     success: true,
     message: `View club with ID ${clubId}`,
-    data: clubWithDepartments,
+    data: serializeClub(club),
   });
 });
 
@@ -694,8 +749,20 @@ exports.viewAllUsers = asyncHandler(async (req, res) => {
  * GET /admin/clubs/:id or /admin/viewClub/:id
  */
 exports.viewClub = asyncHandler(async (req, res) => {
+  if (!req.collegeId) {
+    throw new AppError('Tenant context required: request must be routed through a college subdomain', 400);
+  }
+
   const { id } = req.params;
-  const club = await prisma.club.findUnique({ where: { id } });
+
+  const club = await withTenant(req.collegeId, async (tx) => {
+    return await tx.club.findFirst({
+      where: { id, collegeId: req.collegeId },
+      include: {
+        departments: clubDepartmentsSelect,
+      },
+    });
+  });
 
   if (!club) {
     throw new AppError('Club not found', 404);
@@ -704,7 +771,7 @@ exports.viewClub = asyncHandler(async (req, res) => {
   res.status(200).json({
     success: true,
     message: `View club with ID ${id}`,
-    data: club,
+    data: serializeClub(club),
   });
 });
 
@@ -712,12 +779,30 @@ exports.viewClub = asyncHandler(async (req, res) => {
  * GET /admin/clubs or /admin/viewAllClubs
  */
 exports.viewAllClubs = asyncHandler(async (req, res) => {
-  const clubs = await prisma.club.findMany();
+  if (!req.collegeId) {
+    throw new AppError('Tenant context required: request must be routed through a college subdomain', 400);
+  }
+
+  const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+  const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 50));
+  const skip = (page - 1) * limit;
+
+  const clubs = await withTenant(req.collegeId, async (tx) => {
+    return await tx.club.findMany({
+      where: { collegeId: req.collegeId },
+      include: {
+        departments: clubDepartmentsSelect,
+      },
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+      skip,
+    });
+  });
 
   res.status(200).json({
     success: true,
     message: 'Fetched all clubs',
-    data: clubs,
+    data: clubs.map(serializeClub),
   });
 });
 
