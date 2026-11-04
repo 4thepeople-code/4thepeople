@@ -57,6 +57,29 @@ app.get('/api/health', (req, res) => {
   res.status(200).json({ status: 'ok', uptime: process.uptime() });
 });
 
+// Staging debug endpoint for reverse proxy header inspection (behind shared secret check)
+app.get('/__debug/headers', (req, res, next) => {
+  if (process.env.DEBUG_HEADERS !== 'true') {
+    return next(); // Fall through to 404 handler when not enabled
+  }
+
+  const forwardedHeaders = {};
+  for (const [key, value] of Object.entries(req.headers)) {
+    if (key.startsWith('x-forwarded-')) {
+      forwardedHeaders[key] = value;
+    }
+  }
+
+  res.status(200).json({
+    success: true,
+    ip: req.ip,
+    hostname: req.hostname,
+    protocol: req.protocol,
+    forwardedHeaders,
+    hasSharedSecret: Boolean(req.headers['x-proxy-shared-secret']),
+  });
+});
+
 // Base route
 app.get('/', (req, res) => {
   res.status(200).json({ success: true, message: 'Club Event Manager API is running...' });

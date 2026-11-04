@@ -999,7 +999,45 @@ async function runPhase2Tests() {
         },
       });
       assert.strictEqual(legitimateProxiedRes.status, 200, 'Legitimate call with valid proxy secret must succeed');
+
+      // 19f. Staging debug headers endpoint: disabled when DEBUG_HEADERS is not 'true' -> 404
+      const debugDisabledRes = await apiFetch('/__debug/headers', {
+        method: 'GET',
+        headers: {
+          'x-proxy-shared-secret': TEST_PROXY_SECRET,
+          'X-Forwarded-Host': 'lbrce.localhost',
+        },
+      });
+      assert.strictEqual(debugDisabledRes.status, 404, 'Debug headers endpoint must 404 when DEBUG_HEADERS is not true');
+
+      // 19g. Staging debug headers endpoint: blocked with 403 if shared secret is missing
+      process.env.DEBUG_HEADERS = 'true';
+      const debugBlockedRes = await apiFetch('/__debug/headers', {
+        method: 'GET',
+        headers: {
+          'X-Forwarded-Host': 'lbrce.localhost',
+        },
+      });
+      assert.strictEqual(debugBlockedRes.status, 403, 'Debug headers endpoint must be behind shared secret check');
+
+      // 19h. Staging debug headers endpoint: returns client metadata when enabled and authenticated
+      const debugEnabledRes = await apiFetch('/__debug/headers', {
+        method: 'GET',
+        headers: {
+          'x-proxy-shared-secret': TEST_PROXY_SECRET,
+          'X-Forwarded-Host': 'lbrce.localhost',
+          'X-Forwarded-For': '198.51.100.50',
+          'X-Forwarded-Proto': 'https',
+        },
+      });
+      assert.strictEqual(debugEnabledRes.status, 200, 'Debug headers endpoint must return 200 when enabled and authorized');
+      assert.strictEqual(debugEnabledRes.data.hasSharedSecret, true);
+      assert.strictEqual(debugEnabledRes.data.forwardedHeaders['x-forwarded-proto'], 'https');
+      assert.strictEqual(debugEnabledRes.data.secret, undefined, 'Secret itself must never be exposed');
+      delete process.env.DEBUG_HEADERS;
+
       console.log('  ✔ Direct calls with forged XFF/XFH/CF headers blocked (HTTP 403); shared secret enforced.');
+      console.log('  ✔ GET /__debug/headers verified: active only when DEBUG_HEADERS=true and behind shared secret.');
     } finally {
       delete process.env.PROXY_SHARED_SECRET;
     }
