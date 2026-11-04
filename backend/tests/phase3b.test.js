@@ -1845,6 +1845,85 @@ async function runPhase3bTests() {
     }
 
     // -------------------------------------------------------------------------
+    // 25. Atomic consumeDeletionVerification Under Concurrent Execution (Item 2)
+    // -------------------------------------------------------------------------
+    {
+      console.log('\n[TEST 25] Testing Atomic consumeDeletionVerification Under Concurrent Execution (Item 2)...');
+      let concurrentUser;
+      const concurrentCode = '789123';
+      const concurrentHash = await bcrypt.hash(concurrentCode, 10);
+
+      await withTenant(collegeA.id, async (tx) => {
+        concurrentUser = await tx.user.create({
+          data: {
+            collegeId: collegeA.id,
+            email: 'concurrent_del@example.test',
+            name: 'Concurrent User',
+            role: 'USER',
+            isActive: true,
+          },
+        });
+
+        await tx.deletionVerification.create({
+          data: {
+            collegeId: collegeA.id,
+            adminId: adminUserA.id,
+            targetType: 'USER',
+            targetId: concurrentUser.id,
+            codeHash: concurrentHash,
+            expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+            consumed: false,
+          },
+        });
+      });
+
+      // 1. Direct concurrent transaction test on consumeDeletionVerification
+      const { consumeDeletionVerification } = require('../controllers/adminController');
+      // If not exported, test via concurrent HTTP requests
+      const [resDelA, resDelB] = await Promise.all([
+        makeRequest({
+          method: 'DELETE',
+          path: `/admin/users/${concurrentUser.id}`,
+          host: 'lbrce.localhost',
+          token: tokenAdminA,
+          body: { code: concurrentCode },
+        }),
+        makeRequest({
+          method: 'DELETE',
+          path: `/admin/users/${concurrentUser.id}`,
+          host: 'lbrce.localhost',
+          token: tokenAdminA,
+          body: { code: concurrentCode },
+        }),
+      ]);
+
+      const successCount = [resDelA.status, resDelB.status].filter((s) => s === 200).length;
+      assert.strictEqual(
+        successCount,
+        1,
+        `FAIL: Exactly one concurrent deletion must succeed (200), got: ${resDelA.status} and ${resDelB.status}`
+      );
+      assert.ok(
+        [400, 404].includes(resDelA.status === 200 ? resDelB.status : resDelA.status),
+        'FAIL: The concurrent attempt must fail'
+      );
+
+      // Verify the user was deleted
+      await withTenant(collegeA.id, async (tx) => {
+        const u = await tx.user.findUnique({ where: { id: concurrentUser.id } });
+        assert.strictEqual(u, null, 'User must be deleted from DB');
+        const verif = await tx.deletionVerification.findFirst({
+          where: { targetId: concurrentUser.id, collegeId: collegeA.id },
+        });
+        assert.strictEqual(verif.consumed, true, 'Verification code must be marked consumed');
+        totalRowsChecked += 2;
+      });
+
+      totalRowsChecked += 2;
+      console.log('  ✔ Concurrent deletions with same code tested: exactly one succeeds (200), other fails.');
+    }
+
+    // -------------------------------------------------------------------------
     // Final Assertions & Row Count Verification
     // -------------------------------------------------------------------------
     console.log('\n[SUMMARY] Non-Vacuous Row Count Assertion:');

@@ -76,21 +76,43 @@ const getClubDeletionTarget = async (tx, collegeId, clubId) => {
 };
 
 const consumeDeletionVerification = async (tx, collegeId, adminId, targetType, targetId, code) => {
-  const verification = await tx.deletionVerification.findFirst({
-    where: { collegeId, adminId, targetType, targetId, consumed: false },
+  const verifications = await tx.deletionVerification.findMany({
+    where: {
+      collegeId,
+      adminId,
+      targetType,
+      targetId,
+      consumed: false,
+      expiresAt: { gt: new Date() },
+    },
     orderBy: { createdAt: 'desc' },
+    take: 1,
   });
-  if (!verification || verification.expiresAt < new Date()) {
+
+  if (!verifications.length) {
     throw new AppError(invalidDeletionCodeMessage, 400);
   }
+
+  const verification = verifications[0];
   const isMatch = await bcrypt.compare(code, verification.codeHash);
   if (!isMatch) {
     throw new AppError(invalidDeletionCodeMessage, 400);
   }
-  await tx.deletionVerification.update({
-    where: { id: verification.id },
+
+  // Atomically consume: only update if consumed is still false and not expired.
+  // Requires count === 1 to ensure that racing concurrent requests cannot both consume the code.
+  const updateResult = await tx.deletionVerification.updateMany({
+    where: {
+      id: verification.id,
+      consumed: false,
+      expiresAt: { gt: new Date() },
+    },
     data: { consumed: true },
   });
+
+  if (updateResult.count !== 1) {
+    throw new AppError(invalidDeletionCodeMessage, 400);
+  }
 };
 
 const requestDeletionCode = async (req, res, targetType, targetId) => {
