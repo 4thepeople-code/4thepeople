@@ -498,7 +498,33 @@ async function runPhase2Tests() {
       existingResetRes.data.message,
       'Forgot-password response must be 100% identical between existing and non-existing accounts'
     );
-    console.log('  ✔ Forgot-password returns identical HTTP 200 message (zero account enumeration).');
+
+    // Verify that passwordResetOtpHash is non-null and persisted in PostgreSQL immediately after forgot-password returns 200
+    const userOtpState = await withTenant(collegeA.id, async (tx) => {
+      return await tx.user.findFirst({
+        where: { collegeId: collegeA.id, email: FIXTURE_EMAILS.MANAGER_LBRCE },
+        select: {
+          passwordResetOtpHash: true,
+          passwordResetOtpExpiresAt: true,
+          passwordResetAttempts: true,
+        },
+      });
+    });
+    assert.ok(
+      userOtpState && userOtpState.passwordResetOtpHash,
+      'FAIL: passwordResetOtpHash must be non-null and persisted in PostgreSQL immediately after /auth/manager/forgot-password returns 200'
+    );
+    assert.strictEqual(
+      userOtpState.passwordResetOtpHash.length,
+      64,
+      'passwordResetOtpHash must be a 64-character SHA-256 hex string'
+    );
+    assert.ok(
+      new Date(userOtpState.passwordResetOtpExpiresAt) > new Date(),
+      'passwordResetOtpExpiresAt must be in the future'
+    );
+    assert.strictEqual(userOtpState.passwordResetAttempts, 0);
+    console.log('  ✔ OTP hash confirmed persisted in database upon /auth/manager/forgot-password response.');
 
     // -------------------------------------------------------------------------
     // Test 6: Password Reset Flow (OTP Expiry & Brute Force Protection)

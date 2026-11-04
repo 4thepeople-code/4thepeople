@@ -265,7 +265,11 @@ exports.getMe = asyncHandler(async (req, res) => {
  * Sends a password reset OTP to an active manager account.
  */
 exports.requestManagerPasswordReset = asyncHandler(async (req, res) => {
-  const email = req.body.email.toLowerCase().trim();
+  const rawEmail = req.body && req.body.email;
+  if (!rawEmail || typeof rawEmail !== 'string') {
+    throw new AppError('Email address is required', 400);
+  }
+  const email = rawEmail.toLowerCase().trim();
 
   if (!req.collegeId) {
     throw new AppError('Tenant context required: request must be routed through a college subdomain', 400);
@@ -285,16 +289,11 @@ exports.requestManagerPasswordReset = asyncHandler(async (req, res) => {
         name: true,
         email: true,
         isActive: true,
-        memberships: {
-          where: { role: 'MANAGER' },
-          select: { id: true },
-          take: 1,
-        },
       },
     });
 
-    // Invariant: only active users with MANAGER memberships receive OTP
-    if (user && user.isActive && user.memberships.length > 0) {
+    // Invariant: all active users in this college tenant receive an OTP
+    if (user && user.isActive) {
       const otp = crypto.randomInt(100000, 1000000).toString();
       await tx.user.update({
         where: { id: user.id },
@@ -361,16 +360,11 @@ exports.resetManagerPassword = asyncHandler(async (req, res) => {
         passwordResetOtpHash: true,
         passwordResetOtpExpiresAt: true,
         passwordResetAttempts: true,
-        memberships: {
-          where: { role: 'MANAGER' },
-          select: { id: true },
-          take: 1,
-        },
       },
     });
   });
 
-  if (!user || !user.isActive || user.memberships.length === 0) {
+  if (!user || !user.isActive) {
     throw new AppError('Invalid or expired OTP', 400);
   }
 
