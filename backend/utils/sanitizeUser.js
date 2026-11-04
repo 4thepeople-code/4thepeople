@@ -21,10 +21,24 @@ const sanitizeUser = (user) => {
     passwordResetOtpHash,
     passwordResetOtpExpiresAt,
     passwordResetAttempts,
+    avatarUrl,
+    avatarPublicId,
     ...sanitized
   } = user;
 
-  return sanitized;
+  let avatar = user.avatar;
+  if (avatar === undefined) {
+    if (avatarUrl || avatarPublicId) {
+      avatar = { url: avatarUrl || null, publicId: avatarPublicId || null };
+    } else {
+      avatar = null;
+    }
+  }
+
+  return {
+    ...sanitized,
+    avatar,
+  };
 };
 
 module.exports = { sanitizeUser };

@@ -104,6 +104,10 @@ exports.requestClubDeletionCode = asyncHandler(async (req, res) => {
  * Admin-only route to invite a new manager
  */
 exports.createManager = asyncHandler(async (req, res) => {
+  if (!req.collegeId) {
+    throw new AppError('Tenant context required: request must be routed through a college subdomain', 400);
+  }
+
   const { name, email } = req.body;
 
   if (!name || !email) {
@@ -111,39 +115,46 @@ exports.createManager = asyncHandler(async (req, res) => {
   }
 
   const normalizedEmail = email.toLowerCase().trim();
-
-  // Check if user already exists
-  const existingUser = await prisma.user.findUnique({
-    where: { email: normalizedEmail },
-  });
-
-  if (existingUser) {
-    throw new AppError('User with this email already exists', 409);
-  }
-
-  // Generate invite token and expiration (48 hours)
-  const inviteToken = crypto.randomBytes(32).toString('hex');
+  const rawInviteToken = crypto.randomBytes(32).toString('hex');
+  const inviteTokenHash = crypto.createHash('sha256').update(rawInviteToken).digest('hex');
   const inviteExpiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000);
 
-  // Create pending manager user
-  const user = await prisma.user.create({
-    data: {
-      name: name.trim(),
-      email: normalizedEmail,
-      password: null,
-      role: 'USER',
-      isActive: false,
-      inviteToken,
-      inviteExpiresAt,
-    },
-  });
-
-  // Send invitation email
+  let user;
   try {
-    await sendInviteEmail(user.email, user.name, inviteToken);
+    user = await withTenant(req.collegeId, async (tx) => {
+      const existingUser = await tx.user.findFirst({
+        where: { email: normalizedEmail, collegeId: req.collegeId },
+      });
+
+      if (existingUser) {
+        throw new AppError('User with this email already exists', 409);
+      }
+
+      return await tx.user.create({
+        data: {
+          collegeId: req.collegeId,
+          name: name.trim(),
+          email: normalizedEmail,
+          passwordHash: null,
+          role: 'USER',
+          isActive: false,
+          inviteTokenHash,
+          inviteExpiresAt,
+        },
+      });
+    });
+  } catch (error) {
+    if (error.code === 'P2002') {
+      throw new AppError('User with this email already exists', 409);
+    }
+    throw error;
+  }
+
+  // Send invitation email OUTSIDE transaction
+  try {
+    await sendInviteEmail(user.email, user.name, rawInviteToken);
   } catch (emailError) {
     console.error('Failed to send invite email:', emailError);
-    // Don't fail the user creation completely, but inform response
   }
 
   res.status(201).json({
@@ -158,34 +169,43 @@ exports.createManager = asyncHandler(async (req, res) => {
  * Admin-only route to resend an invitation email
  */
 exports.resendInvite = asyncHandler(async (req, res) => {
+  if (!req.collegeId) {
+    throw new AppError('Tenant context required: request must be routed through a college subdomain', 400);
+  }
+
   const { userId } = req.params;
-
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-  });
-
-  if (!user) {
-    throw new AppError('User not found', 404);
-  }
-
-  if (user.isActive) {
-    throw new AppError('User account is already active', 400);
-  }
-
-  // Regenerate invite token and expiration (48 hours)
-  const inviteToken = crypto.randomBytes(32).toString('hex');
+  const rawInviteToken = crypto.randomBytes(32).toString('hex');
+  const inviteTokenHash = crypto.createHash('sha256').update(rawInviteToken).digest('hex');
   const inviteExpiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000);
 
-  const updatedUser = await prisma.user.update({
-    where: { id: userId },
-    data: {
-      inviteToken,
-      inviteExpiresAt,
-    },
+  const updatedUser = await withTenant(req.collegeId, async (tx) => {
+    const user = await tx.user.findFirst({
+      where: { id: userId, collegeId: req.collegeId },
+    });
+
+    if (!user) {
+      throw new AppError('User not found', 404);
+    }
+
+    if (user.isActive) {
+      throw new AppError('User account is already active', 400);
+    }
+
+    return await tx.user.update({
+      where: { id: userId },
+      data: {
+        inviteTokenHash,
+        inviteExpiresAt,
+      },
+    });
   });
 
-  // Send invitation email
-  await sendInviteEmail(updatedUser.email, updatedUser.name, inviteToken);
+  // Send invitation email OUTSIDE transaction
+  try {
+    await sendInviteEmail(updatedUser.email, updatedUser.name, rawInviteToken);
+  } catch (emailError) {
+    console.error('Failed to send invite email:', emailError);
+  }
 
   res.status(200).json({
     success: true,
@@ -329,6 +349,10 @@ exports.updateClub = asyncHandler(async (req, res) => {
  * Admin-only route to change a member's role within a club.
  */
 exports.updateMembership = asyncHandler(async (req, res) => {
+  if (!req.collegeId) {
+    throw new AppError('Tenant context required: request must be routed through a college subdomain', 400);
+  }
+
   const { membershipId } = req.params;
   const { role } = req.body;
 
@@ -345,9 +369,9 @@ exports.updateMembership = asyncHandler(async (req, res) => {
     throw new AppError('Role must be either MANAGER or MEMBER', 400);
   }
 
-  const updatedMembership = await prisma.$transaction(async (tx) => {
-    const membership = await tx.membership.findUnique({
-      where: { id: membershipId },
+  const updatedMembership = await withTenant(req.collegeId, async (tx) => {
+    const membership = await tx.membership.findFirst({
+      where: { id: membershipId, collegeId: req.collegeId },
     });
 
     if (!membership) {
@@ -359,6 +383,7 @@ exports.updateMembership = asyncHandler(async (req, res) => {
       const managerCount = await tx.membership.count({
         where: {
           clubId: membership.clubId,
+          collegeId: req.collegeId,
           role: 'MANAGER',
         },
       });
@@ -368,7 +393,7 @@ exports.updateMembership = asyncHandler(async (req, res) => {
       }
     }
 
-    return tx.membership.update({
+    return await tx.membership.update({
       where: { id: membershipId },
       data: { role: membershipRole },
       include: {
@@ -402,11 +427,15 @@ exports.updateMembership = asyncHandler(async (req, res) => {
  * Admin-only route to remove a member from a club.
  */
 exports.deleteMembership = asyncHandler(async (req, res) => {
+  if (!req.collegeId) {
+    throw new AppError('Tenant context required: request must be routed through a college subdomain', 400);
+  }
+
   const { membershipId } = req.params;
 
-  const deletedMembership = await prisma.$transaction(async (tx) => {
-    const membership = await tx.membership.findUnique({
-      where: { id: membershipId },
+  const deletedMembership = await withTenant(req.collegeId, async (tx) => {
+    const membership = await tx.membership.findFirst({
+      where: { id: membershipId, collegeId: req.collegeId },
     });
 
     if (!membership) {
@@ -418,6 +447,7 @@ exports.deleteMembership = asyncHandler(async (req, res) => {
       const managerCount = await tx.membership.count({
         where: {
           clubId: membership.clubId,
+          collegeId: req.collegeId,
           role: 'MANAGER',
         },
       });
@@ -427,7 +457,7 @@ exports.deleteMembership = asyncHandler(async (req, res) => {
       }
     }
 
-    return tx.membership.delete({
+    return await tx.membership.delete({
       where: { id: membershipId },
       include: {
         user: {
@@ -460,6 +490,10 @@ exports.deleteMembership = asyncHandler(async (req, res) => {
  * Admin-only route to invite a new manager to a club
  */
 exports.inviteManagerToClub = asyncHandler(async (req, res) => {
+  if (!req.collegeId) {
+    throw new AppError('Tenant context required: request must be routed through a college subdomain', 400);
+  }
+
   const { clubId } = req.params;
   const { name, email } = req.body;
 
@@ -467,43 +501,62 @@ exports.inviteManagerToClub = asyncHandler(async (req, res) => {
     throw new AppError('Name and email are required', 400);
   }
 
-  const club = await prisma.club.findUnique({ where: { id: clubId } });
-  if (!club) {
-    throw new AppError('Club not found', 404);
-  }
-
   const normalizedEmail = email.toLowerCase().trim();
-  const inviteToken = crypto.randomBytes(32).toString('hex');
+  const rawInviteToken = crypto.randomBytes(32).toString('hex');
+  const inviteTokenHash = crypto.createHash('sha256').update(rawInviteToken).digest('hex');
   const inviteExpiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000);
 
-  const { user } = await prisma.$transaction(async (tx) => {
-    const user = await tx.user.create({
-      data: {
-        name: name.trim(),
-        email: normalizedEmail,
-        password: null,
-        role: 'USER',
-        isActive: false,
-        inviteToken,
-        inviteExpiresAt,
-      },
-    });
-
-    await tx.membership.create({
-      data: {
-        userId: user.id,
-        clubId,
-        role: 'MANAGER',
-      },
-    });
-
-    return { user };
-  });
-
-  // Email is sent after the transaction commits so a recipient never receives an invite
-  // for a user and membership that were rolled back.
+  let user;
   try {
-    await sendInviteEmail(user.email, user.name, inviteToken);
+    user = await withTenant(req.collegeId, async (tx) => {
+      const club = await tx.club.findFirst({
+        where: { id: clubId, collegeId: req.collegeId },
+      });
+      if (!club) {
+        throw new AppError('Club not found', 404);
+      }
+
+      const existingUser = await tx.user.findFirst({
+        where: { email: normalizedEmail, collegeId: req.collegeId },
+      });
+      if (existingUser) {
+        throw new AppError('User with this email already exists', 409);
+      }
+
+      const newUser = await tx.user.create({
+        data: {
+          collegeId: req.collegeId,
+          name: name.trim(),
+          email: normalizedEmail,
+          passwordHash: null,
+          role: 'USER',
+          isActive: false,
+          inviteTokenHash,
+          inviteExpiresAt,
+        },
+      });
+
+      await tx.membership.create({
+        data: {
+          collegeId: req.collegeId,
+          userId: newUser.id,
+          clubId,
+          role: 'MANAGER',
+        },
+      });
+
+      return newUser;
+    });
+  } catch (error) {
+    if (error.code === 'P2002') {
+      throw new AppError('User or membership already exists', 409);
+    }
+    throw error;
+  }
+
+  // Send invitation email OUTSIDE transaction
+  try {
+    await sendInviteEmail(user.email, user.name, rawInviteToken);
   } catch (emailError) {
     console.error('Failed to send invite email:', emailError);
   }
@@ -520,6 +573,10 @@ exports.inviteManagerToClub = asyncHandler(async (req, res) => {
  * Admin-only route to add an active existing user as a club manager
  */
 exports.addExistingManagerToClub = asyncHandler(async (req, res) => {
+  if (!req.collegeId) {
+    throw new AppError('Tenant context required: request must be routed through a college subdomain', 400);
+  }
+
   const { clubId } = req.params;
   const { userId } = req.body;
 
@@ -527,33 +584,35 @@ exports.addExistingManagerToClub = asyncHandler(async (req, res) => {
     throw new AppError('User ID is required', 400);
   }
 
-  const club = await prisma.club.findUnique({ where: { id: clubId } });
-  if (!club) {
-    throw new AppError('Club not found', 404);
-  }
-
-  const user = await prisma.user.findUnique({ where: { id: userId } });
-  if (!user) {
-    throw new AppError('User not found', 404);
-  }
-
-  if (!user.isActive) {
-    throw new AppError('User account is not active', 400);
-  }
-
+  let membership;
   try {
-    const membership = await prisma.membership.create({
-      data: {
-        userId,
-        clubId,
-        role: 'MANAGER',
-      },
-    });
+    membership = await withTenant(req.collegeId, async (tx) => {
+      const club = await tx.club.findFirst({
+        where: { id: clubId, collegeId: req.collegeId },
+      });
+      if (!club) {
+        throw new AppError('Club not found', 404);
+      }
 
-    res.status(201).json({
-      success: true,
-      message: 'Existing user added as club manager successfully',
-      data: membership,
+      const user = await tx.user.findFirst({
+        where: { id: userId, collegeId: req.collegeId },
+      });
+      if (!user) {
+        throw new AppError('User not found', 404);
+      }
+
+      if (!user.isActive) {
+        throw new AppError('User account is not active', 400);
+      }
+
+      return await tx.membership.create({
+        data: {
+          collegeId: req.collegeId,
+          userId,
+          clubId,
+          role: 'MANAGER',
+        },
+      });
     });
   } catch (error) {
     if (error.code === 'P2002') {
@@ -561,6 +620,12 @@ exports.addExistingManagerToClub = asyncHandler(async (req, res) => {
     }
     throw error;
   }
+
+  res.status(201).json({
+    success: true,
+    message: 'Existing user added as club manager successfully',
+    data: membership,
+  });
 });
 
 /**
@@ -568,52 +633,56 @@ exports.addExistingManagerToClub = asyncHandler(async (req, res) => {
  * Admin-only route to list managers of a specific club
  */
 exports.getClubManagers = asyncHandler(async (req, res) => {
-  const { clubId } = req.params;
-
-  // Check if club exists
-  const club = await prisma.club.findUnique({
-    where: { id: clubId },
-    select: {
-      id: true,
-      name: true,
-    },
-  });
-
-  if (!club) {
-    throw new AppError('Club not found', 404);
+  if (!req.collegeId) {
+    throw new AppError('Tenant context required: request must be routed through a college subdomain', 400);
   }
 
-  // Fetch only MANAGER memberships
-  const managers = await prisma.membership.findMany({
-    where: {
-      clubId,
-      role: 'MANAGER',
-    },
-    select: {
-      id: true,
-      role: true,
-      joinedAt: true,
-      user: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          isActive: true,
+  const { clubId } = req.params;
+
+  const result = await withTenant(req.collegeId, async (tx) => {
+    const club = await tx.club.findFirst({
+      where: { id: clubId, collegeId: req.collegeId },
+      select: {
+        id: true,
+        name: true,
+      },
+    });
+
+    if (!club) {
+      throw new AppError('Club not found', 404);
+    }
+
+    const managers = await tx.membership.findMany({
+      where: {
+        clubId,
+        collegeId: req.collegeId,
+        role: 'MANAGER',
+      },
+      select: {
+        id: true,
+        role: true,
+        joinedAt: true,
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            isActive: true,
+          },
         },
       },
-    },
-    orderBy: {
-      joinedAt: 'asc',
-    },
+      orderBy: {
+        joinedAt: 'asc',
+      },
+    });
+
+    return { club, managers };
   });
 
   res.status(200).json({
     success: true,
     message: 'Fetched club managers successfully',
-    data: {
-      club,
-      managers,
-    },
+    data: result,
   });
 });
 
@@ -702,23 +771,30 @@ exports.getClub = asyncHandler(async (req, res) => {
  * GET /admin/users/:id or /admin/viewUser/:id
  */
 exports.viewUser = asyncHandler(async (req, res) => {
+  if (!req.collegeId) {
+    throw new AppError('Tenant context required: request must be routed through a college subdomain', 400);
+  }
+
   const { id } = req.params;
-  const user = await prisma.user.findUnique({
-    where: { id },
-    include: {
-      memberships: {
-        include: {
-          club: {
-            select: {
-              id: true,
-              name: true,
-              description: true,
-              createdAt: true,
+  const user = await withTenant(req.collegeId, async (tx) => {
+    return await tx.user.findFirst({
+      where: { id, collegeId: req.collegeId },
+      include: {
+        memberships: {
+          where: { collegeId: req.collegeId },
+          include: {
+            club: {
+              select: {
+                id: true,
+                name: true,
+                description: true,
+                createdAt: true,
+              },
             },
           },
         },
       },
-    },
+    });
   });
 
   if (!user) {
@@ -736,7 +812,33 @@ exports.viewUser = asyncHandler(async (req, res) => {
  * GET /admin/users or /admin/viewAllUsers
  */
 exports.viewAllUsers = asyncHandler(async (req, res) => {
-  const users = await prisma.user.findMany();
+  if (!req.collegeId) {
+    throw new AppError('Tenant context required: request must be routed through a college subdomain', 400);
+  }
+
+  const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+  const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 50));
+  const skip = (page - 1) * limit;
+
+  const users = await withTenant(req.collegeId, async (tx) => {
+    return await tx.user.findMany({
+      where: { collegeId: req.collegeId },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        isActive: true,
+        avatarUrl: true,
+        avatarPublicId: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+      skip,
+    });
+  });
 
   res.status(200).json({
     success: true,
@@ -875,43 +977,52 @@ exports.deleteClub = asyncHandler(async (req, res) => {
  * Fetch logged-in admin's profile and system metrics
  */
 exports.getAdminProfile = asyncHandler(async (req, res) => {
-  const userId = req.user.id;
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: {
-      id: true,
-      name: true,
-      email: true,
-      role: true,
-      isActive: true,
-      avatar: true,
-      createdAt: true,
-      updatedAt: true,
-      _count: {
-        select: {
-          createdClubs: true,
-        },
-      },
-    },
-  });
-
-  if (!user) {
-    throw new AppError('Admin profile not found', 404);
+  if (!req.collegeId) {
+    throw new AppError('Tenant context required: request must be routed through a college subdomain', 400);
   }
 
-  const totalUsers = await prisma.user.count();
-  const totalClubs = await prisma.club.count();
+  const userId = req.user.id;
+
+  const result = await withTenant(req.collegeId, async (tx) => {
+    const user = await tx.user.findFirst({
+      where: { id: userId, collegeId: req.collegeId },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        isActive: true,
+        avatarUrl: true,
+        avatarPublicId: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    if (!user) {
+      throw new AppError('Admin profile not found', 404);
+    }
+
+    const totalUsers = await tx.user.count({ where: { collegeId: req.collegeId } });
+    const totalClubs = await tx.club.count({ where: { collegeId: req.collegeId } });
+    const createdClubs = await tx.club.count({ where: { createdByUserId: userId, collegeId: req.collegeId } });
+
+    return {
+      user: sanitizeUser(user),
+      stats: {
+        totalUsers,
+        totalClubs,
+        createdClubs,
+      },
+    };
+  });
 
   res.status(200).json({
     success: true,
     message: 'Fetched admin profile',
     data: {
-      ...user,
-      stats: {
-        totalUsers,
-        totalClubs,
-        createdClubs: user._count?.createdClubs || 0,
-      },
+      ...result.user,
+      stats: result.stats,
     },
   });
 });
@@ -921,16 +1032,12 @@ exports.getAdminProfile = asyncHandler(async (req, res) => {
  * Update logged-in admin's profile name and/or password
  */
 exports.updateAdminProfile = asyncHandler(async (req, res) => {
+  if (!req.collegeId) {
+    throw new AppError('Tenant context required: request must be routed through a college subdomain', 400);
+  }
+
   const userId = req.user.id;
   const { name, currentPassword, newPassword } = req.body;
-
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-  });
-
-  if (!user) {
-    throw new AppError('Admin user not found', 404);
-  }
 
   const updateData = {};
 
@@ -938,30 +1045,40 @@ exports.updateAdminProfile = asyncHandler(async (req, res) => {
     updateData.name = name.trim();
   }
 
-  if (newPassword) {
-    if (!currentPassword) {
-      throw new AppError('Current password is required to change password', 400);
-    }
-    if (!user.password) {
-      throw new AppError('Password not set for this account', 400);
-    }
-    const isMatch = await bcrypt.compare(currentPassword, user.password);
-    if (!isMatch) {
-      throw new AppError('Current password is incorrect', 400);
-    }
-    if (newPassword.length < 6) {
-      throw new AppError('New password must be at least 6 characters', 400);
-    }
-    updateData.password = await bcrypt.hash(newPassword, 10);
-  }
+  const updatedUser = await withTenant(req.collegeId, async (tx) => {
+    const user = await tx.user.findFirst({
+      where: { id: userId, collegeId: req.collegeId },
+    });
 
-  if (Object.keys(updateData).length === 0) {
-    throw new AppError('No valid profile fields provided for update', 400);
-  }
+    if (!user) {
+      throw new AppError('Admin user not found', 404);
+    }
 
-  const updatedUser = await prisma.user.update({
-    where: { id: userId },
-    data: updateData,
+    if (newPassword) {
+      if (!currentPassword) {
+        throw new AppError('Current password is required to change password', 400);
+      }
+      if (!user.passwordHash) {
+        throw new AppError('Password not set for this account', 400);
+      }
+      const isMatch = await bcrypt.compare(currentPassword, user.passwordHash);
+      if (!isMatch) {
+        throw new AppError('Current password is incorrect', 400);
+      }
+      if (newPassword.length < 6) {
+        throw new AppError('New password must be at least 6 characters', 400);
+      }
+      updateData.passwordHash = await bcrypt.hash(newPassword, 10);
+    }
+
+    if (Object.keys(updateData).length === 0) {
+      throw new AppError('No valid profile fields provided for update', 400);
+    }
+
+    return await tx.user.update({
+      where: { id: userId },
+      data: updateData,
+    });
   });
 
   res.status(200).json({
@@ -980,34 +1097,53 @@ exports.uploadAdminAvatar = asyncHandler(async (req, res) => {
     throw new AppError("An image file is required in the 'avatar' field", 400);
   }
 
+  if (!req.collegeId) {
+    throw new AppError('Tenant context required: request must be routed through a college subdomain', 400);
+  }
+
   const userId = req.user.id;
-  const user = await prisma.user.findUnique({ where: { id: userId } });
 
-  if (!user) {
-    throw new AppError('Admin user not found', 404);
+  const currentAvatarPublicId = await withTenant(req.collegeId, async (tx) => {
+    const user = await tx.user.findFirst({
+      where: { id: userId, collegeId: req.collegeId },
+      select: { avatarPublicId: true },
+    });
+    if (!user) throw new AppError('Admin user not found', 404);
+    return user.avatarPublicId;
+  });
+
+  if (currentAvatarPublicId) {
+    try {
+      await deleteAsset(currentAvatarPublicId);
+    } catch (e) {
+      console.warn('Failed to delete old avatar asset:', e.message);
+    }
   }
 
-  if (user.avatar?.publicId) {
-    await deleteAsset(user.avatar.publicId);
-  }
+  const uploadResult = await uploadBuffer(req.file.buffer, `users/${userId}/avatar`);
 
-  const avatar = await uploadBuffer(req.file.buffer, `users/${userId}/avatar`);
-  const updatedUser = await prisma.user.update({
-    where: { id: userId },
-    data: { avatar },
-    select: {
-      id: true,
-      name: true,
-      email: true,
-      role: true,
-      avatar: true,
-    },
+  const updatedUser = await withTenant(req.collegeId, async (tx) => {
+    return await tx.user.update({
+      where: { id: userId },
+      data: {
+        avatarUrl: uploadResult.url,
+        avatarPublicId: uploadResult.publicId,
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        avatarUrl: true,
+        avatarPublicId: true,
+      },
+    });
   });
 
   res.status(200).json({
     success: true,
     message: 'Profile picture uploaded successfully',
-    data: updatedUser,
+    data: sanitizeUser(updatedUser),
   });
 });
 
@@ -1016,32 +1152,50 @@ exports.uploadAdminAvatar = asyncHandler(async (req, res) => {
  * Deletes the logged-in admin's profile picture.
  */
 exports.deleteAdminAvatar = asyncHandler(async (req, res) => {
+  if (!req.collegeId) {
+    throw new AppError('Tenant context required: request must be routed through a college subdomain', 400);
+  }
+
   const userId = req.user.id;
-  const user = await prisma.user.findUnique({ where: { id: userId } });
 
-  if (!user) {
-    throw new AppError('Admin user not found', 404);
+  const currentAvatarPublicId = await withTenant(req.collegeId, async (tx) => {
+    const user = await tx.user.findFirst({
+      where: { id: userId, collegeId: req.collegeId },
+      select: { avatarPublicId: true },
+    });
+    if (!user) throw new AppError('Admin user not found', 404);
+    return user.avatarPublicId;
+  });
+
+  if (currentAvatarPublicId) {
+    try {
+      await deleteAsset(currentAvatarPublicId);
+    } catch (e) {
+      console.warn('Failed to delete avatar asset:', e.message);
+    }
   }
 
-  if (user.avatar?.publicId) {
-    await deleteAsset(user.avatar.publicId);
-  }
-
-  const updatedUser = await prisma.user.update({
-    where: { id: userId },
-    data: { avatar: null },
-    select: {
-      id: true,
-      name: true,
-      email: true,
-      role: true,
-      avatar: true,
-    },
+  const updatedUser = await withTenant(req.collegeId, async (tx) => {
+    return await tx.user.update({
+      where: { id: userId },
+      data: {
+        avatarUrl: null,
+        avatarPublicId: null,
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        avatarUrl: true,
+        avatarPublicId: true,
+      },
+    });
   });
 
   res.status(200).json({
     success: true,
     message: 'Profile picture removed successfully',
-    data: updatedUser,
+    data: sanitizeUser(updatedUser),
   });
 });

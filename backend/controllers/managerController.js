@@ -1,32 +1,43 @@
 const bcrypt = require('bcryptjs');
-const { prisma } = require('../config/db');
+const { withTenant } = require('../config/db');
 const asyncHandler = require('../utils/asyncHandler');
 const { AppError } = require('../middleware/errorHandler');
 const { uploadBuffer, deleteAsset } = require('../utils/cloudinaryUpload');
 const { sanitizeUser } = require('../utils/sanitizeUser');
+const { serializeClub } = require('../utils/clubDepartments');
 
 /**
  * GET /manager/my-clubs
- * Returns clubs for which the authenticated user has a MANAGER membership.
+ * Returns clubs for which the authenticated user has a MANAGER membership in the current college.
  */
 exports.getMyClubs = asyncHandler(async (req, res) => {
-  const memberships = await prisma.membership.findMany({
-    where: {
-      userId: req.user.id,
-      role: 'MANAGER',
-    },
-    select: {
-      club: {
-        select: {
-          id: true,
-          name: true,
-          description: true,
-          logo: true,
-          coverImage: true,
+  if (!req.collegeId) {
+    throw new AppError('Tenant context required: request must be routed through a college subdomain', 400);
+  }
+
+  const memberships = await withTenant(req.collegeId, async (tx) => {
+    return await tx.membership.findMany({
+      where: {
+        userId: req.user.id,
+        role: 'MANAGER',
+        collegeId: req.collegeId,
+      },
+      select: {
+        club: {
+          select: {
+            id: true,
+            name: true,
+            description: true,
+            clubType: true,
+            logoUrl: true,
+            logoPublicId: true,
+            coverImageUrl: true,
+            coverImagePublicId: true,
+          },
         },
       },
-    },
-    orderBy: { joinedAt: 'asc' },
+      orderBy: { joinedAt: 'asc' },
+    });
   });
 
   if (memberships.length === 0) {
@@ -36,7 +47,7 @@ exports.getMyClubs = asyncHandler(async (req, res) => {
   res.status(200).json({
     success: true,
     message: 'Fetched managed clubs successfully',
-    clubs: memberships.map(({ club }) => club),
+    clubs: memberships.map(({ club }) => serializeClub(club)),
   });
 });
 
@@ -45,6 +56,10 @@ exports.getMyClubs = asyncHandler(async (req, res) => {
  * Updates only manager-editable Club fields after requireClubManager authorizes it.
  */
 exports.updateManagedClub = asyncHandler(async (req, res) => {
+  if (!req.collegeId) {
+    throw new AppError('Tenant context required: request must be routed through a college subdomain', 400);
+  }
+
   const { clubId } = req.params;
   const allowedFields = ['name', 'description'];
   const body = req.body;
@@ -80,16 +95,30 @@ exports.updateManagedClub = asyncHandler(async (req, res) => {
     updateData.description = body.description === null ? null : body.description.trim();
   }
 
-  const club = await prisma.club.update({
-    where: { id: clubId },
-    data: updateData,
-  });
+  try {
+    const club = await withTenant(req.collegeId, async (tx) => {
+      const existing = await tx.club.findFirst({
+        where: { id: clubId, collegeId: req.collegeId },
+      });
+      if (!existing) throw new AppError('Club not found', 404);
 
-  res.status(200).json({
-    success: true,
-    message: 'Club updated successfully',
-    data: club,
-  });
+      return await tx.club.update({
+        where: { id: clubId },
+        data: updateData,
+      });
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Club updated successfully',
+      data: serializeClub(club),
+    });
+  } catch (error) {
+    if (error.code === 'P2002') {
+      throw new AppError('A club with this name already exists for this college.', 409);
+    }
+    throw error;
+  }
 });
 
 /**
@@ -97,30 +126,37 @@ exports.updateManagedClub = asyncHandler(async (req, res) => {
  * Returns profile details for the authenticated manager.
  */
 exports.getManagerProfile = asyncHandler(async (req, res) => {
+  if (!req.collegeId) {
+    throw new AppError('Tenant context required: request must be routed through a college subdomain', 400);
+  }
+
   const userId = req.user.id;
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: {
-      id: true,
-      name: true,
-      email: true,
-      role: true,
-      avatar: true,
-      isActive: true,
-      createdAt: true,
-      updatedAt: true,
-      memberships: {
-        where: { role: 'MANAGER' },
-        select: {
-          club: {
-            select: {
-              id: true,
-              name: true,
+  const user = await withTenant(req.collegeId, async (tx) => {
+    return await tx.user.findFirst({
+      where: { id: userId, collegeId: req.collegeId },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        avatarUrl: true,
+        avatarPublicId: true,
+        isActive: true,
+        createdAt: true,
+        updatedAt: true,
+        memberships: {
+          where: { role: 'MANAGER', collegeId: req.collegeId },
+          select: {
+            club: {
+              select: {
+                id: true,
+                name: true,
+              },
             },
           },
         },
       },
-    },
+    });
   });
 
   if (!user) {
@@ -131,7 +167,6 @@ exports.getManagerProfile = asyncHandler(async (req, res) => {
     success: true,
     data: {
       ...sanitizeUser(user),
-      avatar: user.avatar || null,
       managedClubs: user.memberships?.map((m) => m.club) || [],
     },
   });
@@ -142,16 +177,12 @@ exports.getManagerProfile = asyncHandler(async (req, res) => {
  * Updates manager's name and/or password.
  */
 exports.updateManagerProfile = asyncHandler(async (req, res) => {
+  if (!req.collegeId) {
+    throw new AppError('Tenant context required: request must be routed through a college subdomain', 400);
+  }
+
   const userId = req.user.id;
   const { name, currentPassword, newPassword } = req.body;
-
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-  });
-
-  if (!user) {
-    throw new AppError('User not found', 404);
-  }
 
   const updateData = {};
 
@@ -162,48 +193,58 @@ exports.updateManagerProfile = asyncHandler(async (req, res) => {
     updateData.name = name.trim();
   }
 
-  if (newPassword) {
-    if (!currentPassword) {
-      throw new AppError('Current password is required to set a new password', 400);
-    }
-    if (!user.password) {
-      throw new AppError('Account password is not set', 400);
-    }
+  const updatedUser = await withTenant(req.collegeId, async (tx) => {
+    const user = await tx.user.findFirst({
+      where: { id: userId, collegeId: req.collegeId },
+    });
 
-    const isMatch = await bcrypt.compare(currentPassword, user.password);
-    if (!isMatch) {
-      throw new AppError('Current password is incorrect', 401);
+    if (!user) {
+      throw new AppError('User not found', 404);
     }
 
-    if (newPassword.length < 6) {
-      throw new AppError('New password must be at least 6 characters', 400);
+    if (newPassword) {
+      if (!currentPassword) {
+        throw new AppError('Current password is required to set a new password', 400);
+      }
+      if (!user.passwordHash) {
+        throw new AppError('Account password is not set', 400);
+      }
+
+      const isMatch = await bcrypt.compare(currentPassword, user.passwordHash);
+      if (!isMatch) {
+        throw new AppError('Current password is incorrect', 401);
+      }
+
+      if (newPassword.length < 6) {
+        throw new AppError('New password must be at least 6 characters', 400);
+      }
+
+      updateData.passwordHash = await bcrypt.hash(newPassword, 10);
     }
 
-    const salt = await bcrypt.genSalt(10);
-    updateData.password = await bcrypt.hash(newPassword, salt);
-  }
+    if (Object.keys(updateData).length === 0) {
+      throw new AppError('No profile changes provided', 400);
+    }
 
-  if (Object.keys(updateData).length === 0) {
-    throw new AppError('No profile changes provided', 400);
-  }
-
-  const updatedUser = await prisma.user.update({
-    where: { id: userId },
-    data: updateData,
-    select: {
-      id: true,
-      name: true,
-      email: true,
-      role: true,
-      avatar: true,
-      updatedAt: true,
-    },
+    return await tx.user.update({
+      where: { id: userId },
+      data: updateData,
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        avatarUrl: true,
+        avatarPublicId: true,
+        updatedAt: true,
+      },
+    });
   });
 
   res.status(200).json({
     success: true,
     message: 'Profile updated successfully',
-    data: updatedUser,
+    data: sanitizeUser(updatedUser),
   });
 });
 
@@ -216,35 +257,56 @@ exports.uploadManagerAvatar = asyncHandler(async (req, res) => {
     throw new AppError("An image file is required in the 'avatar' field", 400);
   }
 
+  if (!req.collegeId) {
+    throw new AppError('Tenant context required: request must be routed through a college subdomain', 400);
+  }
+
   const userId = req.user.id;
-  const user = await prisma.user.findUnique({ where: { id: userId } });
 
-  if (!user) {
-    throw new AppError('User not found', 404);
+  // 1. Fetch current avatar info inside transaction
+  const currentAvatarPublicId = await withTenant(req.collegeId, async (tx) => {
+    const user = await tx.user.findFirst({
+      where: { id: userId, collegeId: req.collegeId },
+      select: { avatarPublicId: true },
+    });
+    if (!user) throw new AppError('User not found', 404);
+    return user.avatarPublicId;
+  });
+
+  // 2. Perform Cloudinary operations OUTSIDE transaction
+  if (currentAvatarPublicId) {
+    try {
+      await deleteAsset(currentAvatarPublicId);
+    } catch (e) {
+      console.warn('Failed to delete old avatar asset:', e.message);
+    }
   }
 
-  if (user.avatar?.publicId) {
-    await deleteAsset(user.avatar.publicId);
-  }
+  const uploadResult = await uploadBuffer(req.file.buffer, `users/${userId}/avatar`);
 
-  const avatar = await uploadBuffer(req.file.buffer, `users/${userId}/avatar`);
-
-  const updatedUser = await prisma.user.update({
-    where: { id: userId },
-    data: { avatar },
-    select: {
-      id: true,
-      name: true,
-      email: true,
-      role: true,
-      avatar: true,
-    },
+  // 3. Persist new avatar in DB inside transaction
+  const updatedUser = await withTenant(req.collegeId, async (tx) => {
+    return await tx.user.update({
+      where: { id: userId },
+      data: {
+        avatarUrl: uploadResult.url,
+        avatarPublicId: uploadResult.publicId,
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        avatarUrl: true,
+        avatarPublicId: true,
+      },
+    });
   });
 
   res.status(200).json({
     success: true,
     message: 'Profile picture uploaded successfully',
-    data: updatedUser,
+    data: sanitizeUser(updatedUser),
   });
 });
 
@@ -253,32 +315,53 @@ exports.uploadManagerAvatar = asyncHandler(async (req, res) => {
  * Deletes profile picture from Cloudinary and clears user avatar.
  */
 exports.deleteManagerAvatar = asyncHandler(async (req, res) => {
+  if (!req.collegeId) {
+    throw new AppError('Tenant context required: request must be routed through a college subdomain', 400);
+  }
+
   const userId = req.user.id;
-  const user = await prisma.user.findUnique({ where: { id: userId } });
 
-  if (!user) {
-    throw new AppError('User not found', 404);
+  // 1. Fetch current avatar info inside transaction
+  const currentAvatarPublicId = await withTenant(req.collegeId, async (tx) => {
+    const user = await tx.user.findFirst({
+      where: { id: userId, collegeId: req.collegeId },
+      select: { avatarPublicId: true },
+    });
+    if (!user) throw new AppError('User not found', 404);
+    return user.avatarPublicId;
+  });
+
+  // 2. Perform Cloudinary delete OUTSIDE transaction
+  if (currentAvatarPublicId) {
+    try {
+      await deleteAsset(currentAvatarPublicId);
+    } catch (e) {
+      console.warn('Failed to delete avatar asset:', e.message);
+    }
   }
 
-  if (user.avatar?.publicId) {
-    await deleteAsset(user.avatar.publicId);
-  }
-
-  const updatedUser = await prisma.user.update({
-    where: { id: userId },
-    data: { avatar: null },
-    select: {
-      id: true,
-      name: true,
-      email: true,
-      role: true,
-      avatar: true,
-    },
+  // 3. Clear avatar in DB inside transaction
+  const updatedUser = await withTenant(req.collegeId, async (tx) => {
+    return await tx.user.update({
+      where: { id: userId },
+      data: {
+        avatarUrl: null,
+        avatarPublicId: null,
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        avatarUrl: true,
+        avatarPublicId: true,
+      },
+    });
   });
 
   res.status(200).json({
     success: true,
     message: 'Profile picture removed successfully',
-    data: updatedUser,
+    data: sanitizeUser(updatedUser),
   });
 });

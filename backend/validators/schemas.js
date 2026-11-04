@@ -53,7 +53,7 @@ const departmentIdsBody = z.object({
   departmentIds: z.array(uuid).transform((ids) => [...new Set(ids)]),
 });
 const membershipBody = z.object({ role: z.enum(['MANAGER', 'MEMBER', 'USER']) });
-const existingManagerBody = z.object({ userId: objectId });
+const existingManagerBody = z.object({ userId: uuid });
 const acceptInviteBody = z.object({ password });
 const createEventBody = z.object({
   title: text('title', 200),
