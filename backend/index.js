@@ -47,6 +47,14 @@ app.use(resolveCollege);
 // Origin / Referer Validation for State-Changing Requests (CSRF & Subdomain Isolation)
 app.use(validateOriginOrReferer);
 
+// Health check routes (exempt from proxy shared secret check)
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'ok', uptime: process.uptime() });
+});
+app.get('/api/health', (req, res) => {
+  res.status(200).json({ status: 'ok', uptime: process.uptime() });
+});
+
 // Base route
 app.get('/', (req, res) => {
   res.status(200).json({ success: true, message: 'Club Event Manager API is running...' });

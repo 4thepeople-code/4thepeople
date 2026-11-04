@@ -8,6 +8,11 @@ const crypto = require('crypto');
  * X-Forwarded-Host, or Cloudflare/Render client headers.
  */
 function validateProxySharedSecret(req, res, next) {
+  // Exempt health-check paths from proxy shared secret check (e.g. Render / Cloud health monitors)
+  if (req.path === '/health' || req.path === '/api/health') {
+    return next();
+  }
+
   const sharedSecret = process.env.PROXY_SHARED_SECRET;
   const isProduction = process.env.NODE_ENV === 'production';
 
@@ -20,7 +25,7 @@ function validateProxySharedSecret(req, res, next) {
     });
   }
 
-  // When PROXY_SHARED_SECRET is configured, enforce it on every incoming request
+  // When PROXY_SHARED_SECRET is configured, enforce it on incoming requests
   if (sharedSecret) {
     const incomingHeader = req.headers['x-proxy-shared-secret'];
     if (!incomingHeader) {
@@ -31,10 +36,11 @@ function validateProxySharedSecret(req, res, next) {
       });
     }
 
-    const incomingBuf = Buffer.from(String(incomingHeader));
-    const secretBuf = Buffer.from(String(sharedSecret));
+    // Hash both to fixed-length SHA-256 digests to prevent timingSafeEqual length mismatch exceptions and length leakage
+    const incomingHash = crypto.createHash('sha256').update(String(incomingHeader)).digest();
+    const secretHash = crypto.createHash('sha256').update(String(sharedSecret)).digest();
 
-    if (incomingBuf.length !== secretBuf.length || !crypto.timingSafeEqual(incomingBuf, secretBuf)) {
+    if (!crypto.timingSafeEqual(incomingHash, secretHash)) {
       return res.status(403).json({
         success: false,
         message: 'Direct origin access denied: Invalid proxy shared secret',

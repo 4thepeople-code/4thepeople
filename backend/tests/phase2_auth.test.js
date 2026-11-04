@@ -945,18 +945,46 @@ async function runPhase2Tests() {
       assert.strictEqual(directForgedRes.status, 403, 'Direct call without proxy shared secret must return HTTP 403');
       assert.ok(directForgedRes.data.message.includes('Missing proxy shared secret'));
 
-      // 19b. Direct call with INVALID proxy shared secret -> REJECTED (HTTP 403)
+      // 19b. Health check endpoint is EXEMPT from proxy shared secret check -> ACCEPTED (HTTP 200)
+      const healthCheckRes = await apiFetch('/health', {
+        method: 'GET',
+      });
+      assert.strictEqual(healthCheckRes.status, 200, 'Health check endpoint must be exempt from shared secret');
+      assert.strictEqual(healthCheckRes.data.status, 'ok');
+
+      // 19c. Direct call with WRONG-LENGTH proxy shared secret (testing timingSafeEqual length mismatch fix) -> REJECTED (HTTP 403)
+      const wrongLengthShortRes = await apiFetch('/', {
+        method: 'GET',
+        headers: {
+          'x-proxy-shared-secret': 'short',
+          'X-Forwarded-For': '198.51.100.99',
+        },
+      });
+      assert.strictEqual(wrongLengthShortRes.status, 403, 'Wrong-length short secret must return HTTP 403');
+      assert.ok(wrongLengthShortRes.data.message.includes('Invalid proxy shared secret'));
+
+      const wrongLengthLongRes = await apiFetch('/', {
+        method: 'GET',
+        headers: {
+          'x-proxy-shared-secret': 'this_secret_is_much_longer_than_the_expected_secret_key_1234567890',
+          'X-Forwarded-For': '198.51.100.99',
+        },
+      });
+      assert.strictEqual(wrongLengthLongRes.status, 403, 'Wrong-length long secret must return HTTP 403');
+      assert.ok(wrongLengthLongRes.data.message.includes('Invalid proxy shared secret'));
+
+      // 19d. Direct call with INVALID same-length proxy shared secret -> REJECTED (HTTP 403)
       const invalidSecretRes = await apiFetch('/', {
         method: 'GET',
         headers: {
-          'x-proxy-shared-secret': 'completely_wrong_secret',
+          'x-proxy-shared-secret': 'test_shared_proxy_secret_key_abcdef123457', // same length, last char diff
           'X-Forwarded-For': '198.51.100.99',
         },
       });
       assert.strictEqual(invalidSecretRes.status, 403, 'Invalid proxy secret must return HTTP 403');
       assert.ok(invalidSecretRes.data.message.includes('Invalid proxy shared secret'));
 
-      // 19c. Legitimate call with VALID proxy shared secret -> ACCEPTED (HTTP 200)
+      // 19e. Legitimate call with VALID proxy shared secret -> ACCEPTED (HTTP 200)
       const legitimateProxiedRes = await apiFetch('/', {
         method: 'GET',
         headers: {
