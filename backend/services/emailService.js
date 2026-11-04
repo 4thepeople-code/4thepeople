@@ -14,8 +14,37 @@ dotenv.config();
 
 let brevo;
 
+/**
+ * Validates that the active database host in test environment is strictly local or Neon dev.
+ * Throws an error if tests are attempting to run against an unauthorized database host.
+ */
+const verifyTestDatabaseHost = () => {
+  const dbUrl = process.env.TEST_DATABASE_URL || process.env.DATABASE_URL;
+  if (!dbUrl) {
+    throw new Error('Test environment error: No database URL configured in TEST_DATABASE_URL or DATABASE_URL');
+  }
+
+  let host = '';
+  try {
+    const parsed = new URL(dbUrl);
+    host = parsed.hostname.toLowerCase();
+  } catch {
+    const match = dbUrl.match(/@([^:/]+)/);
+    host = match ? match[1].toLowerCase() : '';
+  }
+
+  const isLocal = host === '127.0.0.1' || host === 'localhost';
+  const isNeonDev = host.endsWith('.neon.tech') && (host.includes('dev') || host.includes('ep-withered-bird-ao71e632'));
+
+  if (!isLocal && !isNeonDev) {
+    throw new Error(`Safety violation: emailService test stub refused to execute. Database host '${host}' is neither local (127.0.0.1/localhost) nor a Neon dev endpoint (*.neon.tech).`);
+  }
+  return true;
+};
+
 const getBrevoClient = () => {
   if (process.env.NODE_ENV === 'test') {
+    verifyTestDatabaseHost();
     return null;
   }
 
@@ -39,6 +68,7 @@ const getBrevoClient = () => {
  */
 const sendEmail = async ({ toEmail, toName, subject, html }) => {
   if (process.env.NODE_ENV === 'test') {
+    verifyTestDatabaseHost();
     return { messageId: 'test-stub-message-id', success: true };
   }
 
@@ -278,7 +308,9 @@ const sendDeletionVerificationCode = async (
 };
 
 module.exports = {
+  sendEmail,
   sendInviteEmail,
   sendManagerPasswordResetOtp,
   sendDeletionVerificationCode,
+  verifyTestDatabaseHost,
 };

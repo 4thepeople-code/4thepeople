@@ -6,6 +6,111 @@ const crypto = require('crypto');
 const BASE32_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
 
 /**
+ * In-memory replay cache to reject TOTP code reuse within its valid window.
+ * Key: `${adminId}:${code}` -> expiresAt (timestamp)
+ */
+const usedTotpCache = new Map();
+
+/**
+ * Derives a 32-byte key from environment for AES-256-GCM.
+ */
+function getEncryptionKey() {
+  const secret = process.env.TOTP_ENCRYPTION_KEY || 'dev_totp_encryption_key_do_not_use_in_prod_1234567890';
+  return crypto.createHash('sha256').update(secret).digest();
+}
+
+/**
+ * Encrypts a plaintext Base32 TOTP secret at rest using AES-256-GCM.
+ *
+ * @param {string} plainSecret - Plain Base32 secret string
+ * @returns {string} Formatted as `enc:<iv_hex>:<tag_hex>:<ciphertext_hex>`
+ */
+function encryptTotpSecret(plainSecret) {
+  if (!plainSecret) return null;
+  const iv = crypto.randomBytes(12); // 96-bit IV for GCM
+  const cipher = crypto.createCipheriv('aes-256-gcm', getEncryptionKey(), iv);
+
+  let encrypted = cipher.update(plainSecret, 'utf8', 'hex');
+  encrypted += cipher.final('hex');
+  const tag = cipher.getAuthTag().toString('hex');
+
+  return `enc:${iv.toString('hex')}:${tag}:${encrypted}`;
+}
+
+/**
+ * Decrypts a stored TOTP secret. Supports backward compatibility with unencrypted secrets.
+ *
+ * @param {string} storedValue - The encrypted string from database
+ * @returns {string} Plaintext Base32 secret
+ */
+function decryptTotpSecret(storedValue) {
+  if (!storedValue) return null;
+  if (!storedValue.startsWith('enc:')) {
+    // Unencrypted legacy fallback
+    return storedValue;
+  }
+
+  const parts = storedValue.split(':');
+  if (parts.length !== 4) {
+    throw new Error('Malformed encrypted TOTP secret format');
+  }
+
+  const [, ivHex, tagHex, encryptedHex] = parts;
+  const iv = Buffer.from(ivHex, 'hex');
+  const tag = Buffer.from(tagHex, 'hex');
+
+  const decipher = crypto.createDecipheriv('aes-256-gcm', getEncryptionKey(), iv);
+  decipher.setAuthTag(tag);
+
+  let decrypted = decipher.update(encryptedHex, 'hex', 'utf8');
+  decrypted += decipher.final('utf8');
+
+  return decrypted;
+}
+
+/**
+ * Checks whether a TOTP code was already consumed for an administrator within its valid window.
+ * Rejects code reuse to prevent replay attacks.
+ *
+ * @param {string} adminId - Platform admin UUID
+ * @param {string} code - 6-digit TOTP code
+ * @returns {boolean} True if code is fresh (not reused); false if already used.
+ */
+function recordAndCheckTotpUsage(adminId, code) {
+  const key = `${adminId}:${code.trim()}`;
+  const now = Date.now();
+
+  // Prune expired entries
+  for (const [k, exp] of usedTotpCache.entries()) {
+    if (now > exp) {
+      usedTotpCache.delete(k);
+    }
+  }
+
+  if (usedTotpCache.has(key)) {
+    return false; // Code was already consumed
+  }
+
+  // Mark code consumed for 90 seconds (covering current step +/- 1 drift window)
+  usedTotpCache.set(key, now + 90 * 1000);
+  return true;
+}
+
+/**
+ * Clears TOTP replay cache (for test isolation).
+ */
+function clearUsedTotpCache() {
+  usedTotpCache.clear();
+}
+
+/**
+ * Generates an otpauth:// URL for QR code generation in authenticator apps.
+ */
+function generateOtpauthUrl(email, plainSecret, issuer = '4 THE PEOPLE Platform') {
+  return `otpauth://totp/${encodeURIComponent(issuer)}:${encodeURIComponent(email)}?secret=${plainSecret}&issuer=${encodeURIComponent(issuer)}&algorithm=SHA1&digits=6&period=30`;
+}
+
+/**
  * Decodes a Base32 string into a Buffer.
  * Ignores whitespace, hyphens, and padding characters.
  */
@@ -63,22 +168,15 @@ function base32Encode(buffer) {
 
 /**
  * Generates an RFC 6238 TOTP token for a given counter and secret buffer.
- *
- * @param {Buffer} secretBuf - Secret key buffer
- * @param {number} counter - Time counter step
- * @param {number} digits - Number of digits (default 6)
- * @returns {string} 6-digit TOTP code
  */
 function generateHotp(secretBuf, counter, digits = 6) {
   const counterBuf = Buffer.alloc(8);
-  // Write counter as 64-bit big-endian integer
   counterBuf.writeBigUInt64BE(BigInt(counter));
 
   const hmac = crypto.createHmac('sha1', secretBuf);
   hmac.update(counterBuf);
   const digest = hmac.digest();
 
-  // Dynamic truncation (RFC 4226 section 5.4)
   const offset = digest[digest.length - 1] & 0x0f;
   const binary =
     ((digest[offset] & 0x7f) << 24) |
@@ -92,11 +190,6 @@ function generateHotp(secretBuf, counter, digits = 6) {
 
 /**
  * Verifies a 6-digit TOTP token against a Base32 secret with drift window tolerance.
- *
- * @param {string} token - The 6-digit TOTP code provided by the user
- * @param {string} secret - Base32 encoded TOTP secret
- * @param {number} window - Time window drift (+/- steps of 30 seconds, default 1)
- * @returns {boolean} True if token matches
  */
 function verifyTotp(token, secret, window = 1) {
   if (!token || !secret) return false;
@@ -105,7 +198,8 @@ function verifyTotp(token, secret, window = 1) {
   if (!/^\d{6}$/.test(sanitizedToken)) return false;
 
   try {
-    const secretBuf = base32Decode(secret);
+    const plainSecret = decryptTotpSecret(secret);
+    const secretBuf = base32Decode(plainSecret);
     const step = 30; // 30-second time step
     const currentCounter = Math.floor(Date.now() / 1000 / step);
 
@@ -132,6 +226,11 @@ function generateTotpSecret() {
 module.exports = {
   verifyTotp,
   generateTotpSecret,
+  encryptTotpSecret,
+  decryptTotpSecret,
+  recordAndCheckTotpUsage,
+  clearUsedTotpCache,
+  generateOtpauthUrl,
   base32Encode,
   base32Decode,
   generateHotp,

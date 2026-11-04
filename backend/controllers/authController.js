@@ -50,7 +50,7 @@ exports.adminLogin = asyncHandler(async (req, res) => {
   // Per-account + IP throttling check
   const throttleStatus = checkLoginThrottled(normalizedEmail, clientIp);
   if (throttleStatus.isThrottled) {
-    throw new AppError(`Too many failed login attempts. Please try again in ${throttleStatus.retryAfterSeconds} seconds.`, 429);
+    throw new AppError(throttleStatus.reason || `Too many failed login attempts. Please try again in ${throttleStatus.retryAfterSeconds} seconds.`, 429);
   }
 
   const user = await withTenant(req.collegeId, async (tx) => {
@@ -124,10 +124,13 @@ exports.adminLogin = asyncHandler(async (req, res) => {
   // Set httpOnly cookie (host-only, no Domain attribute)
   res.cookie('yuva_token', token, getCookieOptions());
 
+  // Do not return token in body when cookie is set, unless ALLOW_BEARER_RESPONSE=true
+  const allowBearerResponse = process.env.ALLOW_BEARER_RESPONSE === 'true';
+
   res.status(200).json({
     success: true,
     message: 'Admin login successful',
-    token,
+    ...(allowBearerResponse ? { token } : {}),
     user: sanitizeUser(user),
   });
 });
@@ -154,7 +157,7 @@ exports.managerLogin = asyncHandler(async (req, res) => {
   // Per-account + IP throttling check
   const throttleStatus = checkLoginThrottled(normalizedEmail, clientIp);
   if (throttleStatus.isThrottled) {
-    throw new AppError(`Too many failed login attempts. Please try again in ${throttleStatus.retryAfterSeconds} seconds.`, 429);
+    throw new AppError(throttleStatus.reason || `Too many failed login attempts. Please try again in ${throttleStatus.retryAfterSeconds} seconds.`, 429);
   }
 
   const user = await withTenant(req.collegeId, async (tx) => {
@@ -217,10 +220,13 @@ exports.managerLogin = asyncHandler(async (req, res) => {
 
   res.cookie('yuva_token', token, getCookieOptions());
 
+  // Do not return token in body when cookie is set, unless ALLOW_BEARER_RESPONSE=true
+  const allowBearerResponse = process.env.ALLOW_BEARER_RESPONSE === 'true';
+
   res.status(200).json({
     success: true,
     message: 'Manager login successful',
-    token,
+    ...(allowBearerResponse ? { token } : {}),
     user: sanitizeUser(user),
   });
 });
@@ -240,6 +246,17 @@ exports.logout = asyncHandler(async (req, res) => {
   res.status(200).json({
     success: true,
     message: 'Logged out successfully',
+  });
+});
+
+/**
+ * GET /auth/me
+ * Retrieves current authenticated college user profile.
+ */
+exports.getMe = asyncHandler(async (req, res) => {
+  res.status(200).json({
+    success: true,
+    user: sanitizeUser(req.user),
   });
 });
 

@@ -3,7 +3,7 @@ const jwt = require('jsonwebtoken');
 const { platformPrisma } = require('../config/platformDb');
 const asyncHandler = require('../utils/asyncHandler');
 const { AppError } = require('../middleware/errorHandler');
-const { verifyTotp } = require('../utils/totp');
+const { verifyTotp, recordAndCheckTotpUsage } = require('../utils/totp');
 const {
   checkLoginThrottled,
   recordFailedLogin,
@@ -17,7 +17,7 @@ const getPlatformCookieOptions = () => {
   return {
     httpOnly: true,
     secure: isProduction,
-    sameSite: isProduction ? 'strict' : 'lax',
+    sameSite: 'strict', // Always strict for platform administration
     maxAge: 4 * 60 * 60 * 1000, // 4 hours (short expiry, host-only: NO domain attribute)
   };
 };
@@ -61,7 +61,7 @@ exports.platformLogin = asyncHandler(async (req, res) => {
   // Per-account + IP throttling check
   const throttleStatus = checkLoginThrottled(normalizedEmail, clientIp);
   if (throttleStatus.isThrottled) {
-    throw new AppError(`Too many failed login attempts. Please try again in ${throttleStatus.retryAfterSeconds} seconds.`, 429);
+    throw new AppError(throttleStatus.reason || `Too many failed login attempts. Please try again in ${throttleStatus.retryAfterSeconds} seconds.`, 429);
   }
 
   const admin = await platformPrisma.platformAdmin.findUnique({
@@ -87,6 +87,12 @@ exports.platformLogin = asyncHandler(async (req, res) => {
     throw new AppError('Invalid platform administrator credentials', 401);
   }
 
+  // In production, refuse platform login if TOTP is not enrolled
+  if (process.env.NODE_ENV === 'production' && !admin.totpSecret) {
+    recordFailedLogin(normalizedEmail, clientIp);
+    throw new AppError('Platform administrator must have two-factor authentication (TOTP) enrolled in production', 403);
+  }
+
   // TOTP 2FA verification if totpSecret exists
   if (admin.totpSecret) {
     const code = totpCode || totp;
@@ -99,6 +105,13 @@ exports.platformLogin = asyncHandler(async (req, res) => {
     if (!isTotpValid) {
       recordFailedLogin(normalizedEmail, clientIp);
       throw new AppError('Invalid two-factor authentication code', 401);
+    }
+
+    // Reject code reuse within its window
+    const isFresh = recordAndCheckTotpUsage(admin.id, code);
+    if (!isFresh) {
+      recordFailedLogin(normalizedEmail, clientIp);
+      throw new AppError('Two-factor authentication code has already been used. Please wait for the next code.', 401);
     }
   }
 
@@ -121,10 +134,13 @@ exports.platformLogin = asyncHandler(async (req, res) => {
   // Set dedicated platform cookie (host-only, no Domain attribute)
   res.cookie('yuva_platform_token', token, getPlatformCookieOptions());
 
+  // Do not return token in body when cookie is set, unless ALLOW_BEARER_RESPONSE=true
+  const allowBearerResponse = process.env.ALLOW_BEARER_RESPONSE === 'true';
+
   res.status(200).json({
     success: true,
     message: 'Platform administrator login successful',
-    token,
+    ...(allowBearerResponse ? { token } : {}),
     admin: {
       id: admin.id,
       name: admin.name,
@@ -143,7 +159,7 @@ exports.platformLogout = asyncHandler(async (req, res) => {
   res.clearCookie('yuva_platform_token', {
     httpOnly: true,
     secure: isProduction,
-    sameSite: isProduction ? 'strict' : 'lax',
+    sameSite: 'strict',
   });
 
   res.status(200).json({

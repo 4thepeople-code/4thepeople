@@ -66,7 +66,17 @@ function validateOriginOrReferer(req, res, next) {
   const rawReferer = req.headers['referer'];
   const requestOrigin = rawOrigin || extractOriginFromReferer(rawReferer);
 
-  // If no Origin or Referer header was supplied:
+  // Check if request is authenticated via HttpOnly cookies
+  const hasCookieAuth = Boolean(
+    req.cookies && (req.cookies.yuva_token || req.cookies.yuva_platform_token || req.cookies.token)
+  );
+
+  // Crucial security invariant: Reject cookie-authenticated non-GET requests with neither Origin nor Referer
+  if (hasCookieAuth && !requestOrigin) {
+    return next(new AppError('Cross-site request blocked: Cookie-authenticated state-changing requests must include Origin or Referer header', 403));
+  }
+
+  // If no Origin or Referer header was supplied on non-cookie requests:
   // In test environment, permit server-to-server tests (unless explicit Origin testing)
   if (!requestOrigin) {
     if (process.env.NODE_ENV === 'test') {
@@ -140,3 +150,4 @@ module.exports = {
   validateOriginOrReferer,
   corsOptionsDelegate,
 };
+

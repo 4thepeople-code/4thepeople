@@ -6,7 +6,9 @@ const {
   requestManagerPasswordReset,
   resetManagerPassword,
   logout,
+  getMe,
 } = require('../controllers/authController');
+const { authenticateToken } = require('../middleware/authMiddleware');
 const { validate } = require('../middleware/validate');
 const { authLimiter, loginLimiter } = require('../middleware/rateLimiters');
 const {
@@ -39,5 +41,8 @@ router.post(
 
 // POST /auth/logout
 router.post('/logout', logout);
+
+// GET /auth/me
+router.get('/me', authenticateToken, getMe);
 
 module.exports = router;

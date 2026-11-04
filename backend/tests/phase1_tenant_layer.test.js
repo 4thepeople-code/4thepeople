@@ -1,13 +1,16 @@
-// Database URLs for local test run (must be set BEFORE any internal modules load PrismaClient)
-const LOCAL_APP_URL =
-  process.env.TEST_DATABASE_URL ||
-  'postgresql://app_user:app_user_local_pass@127.0.0.1:5432/yuva_test?schema=public&pgbouncer=true';
-const LOCAL_PLATFORM_URL =
-  process.env.TEST_PLATFORM_DATABASE_URL ||
-  'postgresql://platform_ops:platform_ops_local_pass@127.0.0.1:5432/yuva_test?schema=public';
+require('dotenv').config();
 
-process.env.DATABASE_URL = LOCAL_APP_URL;
-process.env.PLATFORM_DATABASE_URL = LOCAL_PLATFORM_URL;
+// Strict requirement: TEST_DATABASE_URL must be explicitly provided. No fallback to DATABASE_URL.
+if (!process.env.TEST_DATABASE_URL) {
+  console.error('\n❌ FATAL: TEST_DATABASE_URL environment variable is required to run Phase 1 tests.');
+  console.error('Refusing to run tests or fallback to DATABASE_URL.\n');
+  process.exit(1);
+}
+
+process.env.DATABASE_URL = process.env.TEST_DATABASE_URL;
+if (process.env.TEST_PLATFORM_DATABASE_URL) {
+  process.env.PLATFORM_DATABASE_URL = process.env.TEST_PLATFORM_DATABASE_URL;
+}
 
 const assert = require('assert');
 const path = require('path');
