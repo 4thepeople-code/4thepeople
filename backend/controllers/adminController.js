@@ -1026,35 +1026,11 @@ exports.deleteClub = asyncHandler(async (req, res) => {
     throw new AppError('Verification code is required', 400);
   }
 
-  // 1. Verify code, check eligibility and gather asset IDs to clean up
-  const targetInfo = await withTenant(req.collegeId, async (tx) => {
+  // 1. Verify code, check eligibility, collect publicIds and delete club inside transaction
+  const { deletedClub, assetIds } = await withTenant(req.collegeId, async (tx) => {
     const existingClub = await getClubDeletionTarget(tx, req.collegeId, clubId);
     await consumeDeletionVerification(tx, req.collegeId, req.user.id, 'CLUB', clubId, code);
 
-    const assetIds = [];
-    if (existingClub.logoPublicId) assetIds.push(existingClub.logoPublicId);
-    if (existingClub.coverImagePublicId) assetIds.push(existingClub.coverImagePublicId);
-    if (Array.isArray(existingClub.events)) {
-      existingClub.events.forEach((ev) => {
-        if (ev.coverImagePublicId) assetIds.push(ev.coverImagePublicId);
-        if (Array.isArray(ev.gallery)) {
-          ev.gallery.forEach((g) => {
-            if (g.imagePublicId) assetIds.push(g.imagePublicId);
-          });
-        }
-      });
-    }
-
-    return { existingClub, assetIds };
-  });
-
-  // 2. Perform Cloudinary asset deletions OUTSIDE transaction
-  if (targetInfo.assetIds.length > 0) {
-    await deleteAssetsBestEffort(targetInfo.assetIds, `club ${clubId}`);
-  }
-
-  // 3. Delete club and relations inside transaction
-  const deletedClub = await withTenant(req.collegeId, async (tx) => {
     // Re-verify no active/completed events exist before deleting
     const concurrentBlockingEventCount = await tx.event.count({
       where: { clubId, collegeId: req.collegeId, cancelledAt: null },
@@ -1066,6 +1042,21 @@ exports.deleteClub = asyncHandler(async (req, res) => {
       );
     }
 
+    // Collect all Cloudinary asset public IDs inside the transaction
+    const publicIds = [];
+    if (existingClub.logoPublicId) publicIds.push(existingClub.logoPublicId);
+    if (existingClub.coverImagePublicId) publicIds.push(existingClub.coverImagePublicId);
+    if (Array.isArray(existingClub.events)) {
+      existingClub.events.forEach((ev) => {
+        if (ev.coverImagePublicId) publicIds.push(ev.coverImagePublicId);
+        if (Array.isArray(ev.gallery)) {
+          ev.gallery.forEach((g) => {
+            if (g.imagePublicId) publicIds.push(g.imagePublicId);
+          });
+        }
+      });
+    }
+
     // Clean up dependent records
     await tx.clubDepartment.deleteMany({ where: { clubId, collegeId: req.collegeId } });
     await tx.membership.deleteMany({ where: { clubId, collegeId: req.collegeId } });
@@ -1074,8 +1065,15 @@ exports.deleteClub = asyncHandler(async (req, res) => {
     });
     await tx.event.deleteMany({ where: { clubId, collegeId: req.collegeId } });
 
-    return await tx.club.delete({ where: { id: clubId } });
+    // Delete the club itself
+    const club = await tx.club.delete({ where: { id: clubId } });
+    return { deletedClub: club, assetIds: publicIds };
   });
+
+  // 2. Perform Cloudinary asset deletions AFTER transaction commit (best-effort, logged)
+  if (assetIds.length > 0) {
+    await deleteAssetsBestEffort(assetIds, `club ${clubId}`);
+  }
 
   res.status(200).json({
     success: true,
@@ -1215,42 +1213,56 @@ exports.uploadAdminAvatar = asyncHandler(async (req, res) => {
 
   const userId = req.user.id;
 
-  const currentAvatarPublicId = await withTenant(req.collegeId, async (tx) => {
-    const user = await tx.user.findFirst({
-      where: { id: userId, collegeId: req.collegeId },
-      select: { avatarPublicId: true },
-    });
-    if (!user) throw new AppError('Admin user not found', 404);
-    return user.avatarPublicId;
-  });
+  // 1. Upload new image to Cloudinary first
+  const uploadResult = await uploadBuffer(req.file.buffer, `users/${userId}/avatar`);
 
-  if (currentAvatarPublicId) {
+  // 2. Commit to database first (with compensation if DB fails)
+  let updatedUser;
+  let oldAvatarPublicId = null;
+  try {
+    const result = await withTenant(req.collegeId, async (tx) => {
+      const user = await tx.user.findFirst({
+        where: { id: userId, collegeId: req.collegeId },
+        select: { avatarPublicId: true },
+      });
+      if (!user) throw new AppError('Admin user not found', 404);
+
+      const updated = await tx.user.update({
+        where: { id: userId },
+        data: {
+          avatarUrl: uploadResult.url,
+          avatarPublicId: uploadResult.publicId,
+        },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+          avatarUrl: true,
+          avatarPublicId: true,
+        },
+      });
+      return { updated, oldAvatar: user.avatarPublicId };
+    });
+    updatedUser = result.updated;
+    oldAvatarPublicId = result.oldAvatar;
+  } catch (dbError) {
     try {
-      await deleteAsset(currentAvatarPublicId);
+      await deleteAsset(uploadResult.publicId);
+    } catch (cleanupErr) {
+      console.error('Failed to compensate newly uploaded admin avatar after DB failure:', cleanupErr.message);
+    }
+    throw dbError;
+  }
+
+  // 3. Remote deletion AFTER successful DB commit (best-effort, logged)
+  if (oldAvatarPublicId) {
+    try {
+      await deleteAsset(oldAvatarPublicId);
     } catch (e) {
       console.warn('Failed to delete old avatar asset:', e.message);
     }
   }
-
-  const uploadResult = await uploadBuffer(req.file.buffer, `users/${userId}/avatar`);
-
-  const updatedUser = await withTenant(req.collegeId, async (tx) => {
-    return await tx.user.update({
-      where: { id: userId },
-      data: {
-        avatarUrl: uploadResult.url,
-        avatarPublicId: uploadResult.publicId,
-      },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        role: true,
-        avatarUrl: true,
-        avatarPublicId: true,
-      },
-    });
-  });
 
   res.status(200).json({
     success: true,
@@ -1270,25 +1282,15 @@ exports.deleteAdminAvatar = asyncHandler(async (req, res) => {
 
   const userId = req.user.id;
 
-  const currentAvatarPublicId = await withTenant(req.collegeId, async (tx) => {
+  // 1. Commit database changes first
+  const { updatedUser, oldAvatarPublicId } = await withTenant(req.collegeId, async (tx) => {
     const user = await tx.user.findFirst({
       where: { id: userId, collegeId: req.collegeId },
       select: { avatarPublicId: true },
     });
     if (!user) throw new AppError('Admin user not found', 404);
-    return user.avatarPublicId;
-  });
 
-  if (currentAvatarPublicId) {
-    try {
-      await deleteAsset(currentAvatarPublicId);
-    } catch (e) {
-      console.warn('Failed to delete avatar asset:', e.message);
-    }
-  }
-
-  const updatedUser = await withTenant(req.collegeId, async (tx) => {
-    return await tx.user.update({
+    const updated = await tx.user.update({
       where: { id: userId },
       data: {
         avatarUrl: null,
@@ -1303,7 +1305,17 @@ exports.deleteAdminAvatar = asyncHandler(async (req, res) => {
         avatarPublicId: true,
       },
     });
+    return { updatedUser: updated, oldAvatarPublicId: user.avatarPublicId };
   });
+
+  // 2. Remote deletion AFTER successful DB commit (best-effort, logged)
+  if (oldAvatarPublicId) {
+    try {
+      await deleteAsset(oldAvatarPublicId);
+    } catch (e) {
+      console.warn('Failed to delete avatar asset:', e.message);
+    }
+  }
 
   res.status(200).json({
     success: true,

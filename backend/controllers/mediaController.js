@@ -75,17 +75,44 @@ exports.uploadClubLogo = asyncHandler(async (req, res) => {
   const { clubId } = req.params;
   validateUUID(clubId, 'club ID');
 
-  // 1. Fetch current logo public ID inside transaction
-  const oldLogoPublicId = await withTenant(req.collegeId, async (tx) => {
-    const club = await tx.club.findFirst({
-      where: { id: clubId, collegeId: req.collegeId },
-      select: { id: true, logoPublicId: true },
-    });
-    if (!club) throw new AppError('Club not found', 404);
-    return club.logoPublicId;
-  });
+  // 1. Upload new image to Cloudinary first
+  const uploadResult = await uploadBuffer(req.file.buffer, `clubs/${clubId}/logo`);
 
-  // 2. Perform Cloudinary operations OUTSIDE transaction
+  // 2. Commit to database first (with compensation if DB write fails)
+  let updatedClub;
+  let oldLogoPublicId = null;
+  try {
+    const result = await withTenant(req.collegeId, async (tx) => {
+      const club = await tx.club.findFirst({
+        where: { id: clubId, collegeId: req.collegeId },
+        select: { id: true, logoPublicId: true },
+      });
+      if (!club) throw new AppError('Club not found', 404);
+
+      const updated = await tx.club.update({
+        where: { id: clubId },
+        data: {
+          logoUrl: uploadResult.url,
+          logoPublicId: uploadResult.publicId,
+        },
+        include: {
+          departments: clubDepartmentsSelect,
+        },
+      });
+      return { updated, oldLogo: club.logoPublicId };
+    });
+    updatedClub = result.updated;
+    oldLogoPublicId = result.oldLogo;
+  } catch (dbError) {
+    try {
+      await deleteAsset(uploadResult.publicId);
+    } catch (cleanupErr) {
+      console.error('Failed to compensate newly uploaded club logo after DB failure:', cleanupErr.message);
+    }
+    throw dbError;
+  }
+
+  // 3. Remote deletion AFTER successful DB commit (best-effort, logged)
   if (oldLogoPublicId) {
     try {
       await deleteAsset(oldLogoPublicId);
@@ -93,22 +120,6 @@ exports.uploadClubLogo = asyncHandler(async (req, res) => {
       console.warn('Failed to delete old club logo asset:', e.message);
     }
   }
-
-  const uploadResult = await uploadBuffer(req.file.buffer, `clubs/${clubId}/logo`);
-
-  // 3. Update database inside transaction
-  const updatedClub = await withTenant(req.collegeId, async (tx) => {
-    return await tx.club.update({
-      where: { id: clubId },
-      data: {
-        logoUrl: uploadResult.url,
-        logoPublicId: uploadResult.publicId,
-      },
-      include: {
-        departments: clubDepartmentsSelect,
-      },
-    });
-  });
 
   res.status(200).json({
     success: true,
@@ -128,25 +139,15 @@ exports.deleteClubLogo = asyncHandler(async (req, res) => {
   const { clubId } = req.params;
   validateUUID(clubId, 'club ID');
 
-  const oldLogoPublicId = await withTenant(req.collegeId, async (tx) => {
+  // 1. Commit database changes first
+  const { updatedClub, oldLogoPublicId } = await withTenant(req.collegeId, async (tx) => {
     const club = await tx.club.findFirst({
       where: { id: clubId, collegeId: req.collegeId },
       select: { id: true, logoPublicId: true },
     });
     if (!club) throw new AppError('Club not found', 404);
-    return club.logoPublicId;
-  });
 
-  if (oldLogoPublicId) {
-    try {
-      await deleteAsset(oldLogoPublicId);
-    } catch (e) {
-      console.warn('Failed to delete club logo asset:', e.message);
-    }
-  }
-
-  const updatedClub = await withTenant(req.collegeId, async (tx) => {
-    return await tx.club.update({
+    const updated = await tx.club.update({
       where: { id: clubId },
       data: {
         logoUrl: null,
@@ -156,7 +157,17 @@ exports.deleteClubLogo = asyncHandler(async (req, res) => {
         departments: clubDepartmentsSelect,
       },
     });
+    return { updatedClub: updated, oldLogoPublicId: club.logoPublicId };
   });
+
+  // 2. Remote deletion AFTER successful DB commit (best-effort, logged)
+  if (oldLogoPublicId) {
+    try {
+      await deleteAsset(oldLogoPublicId);
+    } catch (e) {
+      console.warn('Failed to delete club logo asset:', e.message);
+    }
+  }
 
   res.status(200).json({
     success: true,
@@ -177,15 +188,44 @@ exports.uploadClubCover = asyncHandler(async (req, res) => {
   const { clubId } = req.params;
   validateUUID(clubId, 'club ID');
 
-  const oldCoverPublicId = await withTenant(req.collegeId, async (tx) => {
-    const club = await tx.club.findFirst({
-      where: { id: clubId, collegeId: req.collegeId },
-      select: { id: true, coverImagePublicId: true },
-    });
-    if (!club) throw new AppError('Club not found', 404);
-    return club.coverImagePublicId;
-  });
+  // 1. Upload new image to Cloudinary first
+  const uploadResult = await uploadBuffer(req.file.buffer, `clubs/${clubId}/cover`);
 
+  // 2. Commit to database first (with compensation if DB write fails)
+  let updatedClub;
+  let oldCoverPublicId = null;
+  try {
+    const result = await withTenant(req.collegeId, async (tx) => {
+      const club = await tx.club.findFirst({
+        where: { id: clubId, collegeId: req.collegeId },
+        select: { id: true, coverImagePublicId: true },
+      });
+      if (!club) throw new AppError('Club not found', 404);
+
+      const updated = await tx.club.update({
+        where: { id: clubId },
+        data: {
+          coverImageUrl: uploadResult.url,
+          coverImagePublicId: uploadResult.publicId,
+        },
+        include: {
+          departments: clubDepartmentsSelect,
+        },
+      });
+      return { updated, oldCover: club.coverImagePublicId };
+    });
+    updatedClub = result.updated;
+    oldCoverPublicId = result.oldCover;
+  } catch (dbError) {
+    try {
+      await deleteAsset(uploadResult.publicId);
+    } catch (cleanupErr) {
+      console.error('Failed to compensate newly uploaded club cover after DB failure:', cleanupErr.message);
+    }
+    throw dbError;
+  }
+
+  // 3. Remote deletion AFTER successful DB commit (best-effort, logged)
   if (oldCoverPublicId) {
     try {
       await deleteAsset(oldCoverPublicId);
@@ -193,21 +233,6 @@ exports.uploadClubCover = asyncHandler(async (req, res) => {
       console.warn('Failed to delete old club cover asset:', e.message);
     }
   }
-
-  const uploadResult = await uploadBuffer(req.file.buffer, `clubs/${clubId}/cover`);
-
-  const updatedClub = await withTenant(req.collegeId, async (tx) => {
-    return await tx.club.update({
-      where: { id: clubId },
-      data: {
-        coverImageUrl: uploadResult.url,
-        coverImagePublicId: uploadResult.publicId,
-      },
-      include: {
-        departments: clubDepartmentsSelect,
-      },
-    });
-  });
 
   res.status(200).json({
     success: true,
@@ -227,25 +252,15 @@ exports.deleteClubCover = asyncHandler(async (req, res) => {
   const { clubId } = req.params;
   validateUUID(clubId, 'club ID');
 
-  const oldCoverPublicId = await withTenant(req.collegeId, async (tx) => {
+  // 1. Commit database changes first
+  const { updatedClub, oldCoverPublicId } = await withTenant(req.collegeId, async (tx) => {
     const club = await tx.club.findFirst({
       where: { id: clubId, collegeId: req.collegeId },
       select: { id: true, coverImagePublicId: true },
     });
     if (!club) throw new AppError('Club not found', 404);
-    return club.coverImagePublicId;
-  });
 
-  if (oldCoverPublicId) {
-    try {
-      await deleteAsset(oldCoverPublicId);
-    } catch (e) {
-      console.warn('Failed to delete club cover asset:', e.message);
-    }
-  }
-
-  const updatedClub = await withTenant(req.collegeId, async (tx) => {
-    return await tx.club.update({
+    const updated = await tx.club.update({
       where: { id: clubId },
       data: {
         coverImageUrl: null,
@@ -255,7 +270,17 @@ exports.deleteClubCover = asyncHandler(async (req, res) => {
         departments: clubDepartmentsSelect,
       },
     });
+    return { updatedClub: updated, oldCoverPublicId: club.coverImagePublicId };
   });
+
+  // 2. Remote deletion AFTER successful DB commit (best-effort, logged)
+  if (oldCoverPublicId) {
+    try {
+      await deleteAsset(oldCoverPublicId);
+    } catch (e) {
+      console.warn('Failed to delete club cover asset:', e.message);
+    }
+  }
 
   res.status(200).json({
     success: true,
@@ -276,15 +301,49 @@ exports.uploadEventCover = asyncHandler(async (req, res) => {
   const { eventId } = req.params;
   validateUUID(eventId, 'event ID');
 
-  const oldCoverPublicId = await withTenant(req.collegeId, async (tx) => {
-    const event = await tx.event.findFirst({
-      where: { id: eventId, collegeId: req.collegeId },
-      select: { id: true, coverImagePublicId: true },
-    });
-    if (!event) throw new AppError('Event not found', 404);
-    return event.coverImagePublicId;
-  });
+  // 1. Upload new image to Cloudinary first
+  const uploadResult = await uploadBuffer(req.file.buffer, `events/${eventId}/cover`);
 
+  // 2. Commit to database first (with compensation if DB write fails)
+  let eventView;
+  let gallery;
+  let oldCoverPublicId = null;
+  try {
+    const result = await withTenant(req.collegeId, async (tx) => {
+      const event = await tx.event.findFirst({
+        where: { id: eventId, collegeId: req.collegeId },
+        select: { id: true, coverImagePublicId: true },
+      });
+      if (!event) throw new AppError('Event not found', 404);
+
+      await tx.event.update({
+        where: { id: eventId },
+        data: {
+          coverImageUrl: uploadResult.url,
+          coverImagePublicId: uploadResult.publicId,
+        },
+      });
+
+      const viewRow = await tx.eventsWithStatus.findUnique({ where: { id: eventId } });
+      const galleryRows = await tx.eventGalleryImage.findMany({
+        where: { eventId, collegeId: req.collegeId },
+        orderBy: { position: 'asc' },
+      });
+      return { eventView: viewRow, gallery: galleryRows, oldCover: event.coverImagePublicId };
+    });
+    eventView = result.eventView;
+    gallery = result.gallery;
+    oldCoverPublicId = result.oldCover;
+  } catch (dbError) {
+    try {
+      await deleteAsset(uploadResult.publicId);
+    } catch (cleanupErr) {
+      console.error('Failed to compensate newly uploaded event cover after DB failure:', cleanupErr.message);
+    }
+    throw dbError;
+  }
+
+  // 3. Remote deletion AFTER successful DB commit (best-effort, logged)
   if (oldCoverPublicId) {
     try {
       await deleteAsset(oldCoverPublicId);
@@ -292,25 +351,6 @@ exports.uploadEventCover = asyncHandler(async (req, res) => {
       console.warn('Failed to delete old event cover asset:', e.message);
     }
   }
-
-  const uploadResult = await uploadBuffer(req.file.buffer, `events/${eventId}/cover`);
-
-  const { eventView, gallery } = await withTenant(req.collegeId, async (tx) => {
-    await tx.event.update({
-      where: { id: eventId },
-      data: {
-        coverImageUrl: uploadResult.url,
-        coverImagePublicId: uploadResult.publicId,
-      },
-    });
-
-    const viewRow = await tx.eventsWithStatus.findUnique({ where: { id: eventId } });
-    const galleryRows = await tx.eventGalleryImage.findMany({
-      where: { eventId, collegeId: req.collegeId },
-      orderBy: { position: 'asc' },
-    });
-    return { eventView: viewRow, gallery: galleryRows };
-  });
 
   res.status(200).json({
     success: true,
@@ -330,24 +370,14 @@ exports.deleteEventCover = asyncHandler(async (req, res) => {
   const { eventId } = req.params;
   validateUUID(eventId, 'event ID');
 
-  const oldCoverPublicId = await withTenant(req.collegeId, async (tx) => {
+  // 1. Commit database changes first
+  const { eventView, gallery, oldCoverPublicId } = await withTenant(req.collegeId, async (tx) => {
     const event = await tx.event.findFirst({
       where: { id: eventId, collegeId: req.collegeId },
       select: { id: true, coverImagePublicId: true },
     });
     if (!event) throw new AppError('Event not found', 404);
-    return event.coverImagePublicId;
-  });
 
-  if (oldCoverPublicId) {
-    try {
-      await deleteAsset(oldCoverPublicId);
-    } catch (e) {
-      console.warn('Failed to delete event cover asset:', e.message);
-    }
-  }
-
-  const { eventView, gallery } = await withTenant(req.collegeId, async (tx) => {
     await tx.event.update({
       where: { id: eventId },
       data: {
@@ -361,8 +391,17 @@ exports.deleteEventCover = asyncHandler(async (req, res) => {
       where: { eventId, collegeId: req.collegeId },
       orderBy: { position: 'asc' },
     });
-    return { eventView: viewRow, gallery: galleryRows };
+    return { eventView: viewRow, gallery: galleryRows, oldCoverPublicId: event.coverImagePublicId };
   });
+
+  // 2. Remote deletion AFTER successful DB commit (best-effort, logged)
+  if (oldCoverPublicId) {
+    try {
+      await deleteAsset(oldCoverPublicId);
+    } catch (e) {
+      console.warn('Failed to delete event cover asset:', e.message);
+    }
+  }
 
   res.status(200).json({
     success: true,
@@ -406,27 +445,36 @@ exports.uploadEventGallery = asyncHandler(async (req, res) => {
     req.files.map((file) => uploadBuffer(file.buffer, `events/${eventId}/gallery`))
   );
 
-  // 3. Insert gallery rows inside transaction
-  const { eventView, gallery } = await withTenant(req.collegeId, async (tx) => {
-    for (let i = 0; i < uploadedImages.length; i++) {
-      await tx.eventGalleryImage.create({
-        data: {
-          collegeId: req.collegeId,
-          eventId,
-          imageUrl: uploadedImages[i].url,
-          imagePublicId: uploadedImages[i].publicId,
-          position: nextPosition + i,
-        },
-      });
-    }
+  // 3. Insert gallery rows inside transaction (with compensation if DB fails)
+  let eventView;
+  let gallery;
+  try {
+    const result = await withTenant(req.collegeId, async (tx) => {
+      for (let i = 0; i < uploadedImages.length; i++) {
+        await tx.eventGalleryImage.create({
+          data: {
+            collegeId: req.collegeId,
+            eventId,
+            imageUrl: uploadedImages[i].url,
+            imagePublicId: uploadedImages[i].publicId,
+            position: nextPosition + i,
+          },
+        });
+      }
 
-    const viewRow = await tx.eventsWithStatus.findUnique({ where: { id: eventId } });
-    const galleryRows = await tx.eventGalleryImage.findMany({
-      where: { eventId, collegeId: req.collegeId },
-      orderBy: { position: 'asc' },
+      const viewRow = await tx.eventsWithStatus.findUnique({ where: { id: eventId } });
+      const galleryRows = await tx.eventGalleryImage.findMany({
+        where: { eventId, collegeId: req.collegeId },
+        orderBy: { position: 'asc' },
+      });
+      return { eventView: viewRow, gallery: galleryRows };
     });
-    return { eventView: viewRow, gallery: galleryRows };
-  });
+    eventView = result.eventView;
+    gallery = result.gallery;
+  } catch (dbError) {
+    await Promise.allSettled(uploadedImages.map((img) => deleteAsset(img.publicId)));
+    throw dbError;
+  }
 
   res.status(200).json({
     success: true,
@@ -447,8 +495,8 @@ exports.deleteEventGalleryImage = asyncHandler(async (req, res) => {
   validateUUID(eventId, 'event ID');
   const publicId = decodePublicId(req.params.publicId);
 
-  // 1. Verify gallery image exists inside transaction
-  const imageRow = await withTenant(req.collegeId, async (tx) => {
+  // 1. Commit DB deletion first
+  const { eventView, gallery } = await withTenant(req.collegeId, async (tx) => {
     const row = await tx.eventGalleryImage.findFirst({
       where: {
         eventId,
@@ -457,20 +505,9 @@ exports.deleteEventGalleryImage = asyncHandler(async (req, res) => {
       },
     });
     if (!row) throw new AppError('Gallery image not found', 404);
-    return row;
-  });
 
-  // 2. Delete from Cloudinary OUTSIDE transaction
-  try {
-    await deleteAsset(publicId);
-  } catch (e) {
-    console.warn('Failed to delete gallery image asset:', e.message);
-  }
-
-  // 3. Delete database row inside transaction
-  const { eventView, gallery } = await withTenant(req.collegeId, async (tx) => {
     await tx.eventGalleryImage.delete({
-      where: { id: imageRow.id },
+      where: { id: row.id },
     });
 
     const viewRow = await tx.eventsWithStatus.findUnique({ where: { id: eventId } });
@@ -480,6 +517,13 @@ exports.deleteEventGalleryImage = asyncHandler(async (req, res) => {
     });
     return { eventView: viewRow, gallery: galleryRows };
   });
+
+  // 2. Remote deletion AFTER successful DB commit (best-effort, logged)
+  try {
+    await deleteAsset(publicId);
+  } catch (e) {
+    console.warn('Failed to delete gallery image asset:', e.message);
+  }
 
   res.status(200).json({
     success: true,

@@ -6,6 +6,20 @@ const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-
 const TX_MAX_WAIT_MS = 5000; // 5s max wait to acquire a connection from PgBouncer pool
 const TX_TIMEOUT_MS = 10000; // 10s max execution time for tenant transaction
 
+let failTransactionConfig = null;
+function __setFailTransaction(config) {
+  if (!config) {
+    failTransactionConfig = null;
+  } else if (config instanceof Error || typeof config === 'string') {
+    failTransactionConfig = { skip: 0, error: config instanceof Error ? config : new Error(config) };
+  } else {
+    failTransactionConfig = {
+      skip: config.skip || 0,
+      error: config.error || new Error('SIMULATED_DB_WRITE_FAILURE'),
+    };
+  }
+}
+
 /**
  * ============================================================================
  * ARCHITECTURAL CONVENTION & SAFETY RULES FOR withTenant:
@@ -65,6 +79,16 @@ async function withTenant(collegeId, callback, options = {}) {
       // 1. Establish tenant context inside the transaction using parameterized SQL
       await tx.$executeRaw`SELECT set_config('app.college_id', ${collegeId}, true)`;
 
+      if (process.env.NODE_ENV === 'test' && failTransactionConfig) {
+        if (failTransactionConfig.skip > 0) {
+          failTransactionConfig.skip -= 1;
+        } else {
+          const err = failTransactionConfig.error;
+          failTransactionConfig = null;
+          throw err;
+        }
+      }
+
       // 2. Execute tenant-scoped database operations through tx
       return await callback(tx);
     },
@@ -80,4 +104,5 @@ module.exports = {
   withTenant,
   TX_MAX_WAIT_MS,
   TX_TIMEOUT_MS,
+  __setFailTransaction,
 };

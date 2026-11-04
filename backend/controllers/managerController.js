@@ -263,45 +263,56 @@ exports.uploadManagerAvatar = asyncHandler(async (req, res) => {
 
   const userId = req.user.id;
 
-  // 1. Fetch current avatar info inside transaction
-  const currentAvatarPublicId = await withTenant(req.collegeId, async (tx) => {
-    const user = await tx.user.findFirst({
-      where: { id: userId, collegeId: req.collegeId },
-      select: { avatarPublicId: true },
-    });
-    if (!user) throw new AppError('User not found', 404);
-    return user.avatarPublicId;
-  });
+  // 1. Upload new image to Cloudinary first
+  const uploadResult = await uploadBuffer(req.file.buffer, `users/${userId}/avatar`);
 
-  // 2. Perform Cloudinary operations OUTSIDE transaction
-  if (currentAvatarPublicId) {
+  // 2. Commit to database first (with compensation if DB fails)
+  let updatedUser;
+  let oldAvatarPublicId = null;
+  try {
+    const result = await withTenant(req.collegeId, async (tx) => {
+      const user = await tx.user.findFirst({
+        where: { id: userId, collegeId: req.collegeId },
+        select: { avatarPublicId: true },
+      });
+      if (!user) throw new AppError('User not found', 404);
+
+      const updated = await tx.user.update({
+        where: { id: userId },
+        data: {
+          avatarUrl: uploadResult.url,
+          avatarPublicId: uploadResult.publicId,
+        },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+          avatarUrl: true,
+          avatarPublicId: true,
+        },
+      });
+      return { updated, oldAvatar: user.avatarPublicId };
+    });
+    updatedUser = result.updated;
+    oldAvatarPublicId = result.oldAvatar;
+  } catch (dbError) {
     try {
-      await deleteAsset(currentAvatarPublicId);
+      await deleteAsset(uploadResult.publicId);
+    } catch (cleanupErr) {
+      console.error('Failed to compensate newly uploaded manager avatar after DB failure:', cleanupErr.message);
+    }
+    throw dbError;
+  }
+
+  // 3. Remote deletion AFTER successful DB commit (best-effort, logged)
+  if (oldAvatarPublicId) {
+    try {
+      await deleteAsset(oldAvatarPublicId);
     } catch (e) {
       console.warn('Failed to delete old avatar asset:', e.message);
     }
   }
-
-  const uploadResult = await uploadBuffer(req.file.buffer, `users/${userId}/avatar`);
-
-  // 3. Persist new avatar in DB inside transaction
-  const updatedUser = await withTenant(req.collegeId, async (tx) => {
-    return await tx.user.update({
-      where: { id: userId },
-      data: {
-        avatarUrl: uploadResult.url,
-        avatarPublicId: uploadResult.publicId,
-      },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        role: true,
-        avatarUrl: true,
-        avatarPublicId: true,
-      },
-    });
-  });
 
   res.status(200).json({
     success: true,
@@ -321,28 +332,15 @@ exports.deleteManagerAvatar = asyncHandler(async (req, res) => {
 
   const userId = req.user.id;
 
-  // 1. Fetch current avatar info inside transaction
-  const currentAvatarPublicId = await withTenant(req.collegeId, async (tx) => {
+  // 1. Commit database changes first
+  const { updatedUser, oldAvatarPublicId } = await withTenant(req.collegeId, async (tx) => {
     const user = await tx.user.findFirst({
       where: { id: userId, collegeId: req.collegeId },
       select: { avatarPublicId: true },
     });
     if (!user) throw new AppError('User not found', 404);
-    return user.avatarPublicId;
-  });
 
-  // 2. Perform Cloudinary delete OUTSIDE transaction
-  if (currentAvatarPublicId) {
-    try {
-      await deleteAsset(currentAvatarPublicId);
-    } catch (e) {
-      console.warn('Failed to delete avatar asset:', e.message);
-    }
-  }
-
-  // 3. Clear avatar in DB inside transaction
-  const updatedUser = await withTenant(req.collegeId, async (tx) => {
-    return await tx.user.update({
+    const updated = await tx.user.update({
       where: { id: userId },
       data: {
         avatarUrl: null,
@@ -357,7 +355,17 @@ exports.deleteManagerAvatar = asyncHandler(async (req, res) => {
         avatarPublicId: true,
       },
     });
+    return { updatedUser: updated, oldAvatarPublicId: user.avatarPublicId };
   });
+
+  // 2. Remote deletion AFTER successful DB commit (best-effort, logged)
+  if (oldAvatarPublicId) {
+    try {
+      await deleteAsset(oldAvatarPublicId);
+    } catch (e) {
+      console.warn('Failed to delete avatar asset:', e.message);
+    }
+  }
 
   res.status(200).json({
     success: true,

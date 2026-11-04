@@ -37,6 +37,8 @@ const bcrypt = require('bcryptjs');
 const { withTenant } = require('../config/db');
 const { getCollegeBySlug } = require('../config/collegeResolver');
 const { prisma } = require('../config/internalClient');
+const { mockJournal } = require('../utils/cloudinaryUpload');
+const { __setFailTransaction } = require('../config/tenantContext');
 const app = require('../index');
 
 const FIXTURE_EMAILS = {
@@ -1727,6 +1729,119 @@ async function runPhase3bTests() {
 
       totalRowsChecked += 4;
       console.log('  ✔ Complete cross-tenant isolation on media and deletion operations strictly enforced.');
+    }
+
+    // -------------------------------------------------------------------------
+    // 24. Cloudinary Ordering, Compensation on DB Failure & Integrity (Item 1)
+    // -------------------------------------------------------------------------
+    {
+      console.log('\n[TEST 24] Testing Cloudinary Ordering, Compensation on DB Failure & Integrity (Item 1)...');
+      const dummyPng = () => new Blob([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])], { type: 'image/png' });
+      mockJournal.clear();
+
+      // Step A: Replace flow - upload initial logo, then replace with new logo
+      const form1 = new FormData();
+      form1.append('logo', dummyPng(), 'logo1.png');
+      const res1 = await makeRequest({
+        method: 'POST',
+        path: `/admin/clubs/${clubA1.id}/logo`,
+        host: 'lbrce.localhost',
+        token: tokenAdminA,
+        body: form1,
+      });
+      assert.strictEqual(res1.status, 200, 'Initial logo upload must succeed');
+      const club1 = res1.body.club || res1.body.data?.club || res1.body.data;
+      const initialLogoPublicId = club1.logo.publicId;
+      assert.ok(initialLogoPublicId, 'Initial logo publicId must exist');
+
+      // Verify DB row has initial logo
+      await withTenant(collegeA.id, async (tx) => {
+        const row = await tx.club.findUnique({ where: { id: clubA1.id } });
+        assert.strictEqual(row.logoPublicId, initialLogoPublicId);
+        totalRowsChecked += 1;
+      });
+
+      // Now replace with a second logo
+      mockJournal.clear();
+      const form2 = new FormData();
+      form2.append('logo', dummyPng(), 'logo2.png');
+      const res2 = await makeRequest({
+        method: 'POST',
+        path: `/admin/clubs/${clubA1.id}/logo`,
+        host: 'lbrce.localhost',
+        token: tokenAdminA,
+        body: form2,
+      });
+      assert.strictEqual(res2.status, 200, 'Logo replace must succeed');
+      const club2 = res2.body.club || res2.body.data?.club || res2.body.data;
+      const newLogoPublicId = club2.logo.publicId;
+      assert.notStrictEqual(newLogoPublicId, initialLogoPublicId);
+
+      // Assert Cloudinary ordering:
+      // 1. Initial logo was deleted AFTER DB commit
+      assert.ok(mockJournal.deletes.includes(initialLogoPublicId), 'Old logo must be deleted from Cloudinary');
+      // 2. Database row references the new logo and strictly NOT the deleted old logo
+      await withTenant(collegeA.id, async (tx) => {
+        const row = await tx.club.findUnique({ where: { id: clubA1.id } });
+        assert.strictEqual(row.logoPublicId, newLogoPublicId);
+        assert.notStrictEqual(row.logoPublicId, initialLogoPublicId);
+        totalRowsChecked += 1;
+      });
+
+      // Step B: Compensation on DB write failure:
+      // Force a DB failure on the controller transaction (skip=1 for authenticateToken)
+      mockJournal.clear();
+      __setFailTransaction({ skip: 1, error: new Error('SIMULATED_DB_WRITE_FAILURE') });
+
+      const formFail = new FormData();
+      formFail.append('logo', dummyPng(), 'fail-logo.png');
+      const resFail = await makeRequest({
+        method: 'POST',
+        path: `/admin/clubs/${clubA1.id}/logo`,
+        host: 'lbrce.localhost',
+        token: tokenAdminA,
+        body: formFail,
+      });
+      assert.strictEqual(resFail.status, 500, 'Failed DB write must return 500');
+
+      // Assert compensation:
+      // The asset was uploaded to Cloudinary, but because DB write failed,
+      // it was immediately compensated (deleted from Cloudinary)!
+      const failedUpload = mockJournal.uploads[0];
+      assert.ok(failedUpload, 'Asset must have been initially uploaded to Cloudinary');
+      assert.ok(
+        mockJournal.deletes.includes(failedUpload.publicId),
+        'FAIL: Newly uploaded asset must be compensated/deleted from Cloudinary when DB write fails'
+      );
+
+      // Assert that DB row still points to newLogoPublicId and does NOT point to the compensated asset
+      await withTenant(collegeA.id, async (tx) => {
+        const row = await tx.club.findUnique({ where: { id: clubA1.id } });
+        assert.strictEqual(row.logoPublicId, newLogoPublicId);
+        assert.notStrictEqual(row.logoPublicId, failedUpload.publicId);
+        totalRowsChecked += 1;
+      });
+
+      // Step C: Delete flow - DB commit first, remote deletion after
+      mockJournal.clear();
+      const resDel = await makeRequest({
+        method: 'DELETE',
+        path: `/admin/clubs/${clubA1.id}/logo`,
+        host: 'lbrce.localhost',
+        token: tokenAdminA,
+      });
+      assert.strictEqual(resDel.status, 200, 'DELETE /admin/clubs/:clubId/logo must return 200');
+      assert.ok(mockJournal.deletes.includes(newLogoPublicId), 'Old logo must be deleted from Cloudinary');
+      // Assert no row references the deleted asset
+      await withTenant(collegeA.id, async (tx) => {
+        const row = await tx.club.findUnique({ where: { id: clubA1.id } });
+        assert.strictEqual(row.logoPublicId, null);
+        assert.strictEqual(row.logoUrl, null);
+        totalRowsChecked += 1;
+      });
+
+      totalRowsChecked += 4;
+      console.log('  ✔ Cloudinary ordering and compensation on DB write failure verified.');
     }
 
     // -------------------------------------------------------------------------

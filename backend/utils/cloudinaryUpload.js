@@ -9,14 +9,25 @@ const verifyTestSafety = () => {
   }
 };
 
+const mockJournal = {
+  uploads: [],
+  deletes: [],
+  clear() {
+    this.uploads = [];
+    this.deletes = [];
+  },
+};
+
 const uploadBuffer = (buffer, folder) => {
   if (isTestEnv) {
     verifyTestSafety();
     const mockId = `mock_${Date.now()}_${Math.random().toString(36).substring(7)}`;
-    return Promise.resolve({
+    const result = {
       url: `https://res.cloudinary.com/test-cloud/image/upload/${folder}/${mockId}.jpg`,
       publicId: `${folder}/${mockId}`,
-    });
+    };
+    mockJournal.uploads.push(result);
+    return Promise.resolve(result);
   }
 
   return new Promise((resolve, reject) => {
@@ -35,6 +46,7 @@ const uploadBuffer = (buffer, folder) => {
 const deleteAsset = (publicId) => {
   if (isTestEnv) {
     verifyTestSafety();
+    mockJournal.deletes.push(publicId);
     return Promise.resolve({ result: 'ok' });
   }
 
@@ -56,4 +68,4 @@ const deleteAssetsBestEffort = async (publicIds, context) => {
   });
 };
 
-module.exports = { uploadBuffer, deleteAsset, deleteAssetsBestEffort };
+module.exports = { uploadBuffer, deleteAsset, deleteAssetsBestEffort, mockJournal };
