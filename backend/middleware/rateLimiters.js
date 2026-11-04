@@ -10,7 +10,7 @@ const createLimiter = (options) => rateLimit({
   standardHeaders: 'draft-8',
   legacyHeaders: false,
   handler: rateLimitHandler,
-  skip: () => process.env.NODE_ENV === 'development',
+  skip: () => process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test',
   ...options,
 });
 

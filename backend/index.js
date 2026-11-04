@@ -10,6 +10,7 @@ const app = express();
 const { errorHandler } = require('./middleware/errorHandler');
 const { responseFormatter } = require('./middleware/responseFormatter');
 const { resolveCollege } = require('./middleware/resolveCollege');
+const { corsOptionsDelegate, validateOriginOrReferer } = require('./middleware/originValidation');
 const { startEventStatusJob } = require('./services/eventStatusJob');
 
 if (process.env.NODE_ENV !== 'test') {
@@ -33,15 +34,14 @@ app.use(cookieParser());
 app.use(express.json());
 app.use(responseFormatter);
 
+// CORS Policy with strict exact-origin allowlist
+app.use(cors(corsOptionsDelegate));
+
 // Dynamic Multi-tenant Subdomain Resolution Middleware
 app.use(resolveCollege);
 
-app.use(
-  cors({
-    origin: process.env.FRONTEND_URL,
-    credentials: true,
-  })
-);
+// Origin / Referer Validation for State-Changing Requests (CSRF & Subdomain Isolation)
+app.use(validateOriginOrReferer);
 
 // Base route
 app.get('/', (req, res) => {

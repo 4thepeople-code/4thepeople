@@ -54,6 +54,9 @@ const authenticateToken = (req, res, next) => {
 
     next();
   } catch (error) {
+    if (error.name === 'TokenExpiredError') {
+      return next(new AppError('Authentication token has expired', 401));
+    }
     return next(new AppError('Invalid authentication token', 401));
   }
 };

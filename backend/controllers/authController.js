@@ -6,6 +6,13 @@ const asyncHandler = require('../utils/asyncHandler');
 const { AppError } = require('../middleware/errorHandler');
 const { sanitizeUser } = require('../utils/sanitizeUser');
 const { sendManagerPasswordResetOtp } = require('../services/emailService');
+const {
+  checkLoginThrottled,
+  recordFailedLogin,
+  resetLoginThrottling,
+  performDummyPasswordComparison,
+  getClientIp,
+} = require('../utils/loginSecurity');
 
 const PASSWORD_RESET_OTP_TTL_MS = 10 * 60 * 1000; // 10 minutes
 const MAX_OTP_ATTEMPTS = 5;
@@ -17,7 +24,7 @@ const getCookieOptions = () => {
     httpOnly: true,
     secure: isProduction,
     sameSite: isProduction ? 'strict' : 'lax',
-    maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    maxAge: 24 * 60 * 60 * 1000, // 24 hours (short expiry, host-only: NO domain attribute)
   };
 };
 
@@ -38,6 +45,13 @@ exports.adminLogin = asyncHandler(async (req, res) => {
   }
 
   const normalizedEmail = email.toLowerCase().trim();
+  const clientIp = getClientIp(req);
+
+  // Per-account + IP throttling check
+  const throttleStatus = checkLoginThrottled(normalizedEmail, clientIp);
+  if (throttleStatus.isThrottled) {
+    throw new AppError(`Too many failed login attempts. Please try again in ${throttleStatus.retryAfterSeconds} seconds.`, 429);
+  }
 
   const user = await withTenant(req.collegeId, async (tx) => {
     return await tx.user.findFirst({
@@ -48,29 +62,42 @@ exports.adminLogin = asyncHandler(async (req, res) => {
     });
   });
 
+  // Constant-time execution pad for non-existent users
   if (!user) {
+    await performDummyPasswordComparison(password);
+    recordFailedLogin(normalizedEmail, clientIp);
     throw new AppError('Invalid email or password', 401);
   }
 
   // Check role: must be COLLEGE_ADMIN
   if (user.role !== 'COLLEGE_ADMIN') {
+    await performDummyPasswordComparison(password);
+    recordFailedLogin(normalizedEmail, clientIp);
     throw new AppError('Access denied: User is not a college administrator', 403);
   }
 
   // Check active status
   if (!user.isActive) {
+    await performDummyPasswordComparison(password);
+    recordFailedLogin(normalizedEmail, clientIp);
     throw new AppError('Account is inactive. Please contact system administrator.', 403);
   }
 
   // Check password hash
   if (!user.passwordHash) {
+    await performDummyPasswordComparison(password);
+    recordFailedLogin(normalizedEmail, clientIp);
     throw new AppError('Invalid email or password', 401);
   }
 
   const isMatch = await bcrypt.compare(password, user.passwordHash);
   if (!isMatch) {
+    recordFailedLogin(normalizedEmail, clientIp);
     throw new AppError('Invalid email or password', 401);
   }
+
+  // Reset throttling upon successful login
+  resetLoginThrottling(normalizedEmail, clientIp);
 
   // Generate JWT token with college tenant claims
   const jwtSecret = process.env.JWT_SECRET || process.env.JWT_SECRET_TOKEN;
@@ -94,7 +121,7 @@ exports.adminLogin = asyncHandler(async (req, res) => {
     { expiresIn: jwtExpiry }
   );
 
-  // Set httpOnly cookie
+  // Set httpOnly cookie (host-only, no Domain attribute)
   res.cookie('yuva_token', token, getCookieOptions());
 
   res.status(200).json({
@@ -122,6 +149,13 @@ exports.managerLogin = asyncHandler(async (req, res) => {
   }
 
   const normalizedEmail = email.toLowerCase().trim();
+  const clientIp = getClientIp(req);
+
+  // Per-account + IP throttling check
+  const throttleStatus = checkLoginThrottled(normalizedEmail, clientIp);
+  if (throttleStatus.isThrottled) {
+    throw new AppError(`Too many failed login attempts. Please try again in ${throttleStatus.retryAfterSeconds} seconds.`, 429);
+  }
 
   const user = await withTenant(req.collegeId, async (tx) => {
     return await tx.user.findFirst({
@@ -132,22 +166,33 @@ exports.managerLogin = asyncHandler(async (req, res) => {
     });
   });
 
+  // Constant-time execution pad for non-existent users
   if (!user) {
+    await performDummyPasswordComparison(password);
+    recordFailedLogin(normalizedEmail, clientIp);
     throw new AppError('Invalid email or password', 401);
   }
 
   if (!user.passwordHash) {
+    await performDummyPasswordComparison(password);
+    recordFailedLogin(normalizedEmail, clientIp);
     throw new AppError('Account setup is not complete. Please accept your invitation first.', 400);
   }
 
   if (!user.isActive) {
+    await performDummyPasswordComparison(password);
+    recordFailedLogin(normalizedEmail, clientIp);
     throw new AppError('Account is inactive. Please accept your invite or contact an admin.', 403);
   }
 
   const isMatch = await bcrypt.compare(password, user.passwordHash);
   if (!isMatch) {
+    recordFailedLogin(normalizedEmail, clientIp);
     throw new AppError('Invalid email or password', 401);
   }
+
+  // Reset throttling upon successful login
+  resetLoginThrottling(normalizedEmail, clientIp);
 
   const jwtSecret = process.env.JWT_SECRET || process.env.JWT_SECRET_TOKEN;
   if (!jwtSecret && process.env.NODE_ENV === 'production') {

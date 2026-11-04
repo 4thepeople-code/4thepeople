@@ -15,6 +15,10 @@ dotenv.config();
 let brevo;
 
 const getBrevoClient = () => {
+  if (process.env.NODE_ENV === 'test') {
+    return null;
+  }
+
   if (!process.env.BREVO_API_KEY) {
     throw new Error('BREVO_API_KEY is not configured.');
   }
@@ -34,6 +38,10 @@ const getBrevoClient = () => {
  * Generic Brevo email sender
  */
 const sendEmail = async ({ toEmail, toName, subject, html }) => {
+  if (process.env.NODE_ENV === 'test') {
+    return { messageId: 'test-stub-message-id', success: true };
+  }
+
   const senderEmail = process.env.BREVO_SENDER_EMAIL;
   const senderName =
     process.env.BREVO_SENDER_NAME || '4 THE PEOPLE';
