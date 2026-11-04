@@ -289,11 +289,16 @@ exports.requestManagerPasswordReset = asyncHandler(async (req, res) => {
         name: true,
         email: true,
         isActive: true,
+        memberships: {
+          where: { role: 'MANAGER' },
+          select: { id: true },
+          take: 1,
+        },
       },
     });
 
-    // Invariant: all active users in this college tenant receive an OTP
-    if (user && user.isActive) {
+    // Invariant: only active users with MANAGER memberships receive OTP
+    if (user && user.isActive && user.memberships.length > 0) {
       const otp = crypto.randomInt(100000, 1000000).toString();
       await tx.user.update({
         where: { id: user.id },
@@ -360,11 +365,16 @@ exports.resetManagerPassword = asyncHandler(async (req, res) => {
         passwordResetOtpHash: true,
         passwordResetOtpExpiresAt: true,
         passwordResetAttempts: true,
+        memberships: {
+          where: { role: 'MANAGER' },
+          select: { id: true },
+          take: 1,
+        },
       },
     });
   });
 
-  if (!user || !user.isActive) {
+  if (!user || !user.isActive || user.memberships.length === 0) {
     throw new AppError('Invalid or expired OTP', 400);
   }
 

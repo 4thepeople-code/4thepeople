@@ -88,6 +88,11 @@ async function cleanupFixtures(collegeA, collegeB) {
           user: { email: { endsWith: '@example.test' } },
         },
       });
+      await tx.club.deleteMany({
+        where: {
+          name: { startsWith: 'Test Auth Fixture' },
+        },
+      });
       await tx.user.deleteMany({
         where: {
           email: { endsWith: '@example.test' },
@@ -101,6 +106,11 @@ async function cleanupFixtures(collegeA, collegeB) {
       await tx.membership.deleteMany({
         where: {
           user: { email: { endsWith: '@example.test' } },
+        },
+      });
+      await tx.club.deleteMany({
+        where: {
+          name: { startsWith: 'Test Auth Fixture' },
         },
       });
       await tx.user.deleteMany({
@@ -204,6 +214,16 @@ async function runPhase2Tests() {
 
     // 2. College A Manager (USER + Club MANAGER membership)
     let clubA = await tx.club.findFirst({ where: { collegeId: collegeA.id } });
+    if (!clubA) {
+      clubA = await tx.club.create({
+        data: {
+          collegeId: collegeA.id,
+          name: 'Test Auth Fixture Club A',
+          clubType: 'DEPARTMENTAL',
+          createdByUserId: adminUser.id,
+        },
+      });
+    }
     const managerUser = await tx.user.create({
       data: {
         collegeId: collegeA.id,
@@ -216,16 +236,14 @@ async function runPhase2Tests() {
     });
     managerUserId = managerUser.id;
 
-    if (clubA) {
-      await tx.membership.create({
-        data: {
-          collegeId: collegeA.id,
-          userId: managerUser.id,
-          clubId: clubA.id,
-          role: 'MANAGER',
-        },
-      });
-    }
+    await tx.membership.create({
+      data: {
+        collegeId: collegeA.id,
+        userId: managerUser.id,
+        clubId: clubA.id,
+        role: 'MANAGER',
+      },
+    });
 
     // 3. College A Standard User (USER without admin privileges)
     const regUser = await tx.user.create({
