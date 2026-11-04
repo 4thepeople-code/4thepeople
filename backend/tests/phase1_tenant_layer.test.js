@@ -7,7 +7,18 @@ if (!process.env.TEST_DATABASE_URL) {
   process.exit(1);
 }
 
-process.env.DATABASE_URL = process.env.TEST_DATABASE_URL;
+let testDbUrl = process.env.TEST_DATABASE_URL;
+if (process.env.TEST_CONNECTION_LIMIT) {
+  try {
+    const parsed = new URL(testDbUrl);
+    parsed.searchParams.set('connection_limit', process.env.TEST_CONNECTION_LIMIT);
+    testDbUrl = parsed.toString();
+  } catch {
+    const sep = testDbUrl.includes('?') ? '&' : '?';
+    testDbUrl = `${testDbUrl}${sep}connection_limit=${process.env.TEST_CONNECTION_LIMIT}`;
+  }
+}
+process.env.DATABASE_URL = testDbUrl;
 if (process.env.TEST_PLATFORM_DATABASE_URL) {
   process.env.PLATFORM_DATABASE_URL = process.env.TEST_PLATFORM_DATABASE_URL;
 }
@@ -467,14 +478,20 @@ async function runTests() {
   console.log('  ✔ Case-insensitive email operations verified under Prisma and CITEXT.');
 
   // -------------------------------------------------------------------------
-  // 6. Concurrency Isolation Test: 50 Alternating A/B withTenant Calls
+  // 6. Concurrency Isolation Test: Alternating A/B withTenant Calls
   // -------------------------------------------------------------------------
-  console.log('\n[TEST 6] Executing 50 alternating concurrent withTenant calls (A/B)...');
+  const CONCURRENCY_COUNT = parseInt(process.env.TEST_CONCURRENCY || '50', 10);
+  const testMaxWait = process.env.TEST_MAX_WAIT_MS ? parseInt(process.env.TEST_MAX_WAIT_MS, 10) : TX_MAX_WAIT_MS;
+  const configuredConnLimit = process.env.TEST_CONNECTION_LIMIT || 'driver-default';
+
+  console.log(`\n[TEST 6] Executing ${CONCURRENCY_COUNT} alternating concurrent withTenant calls (A/B)...`);
   console.log('  ------------------------------------------------------------------');
-  console.log('  Connection Pool Configuration:');
+  console.log('  Connection Pool & Runtime Configuration:');
   console.log('    Pooling Mode     : PgBouncer transaction pooling (pgbouncer=true)');
-  console.log(`    maxWait          : ${TX_MAX_WAIT_MS}ms (connection acquisition timeout)`);
+  console.log(`    maxWait          : ${testMaxWait}ms (connection acquisition timeout)`);
   console.log(`    timeout          : ${TX_TIMEOUT_MS}ms (transaction execution timeout)`);
+  console.log(`    connection_limit : ${configuredConnLimit}`);
+  console.log(`    Concurrency      : ${CONCURRENCY_COUNT} parallel tasks`);
   console.log('    Isolation Level  : ReadCommitted');
   console.log('  Queried Tables under RLS:');
   console.log('    - users (tenant isolated)');
@@ -482,7 +499,12 @@ async function runTests() {
   console.log('    - Session variable app.college_id');
   console.log('  ------------------------------------------------------------------');
 
-  const CONCURRENCY_COUNT = 50;
+  const latencies = [];
+  let crossTenantUserLeaks = 0;
+  let crossTenantClubLeaks = 0;
+  let totalUserRowsChecked = 0;
+  let totalClubRowsChecked = 0;
+
   const promises = [];
 
   for (let i = 0; i < CONCURRENCY_COUNT; i++) {
@@ -491,48 +513,89 @@ async function runTests() {
     const otherCollege = isCollegeA ? collegeB : collegeA;
     const callIndex = i + 1;
 
-    const task = withTenant(targetCollege.id, async (tx) => {
-      // 1. Verify transaction-local setting matches current task target
-      const sessionResult = await tx.$queryRaw`SELECT current_setting('app.college_id', true) as tenant_id`;
-      assert.strictEqual(
-        sessionResult[0].tenant_id,
+    const task = (async () => {
+      const startTime = performance.now();
+      const res = await withTenant(
         targetCollege.id,
-        `Call ${callIndex}: session setting mismatch`
+        async (tx) => {
+          // 1. Verify transaction-local setting matches current task target
+          const sessionResult = await tx.$queryRaw`SELECT current_setting('app.college_id', true) as tenant_id`;
+          assert.strictEqual(
+            sessionResult[0].tenant_id,
+            targetCollege.id,
+            `Call ${callIndex}: session setting mismatch`
+          );
+
+          // 2. Query users under RLS
+          const users = await tx.user.findMany({ select: { id: true, collegeId: true } });
+          for (const u of users) {
+            totalUserRowsChecked++;
+            if (u.collegeId !== targetCollege.id) {
+              crossTenantUserLeaks++;
+            }
+            assert.strictEqual(
+              u.collegeId,
+              targetCollege.id,
+              `Call ${callIndex}: Cross-tenant user row leak! Expected ${targetCollege.id}, got ${u.collegeId}`
+            );
+            assert.notStrictEqual(
+              u.collegeId,
+              otherCollege.id,
+              `Call ${callIndex}: Leaked user from other college (${otherCollege.id})!`
+            );
+          }
+
+          // 3. Query clubs under RLS
+          const clubs = await tx.club.findMany({ select: { id: true, collegeId: true } });
+          for (const c of clubs) {
+            totalClubRowsChecked++;
+            if (c.collegeId !== targetCollege.id) {
+              crossTenantClubLeaks++;
+            }
+            assert.strictEqual(
+              c.collegeId,
+              targetCollege.id,
+              `Call ${callIndex}: Cross-tenant club row leak! Expected ${targetCollege.id}, got ${c.collegeId}`
+            );
+          }
+
+          return { callIndex, tenantSlug: targetCollege.slug, userCount: users.length };
+        },
+        { maxWait: testMaxWait }
       );
-
-      // 2. Query users under RLS
-      const users = await tx.user.findMany({ select: { id: true, collegeId: true } });
-      for (const u of users) {
-        assert.strictEqual(
-          u.collegeId,
-          targetCollege.id,
-          `Call ${callIndex}: Cross-tenant user row leak! Expected ${targetCollege.id}, got ${u.collegeId}`
-        );
-        assert.notStrictEqual(
-          u.collegeId,
-          otherCollege.id,
-          `Call ${callIndex}: Leaked user from other college (${otherCollege.id})!`
-        );
-      }
-
-      // 3. Query clubs under RLS
-      const clubs = await tx.club.findMany({ select: { id: true, collegeId: true } });
-      for (const c of clubs) {
-        assert.strictEqual(
-          c.collegeId,
-          targetCollege.id,
-          `Call ${callIndex}: Cross-tenant club row leak! Expected ${targetCollege.id}, got ${c.collegeId}`
-        );
-      }
-
-      return { callIndex, tenantSlug: targetCollege.slug, userCount: users.length };
-    });
+      const elapsed = performance.now() - startTime;
+      latencies.push(elapsed);
+      return res;
+    })();
 
     promises.push(task);
   }
 
   const results = await Promise.all(promises);
   assert.strictEqual(results.length, CONCURRENCY_COUNT);
+
+  // Compute latency percentiles
+  latencies.sort((a, b) => a - b);
+  const p50 = latencies[Math.floor(latencies.length * 0.50)];
+  const p95 = latencies[Math.floor(latencies.length * 0.95)];
+  const minLatency = latencies[0];
+  const maxLatency = latencies[latencies.length - 1];
+  const avgLatency = (latencies.reduce((sum, val) => sum + val, 0) / latencies.length).toFixed(2);
+
+  console.log(`\n  Latency Statistics (N = ${CONCURRENCY_COUNT} transactions):`);
+  console.log(`    p50 (median) latency : ${p50.toFixed(2)} ms`);
+  console.log(`    p95 latency          : ${p95.toFixed(2)} ms`);
+  console.log(`    Min latency          : ${minLatency.toFixed(2)} ms`);
+  console.log(`    Max latency          : ${maxLatency.toFixed(2)} ms`);
+  console.log(`    Avg latency          : ${avgLatency} ms`);
+  console.log('  ------------------------------------------------------------------');
+  console.log(`  Cross-Tenant Data Leakage Report:`);
+  console.log(`    Total User rows checked across all calls : ${totalUserRowsChecked}`);
+  console.log(`    Cross-tenant User leaks                  : ${crossTenantUserLeaks}`);
+  console.log(`    Total Club rows checked across all calls : ${totalClubRowsChecked}`);
+  console.log(`    Cross-tenant Club leaks                  : ${crossTenantClubLeaks}`);
+  assert.strictEqual(crossTenantUserLeaks, 0, 'FAIL: Detected cross-tenant user row leak!');
+  assert.strictEqual(crossTenantClubLeaks, 0, 'FAIL: Detected cross-tenant club row leak!');
   console.log(`  ✔ Successfully completed ${CONCURRENCY_COUNT} interleaved concurrent transactions.`);
   console.log(`  ✔ Zero cross-tenant data leakage detected across all ${CONCURRENCY_COUNT} parallel operations.`);
 

@@ -43,9 +43,10 @@ const TX_TIMEOUT_MS = 10000; // 10s max execution time for tenant transaction
  *
  * @param {string} collegeId - Valid UUID of the tenant college.
  * @param {Function} callback - Async function (tx) => Promise<T>
+ * @param {Object} [options] - Optional transaction overrides (e.g. for testing)
  * @returns {Promise<T>} Result of the callback
  */
-async function withTenant(collegeId, callback) {
+async function withTenant(collegeId, callback, options = {}) {
   if (!collegeId || typeof collegeId !== 'string' || !UUID_REGEX.test(collegeId)) {
     const error = new Error('Invalid or missing tenant identifier (must be a valid UUID)');
     error.statusCode = 400;
@@ -56,6 +57,9 @@ async function withTenant(collegeId, callback) {
     throw new Error('withTenant requires a callback function');
   }
 
+  const maxWait = options.maxWait !== undefined ? options.maxWait : TX_MAX_WAIT_MS;
+  const timeout = options.timeout !== undefined ? options.timeout : TX_TIMEOUT_MS;
+
   return await prisma.$transaction(
     async (tx) => {
       // 1. Establish tenant context inside the transaction using parameterized SQL
@@ -65,8 +69,8 @@ async function withTenant(collegeId, callback) {
       return await callback(tx);
     },
     {
-      maxWait: TX_MAX_WAIT_MS,
-      timeout: TX_TIMEOUT_MS,
+      maxWait,
+      timeout,
       isolationLevel: 'ReadCommitted',
     }
   );
