@@ -1185,7 +1185,85 @@ async function runPhase3bTests() {
       assert.strictEqual(adminDeleteRes.status, 200, 'FAIL: Admin can delete any event in college');
       totalRowsChecked += 1;
 
-      console.log('  ✔ Event deletion and RBAC permissions verified.');
+      // 5. Test past-event deletion safeguards matching events_with_status view
+      let pastWithEndEvent, pastEndlessEvent, ongoingEndlessEvent;
+      await withTenant(collegeA.id, async (tx) => {
+        // Event with endAt that has passed
+        pastWithEndEvent = await tx.event.create({
+          data: {
+            collegeId: collegeA.id,
+            clubId: clubA1.id,
+            title: 'Past Event With End',
+            description: 'Past event',
+            location: 'Hall A',
+            startAt: new Date(Date.now() - 7200000),
+            endAt: new Date(Date.now() - 3600000),
+          },
+        });
+
+        // End-less event started >24 hours ago (completed per 24h fallback)
+        pastEndlessEvent = await tx.event.create({
+          data: {
+            collegeId: collegeA.id,
+            clubId: clubA1.id,
+            title: 'Past End-less Event',
+            description: 'End-less past event',
+            location: 'Hall B',
+            startAt: new Date(Date.now() - 25 * 3600000),
+            endAt: null,
+          },
+        });
+
+        // End-less event started <24 hours ago (ongoing per 24h fallback)
+        ongoingEndlessEvent = await tx.event.create({
+          data: {
+            collegeId: collegeA.id,
+            clubId: clubA1.id,
+            title: 'Ongoing End-less Event',
+            description: 'End-less ongoing event',
+            location: 'Hall C',
+            startAt: new Date(Date.now() - 2 * 3600000),
+            endAt: null,
+          },
+        });
+      });
+
+      // Attempt deleting past event with endAt -> 400
+      const pastWithEndDelRes = await makeRequest({
+        method: 'DELETE',
+        path: `/admin/events/${pastWithEndEvent.id}`,
+        host: 'lbrce.localhost',
+        token: tokenAdminA,
+      });
+      assert.strictEqual(pastWithEndDelRes.status, 400, 'FAIL: Deleting past event with endAt must return 400');
+
+      // Attempt deleting end-less event started >24 hours ago -> 400
+      const pastEndlessDelRes = await makeRequest({
+        method: 'DELETE',
+        path: `/admin/events/${pastEndlessEvent.id}`,
+        host: 'lbrce.localhost',
+        token: tokenAdminA,
+      });
+      assert.strictEqual(pastEndlessDelRes.status, 400, 'FAIL: Deleting end-less event older than 24h must return 400');
+
+      // Attempt deleting end-less event started <24 hours ago -> 200 (allowed)
+      const ongoingEndlessDelRes = await makeRequest({
+        method: 'DELETE',
+        path: `/admin/events/${ongoingEndlessEvent.id}`,
+        host: 'lbrce.localhost',
+        token: tokenAdminA,
+      });
+      assert.strictEqual(ongoingEndlessDelRes.status, 200, 'FAIL: Deleting ongoing end-less event within 24h must return 200');
+
+      // Cleanup remaining test events in College A
+      await withTenant(collegeA.id, async (tx) => {
+        await tx.event.deleteMany({
+          where: { id: { in: [pastWithEndEvent.id, pastEndlessEvent.id] }, collegeId: collegeA.id },
+        });
+      });
+
+      totalRowsChecked += 3;
+      console.log('  ✔ Event deletion and RBAC permissions verified (including 24h fallback past-event checks).');
     }
 
     // -------------------------------------------------------------------------

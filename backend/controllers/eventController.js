@@ -307,8 +307,8 @@ exports.deleteEvent = asyncHandler(async (req, res) => {
   const { eventId } = req.params;
   validateUUID(eventId, 'event ID');
 
-  // 1. Fetch event and images inside transaction
-  const eventDetails = await withTenant(req.collegeId, async (tx) => {
+  // 1. Fetch, validate past-event rule matching events_with_status, collect assets, and delete event inside transaction
+  const { deletedEvent, assetPublicIds } = await withTenant(req.collegeId, async (tx) => {
     const event = await tx.event.findFirst({
       where: { id: eventId, collegeId: req.collegeId },
       include: {
@@ -318,28 +318,42 @@ exports.deleteEvent = asyncHandler(async (req, res) => {
       },
     });
     if (!event) throw new AppError('Event not found', 404);
-    return event;
+
+    // Enforce past-event safeguard matching events_with_status view:
+    // If endAt is present: completed if now >= endAt
+    // If endAt is NULL: completed if startAt < (now - 24 hours) (24-hour fallback)
+    const now = new Date();
+    const isCompleted = event.endAt
+      ? new Date(event.endAt) <= now
+      : (new Date(event.startAt).getTime() + 24 * 60 * 60 * 1000) <= now.getTime();
+
+    if (isCompleted) {
+      throw new AppError('Cannot delete past events. Event has already occurred or completed.', 400);
+    }
+
+    const publicIds = [];
+    if (event.coverImagePublicId) publicIds.push(event.coverImagePublicId);
+    if (Array.isArray(event.gallery)) {
+      event.gallery.forEach((img) => {
+        if (img.imagePublicId) publicIds.push(img.imagePublicId);
+      });
+    }
+
+    await tx.eventGalleryImage.deleteMany({
+      where: { eventId, collegeId: req.collegeId },
+    });
+
+    const deleted = await tx.event.delete({
+      where: { id: eventId },
+    });
+
+    return { deletedEvent: deleted, assetPublicIds: publicIds };
   });
 
-  // 2. Perform Cloudinary cleanup OUTSIDE transaction
-  const assetPublicIds = [];
-  if (eventDetails.coverImagePublicId) assetPublicIds.push(eventDetails.coverImagePublicId);
-  if (Array.isArray(eventDetails.gallery)) {
-    eventDetails.gallery.forEach((img) => {
-      if (img.imagePublicId) assetPublicIds.push(img.imagePublicId);
-    });
-  }
-
+  // 2. Perform Cloudinary asset deletions AFTER database commit (best-effort, logged)
   if (assetPublicIds.length > 0) {
     await deleteAssetsBestEffort(assetPublicIds, `event ${eventId}`);
   }
-
-  // 3. Delete event inside transaction
-  const deletedEvent = await withTenant(req.collegeId, async (tx) => {
-    return await tx.event.delete({
-      where: { id: eventId },
-    });
-  });
 
   res.status(200).json({
     success: true,
