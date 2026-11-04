@@ -58,6 +58,20 @@ async function runTests() {
   console.log(`  Current Database : ${dbMeta.current_database}`);
   console.log(`  Current User     : ${dbMeta.current_user}`);
 
+  // Identify whether endpoint is connection pooler or direct host (without printing host itself)
+  let endpointType = 'Direct Database Endpoint';
+  try {
+    const parsedUrl = new URL(process.env.TEST_DATABASE_URL);
+    if (parsedUrl.hostname.includes('-pooler') || parsedUrl.searchParams.get('pgbouncer') === 'true') {
+      endpointType = 'PgBouncer Pooler Endpoint (pgbouncer=true)';
+    }
+  } catch {
+    if (process.env.TEST_DATABASE_URL.includes('-pooler') || process.env.TEST_DATABASE_URL.includes('pgbouncer=true')) {
+      endpointType = 'PgBouncer Pooler Endpoint (pgbouncer=true)';
+    }
+  }
+  console.log(`  Endpoint Type    : ${endpointType}`);
+
   assert.strictEqual(
     dbMeta.current_database,
     'yuva_test',
@@ -499,105 +513,195 @@ async function runTests() {
   console.log('    - Session variable app.college_id');
   console.log('  ------------------------------------------------------------------');
 
+  // Setup @example.test fixtures in both colleges to guarantee non-vacuous assertions
+  console.log('  Setting up @example.test concurrency fixtures in both colleges...');
+  let fixtureUserAId, fixtureUserBId;
+
+  await withTenant(collegeA.id, async (tx) => {
+    await tx.membership.deleteMany({ where: { user: { email: { endsWith: '@example.test' } } } });
+    await tx.club.deleteMany({ where: { name: { startsWith: 'Phase1 Fixture' } } });
+    await tx.user.deleteMany({ where: { email: { endsWith: '@example.test' } } });
+
+    const uA = await tx.user.create({
+      data: {
+        collegeId: collegeA.id,
+        name: 'Phase1 Fixture User A',
+        email: 'phase1_fixture_a@example.test',
+        role: 'USER',
+        isActive: true,
+      },
+    });
+    fixtureUserAId = uA.id;
+
+    await tx.club.create({
+      data: {
+        collegeId: collegeA.id,
+        name: 'Phase1 Fixture Club A',
+        clubType: 'DEPARTMENTAL',
+        createdByUserId: fixtureUserAId,
+      },
+    });
+  });
+
+  await withTenant(collegeB.id, async (tx) => {
+    await tx.membership.deleteMany({ where: { user: { email: { endsWith: '@example.test' } } } });
+    await tx.club.deleteMany({ where: { name: { startsWith: 'Phase1 Fixture' } } });
+    await tx.user.deleteMany({ where: { email: { endsWith: '@example.test' } } });
+
+    const uB = await tx.user.create({
+      data: {
+        collegeId: collegeB.id,
+        name: 'Phase1 Fixture User B',
+        email: 'phase1_fixture_b@example.test',
+        role: 'USER',
+        isActive: true,
+      },
+    });
+    fixtureUserBId = uB.id;
+
+    await tx.club.create({
+      data: {
+        collegeId: collegeB.id,
+        name: 'Phase1 Fixture Club B',
+        clubType: 'DEPARTMENTAL',
+        createdByUserId: fixtureUserBId,
+      },
+    });
+  });
+
   const latencies = [];
   let crossTenantUserLeaks = 0;
   let crossTenantClubLeaks = 0;
   let totalUserRowsChecked = 0;
   let totalClubRowsChecked = 0;
+  let rowsCheckedCollegeA = 0;
+  let rowsCheckedCollegeB = 0;
 
-  const promises = [];
+  try {
+    const promises = [];
 
-  for (let i = 0; i < CONCURRENCY_COUNT; i++) {
-    const isCollegeA = i % 2 === 0;
-    const targetCollege = isCollegeA ? collegeA : collegeB;
-    const otherCollege = isCollegeA ? collegeB : collegeA;
-    const callIndex = i + 1;
+    for (let i = 0; i < CONCURRENCY_COUNT; i++) {
+      const isCollegeA = i % 2 === 0;
+      const targetCollege = isCollegeA ? collegeA : collegeB;
+      const otherCollege = isCollegeA ? collegeB : collegeA;
+      const callIndex = i + 1;
 
-    const task = (async () => {
-      const startTime = performance.now();
-      const res = await withTenant(
-        targetCollege.id,
-        async (tx) => {
-          // 1. Verify transaction-local setting matches current task target
-          const sessionResult = await tx.$queryRaw`SELECT current_setting('app.college_id', true) as tenant_id`;
-          assert.strictEqual(
-            sessionResult[0].tenant_id,
-            targetCollege.id,
-            `Call ${callIndex}: session setting mismatch`
-          );
-
-          // 2. Query users under RLS
-          const users = await tx.user.findMany({ select: { id: true, collegeId: true } });
-          for (const u of users) {
-            totalUserRowsChecked++;
-            if (u.collegeId !== targetCollege.id) {
-              crossTenantUserLeaks++;
-            }
+      const task = (async () => {
+        const startTime = performance.now();
+        const res = await withTenant(
+          targetCollege.id,
+          async (tx) => {
+            // 1. Verify transaction-local setting matches current task target
+            const sessionResult = await tx.$queryRaw`SELECT current_setting('app.college_id', true) as tenant_id`;
             assert.strictEqual(
-              u.collegeId,
+              sessionResult[0].tenant_id,
               targetCollege.id,
-              `Call ${callIndex}: Cross-tenant user row leak! Expected ${targetCollege.id}, got ${u.collegeId}`
+              `Call ${callIndex}: session setting mismatch`
             );
-            assert.notStrictEqual(
-              u.collegeId,
-              otherCollege.id,
-              `Call ${callIndex}: Leaked user from other college (${otherCollege.id})!`
-            );
-          }
 
-          // 3. Query clubs under RLS
-          const clubs = await tx.club.findMany({ select: { id: true, collegeId: true } });
-          for (const c of clubs) {
-            totalClubRowsChecked++;
-            if (c.collegeId !== targetCollege.id) {
-              crossTenantClubLeaks++;
+            // 2. Query users under RLS
+            const users = await tx.user.findMany({ select: { id: true, collegeId: true } });
+            for (const u of users) {
+              totalUserRowsChecked++;
+              if (u.collegeId !== targetCollege.id) {
+                crossTenantUserLeaks++;
+              }
+              assert.strictEqual(
+                u.collegeId,
+                targetCollege.id,
+                `Call ${callIndex}: Cross-tenant user row leak! Expected ${targetCollege.id}, got ${u.collegeId}`
+              );
+              assert.notStrictEqual(
+                u.collegeId,
+                otherCollege.id,
+                `Call ${callIndex}: Leaked user from other college (${otherCollege.id})!`
+              );
             }
-            assert.strictEqual(
-              c.collegeId,
-              targetCollege.id,
-              `Call ${callIndex}: Cross-tenant club row leak! Expected ${targetCollege.id}, got ${c.collegeId}`
-            );
-          }
 
-          return { callIndex, tenantSlug: targetCollege.slug, userCount: users.length };
-        },
-        { maxWait: testMaxWait }
-      );
-      const elapsed = performance.now() - startTime;
-      latencies.push(elapsed);
-      return res;
-    })();
+            // 3. Query clubs under RLS
+            const clubs = await tx.club.findMany({ select: { id: true, collegeId: true } });
+            for (const c of clubs) {
+              totalClubRowsChecked++;
+              if (c.collegeId !== targetCollege.id) {
+                crossTenantClubLeaks++;
+              }
+              assert.strictEqual(
+                c.collegeId,
+                targetCollege.id,
+                `Call ${callIndex}: Cross-tenant club row leak! Expected ${targetCollege.id}, got ${c.collegeId}`
+              );
+            }
 
-    promises.push(task);
+            if (targetCollege.id === collegeA.id) {
+              rowsCheckedCollegeA += (users.length + clubs.length);
+            } else {
+              rowsCheckedCollegeB += (users.length + clubs.length);
+            }
+
+            return { callIndex, tenantSlug: targetCollege.slug, userCount: users.length, clubCount: clubs.length };
+          },
+          { maxWait: testMaxWait }
+        );
+        const elapsed = performance.now() - startTime;
+        latencies.push(elapsed);
+        return res;
+      })();
+
+      promises.push(task);
+    }
+
+    const results = await Promise.all(promises);
+    assert.strictEqual(results.length, CONCURRENCY_COUNT);
+
+    // Compute latency percentiles
+    latencies.sort((a, b) => a - b);
+    const p50 = latencies[Math.floor(latencies.length * 0.50)];
+    const p95 = latencies[Math.floor(latencies.length * 0.95)];
+    const minLatency = latencies[0];
+    const maxLatency = latencies[latencies.length - 1];
+    const avgLatency = (latencies.reduce((sum, val) => sum + val, 0) / latencies.length).toFixed(2);
+
+    console.log(`\n  Latency Statistics (N = ${CONCURRENCY_COUNT} transactions):`);
+    console.log(`    p50 (median) latency : ${p50.toFixed(2)} ms`);
+    console.log(`    p95 latency          : ${p95.toFixed(2)} ms`);
+    console.log(`    Min latency          : ${minLatency.toFixed(2)} ms`);
+    console.log(`    Max latency          : ${maxLatency.toFixed(2)} ms`);
+    console.log(`    Avg latency          : ${avgLatency} ms`);
+    console.log('  ------------------------------------------------------------------');
+    console.log(`  Cross-Tenant Data Leakage Report:`);
+    console.log(`    Total User rows checked across all calls : ${totalUserRowsChecked}`);
+    console.log(`    Cross-tenant User leaks                  : ${crossTenantUserLeaks}`);
+    console.log(`    Total Club rows checked across all calls : ${totalClubRowsChecked}`);
+    console.log(`    Cross-tenant Club leaks                  : ${crossTenantClubLeaks}`);
+    console.log(`    College A (lbrce) rows checked           : ${rowsCheckedCollegeA}`);
+    console.log(`    College B (vrsec) rows checked           : ${rowsCheckedCollegeB}`);
+
+    assert.strictEqual(crossTenantUserLeaks, 0, 'FAIL: Detected cross-tenant user row leak!');
+    assert.strictEqual(crossTenantClubLeaks, 0, 'FAIL: Detected cross-tenant club row leak!');
+    assert.ok(rowsCheckedCollegeA > 0, 'FAIL: Zero rows checked in College A (lbrce). Test assertion is vacuous!');
+    assert.ok(rowsCheckedCollegeB > 0, 'FAIL: Zero rows checked in College B (vrsec). Test assertion is vacuous!');
+
+    console.log(`  ✔ Successfully completed ${CONCURRENCY_COUNT} interleaved concurrent transactions.`);
+    console.log(`  ✔ Verified non-zero rows checked per tenant (College A: ${rowsCheckedCollegeA}, College B: ${rowsCheckedCollegeB}).`);
+    console.log(`  ✔ Zero cross-tenant data leakage detected across all ${CONCURRENCY_COUNT} parallel operations.`);
+  } finally {
+    console.log('  Cleaning up @example.test concurrency fixtures...');
+    try {
+      await withTenant(collegeA.id, async (tx) => {
+        await tx.membership.deleteMany({ where: { user: { email: { endsWith: '@example.test' } } } });
+        await tx.club.deleteMany({ where: { name: { startsWith: 'Phase1 Fixture' } } });
+        await tx.user.deleteMany({ where: { email: { endsWith: '@example.test' } } });
+      });
+      await withTenant(collegeB.id, async (tx) => {
+        await tx.membership.deleteMany({ where: { user: { email: { endsWith: '@example.test' } } } });
+        await tx.club.deleteMany({ where: { name: { startsWith: 'Phase1 Fixture' } } });
+        await tx.user.deleteMany({ where: { email: { endsWith: '@example.test' } } });
+      });
+      console.log('  ✔ Fixtures cleaned up successfully.');
+    } catch (cleanupErr) {
+      console.error('  ⚠ Warning: Error cleaning up Test 6 fixtures:', cleanupErr.message);
+    }
   }
-
-  const results = await Promise.all(promises);
-  assert.strictEqual(results.length, CONCURRENCY_COUNT);
-
-  // Compute latency percentiles
-  latencies.sort((a, b) => a - b);
-  const p50 = latencies[Math.floor(latencies.length * 0.50)];
-  const p95 = latencies[Math.floor(latencies.length * 0.95)];
-  const minLatency = latencies[0];
-  const maxLatency = latencies[latencies.length - 1];
-  const avgLatency = (latencies.reduce((sum, val) => sum + val, 0) / latencies.length).toFixed(2);
-
-  console.log(`\n  Latency Statistics (N = ${CONCURRENCY_COUNT} transactions):`);
-  console.log(`    p50 (median) latency : ${p50.toFixed(2)} ms`);
-  console.log(`    p95 latency          : ${p95.toFixed(2)} ms`);
-  console.log(`    Min latency          : ${minLatency.toFixed(2)} ms`);
-  console.log(`    Max latency          : ${maxLatency.toFixed(2)} ms`);
-  console.log(`    Avg latency          : ${avgLatency} ms`);
-  console.log('  ------------------------------------------------------------------');
-  console.log(`  Cross-Tenant Data Leakage Report:`);
-  console.log(`    Total User rows checked across all calls : ${totalUserRowsChecked}`);
-  console.log(`    Cross-tenant User leaks                  : ${crossTenantUserLeaks}`);
-  console.log(`    Total Club rows checked across all calls : ${totalClubRowsChecked}`);
-  console.log(`    Cross-tenant Club leaks                  : ${crossTenantClubLeaks}`);
-  assert.strictEqual(crossTenantUserLeaks, 0, 'FAIL: Detected cross-tenant user row leak!');
-  assert.strictEqual(crossTenantClubLeaks, 0, 'FAIL: Detected cross-tenant club row leak!');
-  console.log(`  ✔ Successfully completed ${CONCURRENCY_COUNT} interleaved concurrent transactions.`);
-  console.log(`  ✔ Zero cross-tenant data leakage detected across all ${CONCURRENCY_COUNT} parallel operations.`);
 
   console.log('\n======================================================================');
   console.log('ALL PHASE 1 TESTS PASSED SUCCESSFULLY (0 FAILURES)');
