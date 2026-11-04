@@ -19,16 +19,10 @@ const RATE_LIMIT_WINDOW_MS = 60 * 1000; // 60s sliding window
 const MAX_DB_LOOKUPS_PER_WINDOW = 30; // Max 30 un-cached DB lookups per IP per minute
 
 /**
- * Extracts client IP from request. Honors X-Forwarded-For ONLY when Express
- * 'trust proxy' is explicitly enabled.
+ * Extracts client IP derived exclusively via Express req.ip (using trust proxy).
  */
 function getClientIp(req) {
-  const isProxyTrusted = Boolean(req.app && req.app.get('trust proxy'));
-  if (isProxyTrusted && req.headers && req.headers['x-forwarded-for']) {
-    const raw = req.headers['x-forwarded-for'].split(',')[0].trim();
-    if (raw) return raw;
-  }
-  return req.ip || (req.socket && req.socket.remoteAddress) || '127.0.0.1';
+  return (req && req.ip) || (req && req.socket && req.socket.remoteAddress) || '127.0.0.1';
 }
 
 /**

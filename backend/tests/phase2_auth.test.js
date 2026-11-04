@@ -696,14 +696,19 @@ async function runPhase2Tests() {
 
     // 12c. Platform login in production mode refuses login if totp_secret is NULL
     process.env.NODE_ENV = 'production';
+    process.env.PROXY_SHARED_SECRET = 'test_temp_proxy_secret';
     const noTotpProdRes = await apiFetch('/api/platform/auth/login', {
       method: 'POST',
       tenantHost: 'admin.4thepeople.in',
-      headers: { Origin: 'https://admin.4thepeople.in' },
+      headers: {
+        Origin: 'https://admin.4thepeople.in',
+        'x-proxy-shared-secret': 'test_temp_proxy_secret',
+      },
       body: { email: FIXTURE_EMAILS.PLATFORM_NO_TOTP, password: PLATFORM_ADMIN_PASSWORD },
     });
     assert.strictEqual(noTotpProdRes.status, 403, 'Platform login in production without TOTP must return HTTP 403');
     assert.ok(noTotpProdRes.data.message.includes('two-factor authentication (TOTP) enrolled'));
+    delete process.env.PROXY_SHARED_SECRET;
     process.env.NODE_ENV = 'test'; // Restore test env
 
     // 12d. Valid TOTP login
@@ -874,6 +879,52 @@ async function runPhase2Tests() {
     });
     assert.strictEqual(registerRes.status, 404);
     console.log('  ✔ Public admin registration endpoint confirmed removed (HTTP 404).');
+
+    // -------------------------------------------------------------------------
+    // Test 19: Proxy Shared Secret Guard & Forged Header Simulation (Requirement 1)
+    // -------------------------------------------------------------------------
+    console.log('\n[TEST 19] Testing Proxy Shared Secret Guard & Forged Header Simulation (Requirement 1)...');
+    const TEST_PROXY_SECRET = 'test_shared_proxy_secret_key_abcdef123456';
+    process.env.PROXY_SHARED_SECRET = TEST_PROXY_SECRET;
+
+    try {
+      // 19a. Direct call with forged XFF, XFH, and CF headers but MISSING proxy shared secret -> REJECTED (HTTP 403)
+      const directForgedRes = await apiFetch('/', {
+        method: 'GET',
+        headers: {
+          'X-Forwarded-For': '198.51.100.99, 10.0.0.1',
+          'X-Forwarded-Host': 'spoofed.4thepeople.in',
+          'cf-connecting-ip': '203.0.113.88',
+          'render-client-ip': '203.0.113.77',
+        },
+      });
+      assert.strictEqual(directForgedRes.status, 403, 'Direct call without proxy shared secret must return HTTP 403');
+      assert.ok(directForgedRes.data.message.includes('Missing proxy shared secret'));
+
+      // 19b. Direct call with INVALID proxy shared secret -> REJECTED (HTTP 403)
+      const invalidSecretRes = await apiFetch('/', {
+        method: 'GET',
+        headers: {
+          'x-proxy-shared-secret': 'completely_wrong_secret',
+          'X-Forwarded-For': '198.51.100.99',
+        },
+      });
+      assert.strictEqual(invalidSecretRes.status, 403, 'Invalid proxy secret must return HTTP 403');
+      assert.ok(invalidSecretRes.data.message.includes('Invalid proxy shared secret'));
+
+      // 19c. Legitimate call with VALID proxy shared secret -> ACCEPTED (HTTP 200)
+      const legitimateProxiedRes = await apiFetch('/', {
+        method: 'GET',
+        headers: {
+          'x-proxy-shared-secret': TEST_PROXY_SECRET,
+          'X-Forwarded-Host': 'lbrce.localhost',
+        },
+      });
+      assert.strictEqual(legitimateProxiedRes.status, 200, 'Legitimate call with valid proxy secret must succeed');
+      console.log('  ✔ Direct calls with forged XFF/XFH/CF headers blocked (HTTP 403); shared secret enforced.');
+    } finally {
+      delete process.env.PROXY_SHARED_SECRET;
+    }
 
     console.log('\n======================================================================');
     console.log('ALL PHASE 2 REFINED TESTS PASSED SUCCESSFULLY (0 FAILURES)');

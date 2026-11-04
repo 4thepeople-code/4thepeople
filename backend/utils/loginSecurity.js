@@ -50,15 +50,11 @@ function getAccountKey(account) {
 }
 
 /**
- * Extracts client IP from request safely.
+ * Extracts client IP derived exclusively via Express req.ip (using trust proxy).
  */
 function getClientIp(req) {
   if (!req) return '127.0.0.1';
-  if (req.ip) return req.ip;
-  if (req.headers && req.headers['x-forwarded-for']) {
-    return req.headers['x-forwarded-for'].split(',')[0].trim();
-  }
-  return (req.socket && req.socket.remoteAddress) || '127.0.0.1';
+  return req.ip || (req.socket && req.socket.remoteAddress) || '127.0.0.1';
 }
 
 /**

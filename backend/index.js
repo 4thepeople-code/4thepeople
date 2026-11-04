@@ -11,6 +11,7 @@ const { errorHandler } = require('./middleware/errorHandler');
 const { responseFormatter } = require('./middleware/responseFormatter');
 const { resolveCollege } = require('./middleware/resolveCollege');
 const { corsOptionsDelegate, validateOriginOrReferer } = require('./middleware/originValidation');
+const { validateProxySharedSecret } = require('./middleware/proxySecurity');
 const { startEventStatusJob } = require('./services/eventStatusJob');
 
 if (process.env.NODE_ENV !== 'test') {
@@ -28,6 +29,9 @@ const publicRouter = require('./routes/publicRoutes');
 const platformAuthRouter = require('./platform/platformAuthRoutes');
 
 app.set('trust proxy', 1);
+
+// Shared Proxy Secret Guard (enforce trusted reverse proxy boundary)
+app.use(validateProxySharedSecret);
 
 // Standard Express Middlewares
 app.use(cookieParser());
