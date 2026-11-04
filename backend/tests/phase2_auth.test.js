@@ -522,9 +522,19 @@ async function runPhase2Tests() {
       existingResetRes.data.message,
       'Forgot-password response must be 100% identical between existing and non-existing accounts'
     );
+    console.log(`    Existing Account Response : "${existingResetRes.data.message}"`);
+    console.log(`    Unknown Account Response  : "${unknownResetRes.data.message}"`);
+    console.log('  ✔ Identical response confirmed between existing and unknown email: zero account enumeration.');
 
     // Verify that passwordResetOtpHash is non-null and persisted in PostgreSQL immediately after forgot-password returns 200
+    let collegeAUsersChecked = 0;
     const userOtpState = await withTenant(collegeA.id, async (tx) => {
+      const allUsers = await tx.user.findMany({
+        where: { collegeId: collegeA.id },
+        select: { id: true },
+      });
+      collegeAUsersChecked = allUsers.length;
+
       return await tx.user.findFirst({
         where: { collegeId: collegeA.id, email: FIXTURE_EMAILS.MANAGER_LBRCE },
         select: {
@@ -534,6 +544,9 @@ async function runPhase2Tests() {
         },
       });
     });
+
+    console.log(`    College A user rows checked in DB for OTP state : ${collegeAUsersChecked}`);
+    assert.ok(collegeAUsersChecked > 0, 'FAIL: College A user rows checked must be > 0');
     assert.ok(
       userOtpState && userOtpState.passwordResetOtpHash,
       'FAIL: passwordResetOtpHash must be non-null and persisted in PostgreSQL immediately after /auth/manager/forgot-password returns 200'
@@ -911,12 +924,37 @@ async function runPhase2Tests() {
     });
     assert.ok(collegeOnPlatformRes.status === 401 || collegeOnPlatformRes.status === 403);
 
-    // Zero cross-tenant user visibility under RLS
+    // Zero cross-tenant user visibility under RLS: assert rows checked > 0 and print counts
+    let collegeAUsersCount = 0;
+    let collegeBUsersCount = 0;
+
     await withTenant(collegeA.id, async (tx) => {
+      const collegeAUsers = await tx.user.findMany({ select: { id: true, email: true, collegeId: true } });
+      collegeAUsersCount = collegeAUsers.length;
+      for (const u of collegeAUsers) {
+        assert.strictEqual(u.collegeId, collegeA.id, 'College A query returned user belonging to another college!');
+        assert.notStrictEqual(u.email, FIXTURE_EMAILS.ADMIN_VRSEC, 'RLS leak: VRSEC admin visible in LBRCE context');
+      }
       const crossUser = await tx.user.findFirst({ where: { email: FIXTURE_EMAILS.ADMIN_VRSEC } });
       assert.strictEqual(crossUser, null, 'RLS leak: VRSEC admin visible in LBRCE context');
     });
-    console.log('  ✔ Token isolation and zero cross-tenant RLS visibility verified.');
+
+    await withTenant(collegeB.id, async (tx) => {
+      const collegeBUsers = await tx.user.findMany({ select: { id: true, email: true, collegeId: true } });
+      collegeBUsersCount = collegeBUsers.length;
+      for (const u of collegeBUsers) {
+        assert.strictEqual(u.collegeId, collegeB.id, 'College B query returned user belonging to another college!');
+        assert.notStrictEqual(u.email, FIXTURE_EMAILS.ADMIN_LBRCE, 'RLS leak: LBRCE admin visible in VRSEC context');
+      }
+      const crossUser = await tx.user.findFirst({ where: { email: FIXTURE_EMAILS.ADMIN_LBRCE } });
+      assert.strictEqual(crossUser, null, 'RLS leak: LBRCE admin visible in VRSEC context');
+    });
+
+    console.log(`    College A (lbrce) user rows checked under RLS : ${collegeAUsersCount}`);
+    console.log(`    College B (vrsec) user rows checked under RLS : ${collegeBUsersCount}`);
+    assert.ok(collegeAUsersCount > 0, 'FAIL: College A rows checked must be > 0');
+    assert.ok(collegeBUsersCount > 0, 'FAIL: College B rows checked must be > 0');
+    console.log('  ✔ Token isolation and zero cross-tenant RLS visibility verified (non-vacuous check).');
 
     // -------------------------------------------------------------------------
     // Test 18: Public Registration Endpoint Confirmed Removed
@@ -1031,9 +1069,10 @@ async function runPhase2Tests() {
         },
       });
       assert.strictEqual(debugEnabledRes.status, 200, 'Debug headers endpoint must return 200 when enabled and authorized');
-      assert.strictEqual(debugEnabledRes.data.hasSharedSecret, true);
-      assert.strictEqual(debugEnabledRes.data.forwardedHeaders['x-forwarded-proto'], 'https');
-      assert.strictEqual(debugEnabledRes.data.secret, undefined, 'Secret itself must never be exposed');
+      const debugData = debugEnabledRes.data.data || debugEnabledRes.data;
+      assert.strictEqual(debugData.hasSharedSecret, true);
+      assert.strictEqual(debugData.forwardedHeaders['x-forwarded-proto'], 'https');
+      assert.strictEqual(debugData.secret, undefined, 'Secret itself must never be exposed');
       delete process.env.DEBUG_HEADERS;
 
       console.log('  ✔ Direct calls with forged XFF/XFH/CF headers blocked (HTTP 403); shared secret enforced.');
