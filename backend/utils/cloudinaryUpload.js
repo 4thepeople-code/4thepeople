@@ -1,20 +1,47 @@
 const cloudinary = require('../config/cloudinary');
 
-const uploadBuffer = (buffer, folder) => new Promise((resolve, reject) => {
-  const stream = cloudinary.uploader.upload_stream(
-    { folder, resource_type: 'image' },
-    (error, result) => {
-      if (error) return reject(error);
-      resolve({ url: result.secure_url, publicId: result.public_id });
-    }
-  );
+const isTestEnv = process.env.NODE_ENV === 'test';
 
-  stream.end(buffer);
-});
+const verifyTestSafety = () => {
+  const dbUrl = process.env.TEST_DATABASE_URL || process.env.DATABASE_URL || '';
+  if (!dbUrl.includes('yuva_test')) {
+    throw new Error('Safety violation: Cloudinary test stub can only be used when database is strictly yuva_test');
+  }
+};
 
-const deleteAsset = (publicId) => cloudinary.uploader.destroy(publicId, {
-  resource_type: 'image',
-});
+const uploadBuffer = (buffer, folder) => {
+  if (isTestEnv) {
+    verifyTestSafety();
+    const mockId = `mock_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+    return Promise.resolve({
+      url: `https://res.cloudinary.com/test-cloud/image/upload/${folder}/${mockId}.jpg`,
+      publicId: `${folder}/${mockId}`,
+    });
+  }
+
+  return new Promise((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(
+      { folder, resource_type: 'image' },
+      (error, result) => {
+        if (error) return reject(error);
+        resolve({ url: result.secure_url, publicId: result.public_id });
+      }
+    );
+
+    stream.end(buffer);
+  });
+};
+
+const deleteAsset = (publicId) => {
+  if (isTestEnv) {
+    verifyTestSafety();
+    return Promise.resolve({ result: 'ok' });
+  }
+
+  return cloudinary.uploader.destroy(publicId, {
+    resource_type: 'image',
+  });
+};
 
 // Asset deletion must not prevent a related database record from being deleted.
 // Any failed cleanup is logged for later recovery instead of aborting the delete.

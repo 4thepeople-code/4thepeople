@@ -11,12 +11,26 @@ const { uploadBuffer, deleteAsset, deleteAssetsBestEffort } = require('../utils/
 const deletionCodeExpiryMs = 10 * 60 * 1000;
 const invalidDeletionCodeMessage = 'Invalid or expired verification code. Request a new one.';
 
-const getUserDeletionTarget = async (db, userId) => {
-  const existing = await db.user.findUnique({ where: { id: userId } });
-  if (!existing) throw new AppError('User not found', 404);
-  if (existing.role === 'ADMIN') throw new AppError('Admin accounts cannot be deleted.', 403);
+const UUID_REGEX = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 
-  const ownedClubCount = await db.club.count({ where: { createdById: userId } });
+const validateUUID = (value, label) => {
+  if (!value || !UUID_REGEX.test(value)) {
+    throw new AppError(`Invalid ${label} (must be a valid UUID)`, 400);
+  }
+};
+
+const getUserDeletionTarget = async (tx, collegeId, userId) => {
+  const existing = await tx.user.findFirst({
+    where: { id: userId, collegeId },
+  });
+  if (!existing) throw new AppError('User not found', 404);
+  if (existing.role === 'COLLEGE_ADMIN' || existing.role === 'ADMIN') {
+    throw new AppError('Admin accounts cannot be deleted.', 403);
+  }
+
+  const ownedClubCount = await tx.club.count({
+    where: { createdByUserId: userId, collegeId },
+  });
   if (ownedClubCount > 0) {
     throw new AppError(
       `Cannot delete user: they own ${ownedClubCount} club(s). Reassign or delete those clubs first.`,
@@ -26,15 +40,31 @@ const getUserDeletionTarget = async (db, userId) => {
   return existing;
 };
 
-const getClubDeletionTarget = async (db, clubId) => {
-  const existingClub = await db.club.findUnique({
-    where: { id: clubId },
-    select: { logo: true, events: { select: { coverImage: true, gallery: true } } },
+const getClubDeletionTarget = async (tx, collegeId, clubId) => {
+  const existingClub = await tx.club.findFirst({
+    where: { id: clubId, collegeId },
+    select: {
+      id: true,
+      name: true,
+      description: true,
+      clubType: true,
+      logoPublicId: true,
+      coverImagePublicId: true,
+      events: {
+        select: {
+          id: true,
+          coverImagePublicId: true,
+          gallery: {
+            select: { imagePublicId: true },
+          },
+        },
+      },
+    },
   });
   if (!existingClub) throw new AppError('Club not found', 404);
 
-  const blockingEventCount = await db.event.count({
-    where: { clubId, status: { not: 'CANCELLED' } },
+  const blockingEventCount = await tx.event.count({
+    where: { clubId, collegeId, cancelledAt: null },
   });
   if (blockingEventCount > 0) {
     throw new AppError(
@@ -45,45 +75,75 @@ const getClubDeletionTarget = async (db, clubId) => {
   return existingClub;
 };
 
-const consumeDeletionVerification = async (adminId, targetType, targetId, code) => {
-  const verification = await prisma.deletionVerification.findFirst({
-    where: { adminId, targetType, targetId, consumed: false },
+const consumeDeletionVerification = async (tx, collegeId, adminId, targetType, targetId, code) => {
+  const verification = await tx.deletionVerification.findFirst({
+    where: { collegeId, adminId, targetType, targetId, consumed: false },
     orderBy: { createdAt: 'desc' },
   });
-  if (!verification || verification.expiresAt < new Date() || !(await bcrypt.compare(code, verification.codeHash))) {
+  if (!verification || verification.expiresAt < new Date()) {
     throw new AppError(invalidDeletionCodeMessage, 400);
   }
-  await prisma.deletionVerification.update({
+  const isMatch = await bcrypt.compare(code, verification.codeHash);
+  if (!isMatch) {
+    throw new AppError(invalidDeletionCodeMessage, 400);
+  }
+  await tx.deletionVerification.update({
     where: { id: verification.id },
     data: { consumed: true },
   });
 };
 
 const requestDeletionCode = async (req, res, targetType, targetId) => {
-  if (targetType === 'USER') await getUserDeletionTarget(prisma, targetId);
-  else await getClubDeletionTarget(prisma, targetId);
+  if (!req.collegeId) {
+    throw new AppError('Tenant context required: request must be routed through a college subdomain', 400);
+  }
+  validateUUID(targetId, `${targetType.toLowerCase()} ID`);
 
-  const admin = await prisma.user.findUnique({
-    where: { id: req.user.id },
-    select: { email: true, name: true },
-  });
-  if (!admin) throw new AppError('Admin account not found', 404);
+  // 1. Verify target exists and generate code inside transaction
+  const codeInfo = await withTenant(req.collegeId, async (tx) => {
+    if (targetType === 'USER') {
+      await getUserDeletionTarget(tx, req.collegeId, targetId);
+    } else {
+      await getClubDeletionTarget(tx, req.collegeId, targetId);
+    }
 
-  const code = crypto.randomInt(100000, 1000000).toString();
-  await prisma.deletionVerification.updateMany({
-    where: { adminId: req.user.id, targetType, targetId, consumed: false },
-    data: { consumed: true },
+    const admin = await tx.user.findFirst({
+      where: { id: req.user.id, collegeId: req.collegeId },
+      select: { email: true, name: true },
+    });
+    if (!admin) throw new AppError('Admin account not found', 404);
+
+    const code = crypto.randomInt(100000, 1000000).toString();
+    const codeHash = await bcrypt.hash(code, 10);
+
+    // Invalidate earlier active codes for this admin & target
+    await tx.deletionVerification.updateMany({
+      where: {
+        collegeId: req.collegeId,
+        adminId: req.user.id,
+        targetType,
+        targetId,
+        consumed: false,
+      },
+      data: { consumed: true },
+    });
+
+    await tx.deletionVerification.create({
+      data: {
+        collegeId: req.collegeId,
+        adminId: req.user.id,
+        targetType,
+        targetId,
+        codeHash,
+        expiresAt: new Date(Date.now() + deletionCodeExpiryMs),
+      },
+    });
+
+    return { adminEmail: admin.email, adminName: admin.name, code };
   });
-  await prisma.deletionVerification.create({
-    data: {
-      adminId: req.user.id,
-      targetType,
-      targetId,
-      codeHash: await bcrypt.hash(code, 10),
-      expiresAt: new Date(Date.now() + deletionCodeExpiryMs),
-    },
-  });
-  await sendDeletionVerificationCode(admin.email, admin.name, code);
+
+  // 2. Send email OUTSIDE transaction
+  await sendDeletionVerificationCode(codeInfo.adminEmail, codeInfo.adminName, codeInfo.code);
 
   res.status(200).json({
     success: true,
@@ -912,20 +972,42 @@ exports.viewAllClubs = asyncHandler(async (req, res) => {
  * DELETE /admin/users/:id or /admin/deleteUser/:id
  */
 exports.deleteUser = asyncHandler(async (req, res) => {
+  if (!req.collegeId) {
+    throw new AppError('Tenant context required: request must be routed through a college subdomain', 400);
+  }
+
   const { id } = req.params;
-  await consumeDeletionVerification(req.user.id, 'USER', id, req.body.code);
+  validateUUID(id, 'user ID');
+  const { code } = req.body;
+  if (!code || typeof code !== 'string') {
+    throw new AppError('Verification code is required', 400);
+  }
 
-  const user = await prisma.$transaction(async (tx) => {
-    const existing = await getUserDeletionTarget(tx, id);
+  // 1. Verify code and perform deletion under withTenant
+  const result = await withTenant(req.collegeId, async (tx) => {
+    const existing = await getUserDeletionTarget(tx, req.collegeId, id);
+    await consumeDeletionVerification(tx, req.collegeId, req.user.id, 'USER', id, code);
 
-    await tx.membership.deleteMany({ where: { userId: id } });
-    return tx.user.delete({ where: { id } });
+    // Remove memberships and delete user
+    await tx.membership.deleteMany({ where: { userId: id, collegeId: req.collegeId } });
+    const deletedUser = await tx.user.delete({ where: { id } });
+
+    return { deletedUser, avatarPublicId: existing.avatarPublicId };
   });
+
+  // 2. Clean up avatar in Cloudinary outside transaction
+  if (result.avatarPublicId) {
+    try {
+      await deleteAsset(result.avatarPublicId);
+    } catch (e) {
+      console.warn('Failed to delete avatar asset:', e.message);
+    }
+  }
 
   res.status(200).json({
     success: true,
     message: `Deleted user with ID ${id}`,
-    data: sanitizeUser(user),
+    data: sanitizeUser(result.deletedUser),
   });
 });
 
@@ -933,23 +1015,49 @@ exports.deleteUser = asyncHandler(async (req, res) => {
  * DELETE /admin/clubs/:clubId or /admin/deleteClub/:id
  */
 exports.deleteClub = asyncHandler(async (req, res) => {
+  if (!req.collegeId) {
+    throw new AppError('Tenant context required: request must be routed through a college subdomain', 400);
+  }
+
   const clubId = req.params.clubId || req.params.id;
-  await consumeDeletionVerification(req.user.id, 'CLUB', clubId, req.body.code);
+  validateUUID(clubId, 'club ID');
+  const { code } = req.body;
+  if (!code || typeof code !== 'string') {
+    throw new AppError('Verification code is required', 400);
+  }
 
-  const existingClub = await getClubDeletionTarget(prisma, clubId);
+  // 1. Verify code, check eligibility and gather asset IDs to clean up
+  const targetInfo = await withTenant(req.collegeId, async (tx) => {
+    const existingClub = await getClubDeletionTarget(tx, req.collegeId, clubId);
+    await consumeDeletionVerification(tx, req.collegeId, req.user.id, 'CLUB', clubId, code);
 
-  const assetIds = [
-    existingClub.logo?.publicId,
-    ...existingClub.events.flatMap((event) => [
-      event.coverImage?.publicId,
-      ...(event.gallery || []).map((image) => image.publicId),
-    ]),
-  ];
-  await deleteAssetsBestEffort(assetIds, `club ${clubId}`);
+    const assetIds = [];
+    if (existingClub.logoPublicId) assetIds.push(existingClub.logoPublicId);
+    if (existingClub.coverImagePublicId) assetIds.push(existingClub.coverImagePublicId);
+    if (Array.isArray(existingClub.events)) {
+      existingClub.events.forEach((ev) => {
+        if (ev.coverImagePublicId) assetIds.push(ev.coverImagePublicId);
+        if (Array.isArray(ev.gallery)) {
+          ev.gallery.forEach((g) => {
+            if (g.imagePublicId) assetIds.push(g.imagePublicId);
+          });
+        }
+      });
+    }
 
-  const club = await prisma.$transaction(async (tx) => {
+    return { existingClub, assetIds };
+  });
+
+  // 2. Perform Cloudinary asset deletions OUTSIDE transaction
+  if (targetInfo.assetIds.length > 0) {
+    await deleteAssetsBestEffort(targetInfo.assetIds, `club ${clubId}`);
+  }
+
+  // 3. Delete club and relations inside transaction
+  const deletedClub = await withTenant(req.collegeId, async (tx) => {
+    // Re-verify no active/completed events exist before deleting
     const concurrentBlockingEventCount = await tx.event.count({
-      where: { clubId, status: { not: 'CANCELLED' } },
+      where: { clubId, collegeId: req.collegeId, cancelledAt: null },
     });
     if (concurrentBlockingEventCount > 0) {
       throw new AppError(
@@ -958,17 +1066,21 @@ exports.deleteClub = asyncHandler(async (req, res) => {
       );
     }
 
-    // Memberships and cancelled events reference the club, so remove them first.
-    await tx.membership.deleteMany({ where: { clubId } });
-    await tx.event.deleteMany({ where: { clubId, status: 'CANCELLED' } });
+    // Clean up dependent records
+    await tx.clubDepartment.deleteMany({ where: { clubId, collegeId: req.collegeId } });
+    await tx.membership.deleteMany({ where: { clubId, collegeId: req.collegeId } });
+    await tx.eventGalleryImage.deleteMany({
+      where: { collegeId: req.collegeId, event: { clubId } },
+    });
+    await tx.event.deleteMany({ where: { clubId, collegeId: req.collegeId } });
 
-    return tx.club.delete({ where: { id: clubId } });
+    return await tx.club.delete({ where: { id: clubId } });
   });
 
   res.status(200).json({
     success: true,
     message: `Deleted club with ID ${clubId}`,
-    data: club,
+    data: serializeClub(deletedClub),
   });
 });
 

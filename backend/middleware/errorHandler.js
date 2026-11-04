@@ -45,7 +45,7 @@ const errorHandler = (err, req, res, next) => {
   }
 
   // Log non-operational error details for debugging
-  if (process.env.NODE_ENV !== 'test' && statusCode === 500) {
+  if (statusCode === 500) {
     console.error('Unhandled Error:', err);
   }
 
@@ -56,4 +56,4 @@ const errorHandler = (err, req, res, next) => {
   });
 };
 
-module.exports = { errorHandler, AppError };
+module.exports = { AppError, errorHandler };

@@ -51,6 +51,9 @@ const FIXTURE_EMAILS = {
 async function cleanupFixtures(collegeA, collegeB) {
   if (collegeA && collegeA.id) {
     await withTenant(collegeA.id, async (tx) => {
+      await tx.deletionVerification.deleteMany({
+        where: { collegeId: collegeA.id },
+      });
       await tx.eventGalleryImage.deleteMany({
         where: { collegeId: collegeA.id, event: { title: { startsWith: 'P3B ' } } },
       });
@@ -71,6 +74,9 @@ async function cleanupFixtures(collegeA, collegeB) {
 
   if (collegeB && collegeB.id) {
     await withTenant(collegeB.id, async (tx) => {
+      await tx.deletionVerification.deleteMany({
+        where: { collegeId: collegeB.id },
+      });
       await tx.eventGalleryImage.deleteMany({
         where: { collegeId: collegeB.id, event: { title: { startsWith: 'P3B ' } } },
       });
@@ -304,14 +310,20 @@ async function runPhase3bTests() {
         reqHeaders['Authorization'] = `Bearer ${token}`;
       }
 
+      let reqBody;
       if (body) {
-        reqHeaders['Content-Type'] = 'application/json';
+        if (typeof FormData !== 'undefined' && body instanceof FormData) {
+          reqBody = body;
+        } else {
+          reqHeaders['Content-Type'] = 'application/json';
+          reqBody = JSON.stringify(body);
+        }
       }
 
       const res = await fetch(`${baseUrl}${path}`, {
         method,
         headers: reqHeaders,
-        body: body ? JSON.stringify(body) : undefined,
+        body: reqBody,
       });
 
       let resBody = null;
@@ -1241,15 +1253,492 @@ async function runPhase3bTests() {
     }
 
     // -------------------------------------------------------------------------
+    // TEST 18: Club Media Management (Upload/Delete Club Logo & Cover)
+    // -------------------------------------------------------------------------
+    console.log('\n[TEST 18] Testing Club Media Management (Upload/Delete Club Logo & Cover)...');
+    {
+      const dummyPng = () => new Blob([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])], { type: 'image/png' });
+
+      // 1. Admin A uploads club logo
+      const logoForm = new FormData();
+      logoForm.append('logo', dummyPng(), 'test-logo.png');
+      const uploadLogoRes = await makeRequest({
+        method: 'POST',
+        path: `/admin/clubs/${clubA1.id}/logo`,
+        host: 'lbrce.localhost',
+        token: tokenAdminA,
+        body: logoForm,
+      });
+      assert.strictEqual(uploadLogoRes.status, 200, 'FAIL: POST /admin/clubs/:clubId/logo must return 200');
+      const clubWithLogo = uploadLogoRes.body.club || uploadLogoRes.body.data?.club || uploadLogoRes.body.data;
+      assert.ok(clubWithLogo.logo?.url, 'FAIL: logo url must be populated');
+      assert.ok(clubWithLogo.logo?.publicId, 'FAIL: logo publicId must be populated');
+      totalRowsChecked += 1;
+
+      // Verify in DB
+      await withTenant(collegeA.id, async (tx) => {
+        const c = await tx.club.findUnique({ where: { id: clubA1.id } });
+        assert.ok(c.logoUrl);
+        assert.ok(c.logoPublicId);
+        totalRowsChecked += 1;
+      });
+
+      // 2. Admin A deletes club logo
+      const deleteLogoRes = await makeRequest({
+        method: 'DELETE',
+        path: `/admin/clubs/${clubA1.id}/logo`,
+        host: 'lbrce.localhost',
+        token: tokenAdminA,
+      });
+      assert.strictEqual(deleteLogoRes.status, 200, 'FAIL: DELETE /admin/clubs/:clubId/logo must return 200');
+      const clubNoLogo = deleteLogoRes.body.club || deleteLogoRes.body.data?.club || deleteLogoRes.body.data;
+      assert.strictEqual(clubNoLogo.logo, null);
+
+      // Verify in DB
+      await withTenant(collegeA.id, async (tx) => {
+        const c = await tx.club.findUnique({ where: { id: clubA1.id } });
+        assert.strictEqual(c.logoUrl, null);
+        assert.strictEqual(c.logoPublicId, null);
+        totalRowsChecked += 1;
+      });
+
+      // 3. Manager A uploads club cover to Club A1
+      const coverForm = new FormData();
+      coverForm.append('cover', dummyPng(), 'test-cover.png');
+      const uploadCoverRes = await makeRequest({
+        method: 'POST',
+        path: `/admin/clubs/${clubA1.id}/cover`,
+        host: 'lbrce.localhost',
+        token: tokenManagerA,
+        body: coverForm,
+      });
+      assert.strictEqual(uploadCoverRes.status, 200, 'FAIL: POST /admin/clubs/:clubId/cover must return 200');
+      const clubWithCover = uploadCoverRes.body.club || uploadCoverRes.body.data?.club || uploadCoverRes.body.data;
+      assert.ok(clubWithCover.coverImage?.url);
+      totalRowsChecked += 1;
+
+      // 4. Manager A deletes club cover
+      const deleteCoverRes = await makeRequest({
+        method: 'DELETE',
+        path: `/admin/clubs/${clubA1.id}/cover`,
+        host: 'lbrce.localhost',
+        token: tokenManagerA,
+      });
+      assert.strictEqual(deleteCoverRes.status, 200, 'FAIL: DELETE /admin/clubs/:clubId/cover must return 200');
+
+      // 5. Manager A trying to upload cover to unmanaged Club A2 -> 403
+      const unauthCoverForm = new FormData();
+      unauthCoverForm.append('cover', dummyPng(), 'unauth.png');
+      const unauthCoverRes = await makeRequest({
+        method: 'POST',
+        path: `/admin/clubs/${clubA2.id}/cover`,
+        host: 'lbrce.localhost',
+        token: tokenManagerA,
+        body: unauthCoverForm,
+      });
+      assert.strictEqual(unauthCoverRes.status, 403, 'FAIL: Manager cannot upload cover to unmanaged club');
+
+      console.log('  ✔ Club logo and cover image upload/delete lifecycle verified.');
+    }
+
+    // -------------------------------------------------------------------------
+    // TEST 19: Event Media Management (Upload/Delete Event Cover & Gallery Images)
+    // -------------------------------------------------------------------------
+    console.log('\n[TEST 19] Testing Event Media Management (Upload/Delete Event Cover & Gallery Images)...');
+    let mediaEventA1;
+    {
+      const dummyPng = () => new Blob([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])], { type: 'image/png' });
+
+      // Seed an event for media testing
+      await withTenant(collegeA.id, async (tx) => {
+        mediaEventA1 = await tx.event.create({
+          data: {
+            collegeId: collegeA.id,
+            clubId: clubA1.id,
+            title: 'P3B Media Event',
+            description: 'Event for media tests',
+            location: 'Media Lab',
+            startAt: new Date(Date.now() + 86400000 * 4),
+            endAt: new Date(Date.now() + 86400000 * 5),
+          },
+        });
+      });
+
+      // 1. Manager A uploads event cover
+      const eventCoverForm = new FormData();
+      eventCoverForm.append('cover', dummyPng(), 'event-cover.png');
+      const uploadEvCoverRes = await makeRequest({
+        method: 'POST',
+        path: `/admin/events/${mediaEventA1.id}/cover`,
+        host: 'lbrce.localhost',
+        token: tokenManagerA,
+        body: eventCoverForm,
+      });
+      assert.strictEqual(uploadEvCoverRes.status, 200, 'FAIL: POST /admin/events/:eventId/cover must return 200');
+      const evWithCover = uploadEvCoverRes.body.event || uploadEvCoverRes.body.data?.event || uploadEvCoverRes.body.data;
+      assert.ok(evWithCover.coverImage?.url);
+      totalRowsChecked += 1;
+
+      // 2. Manager A deletes event cover
+      const delEvCoverRes = await makeRequest({
+        method: 'DELETE',
+        path: `/admin/events/${mediaEventA1.id}/cover`,
+        host: 'lbrce.localhost',
+        token: tokenManagerA,
+      });
+      assert.strictEqual(delEvCoverRes.status, 200, 'FAIL: DELETE /admin/events/:eventId/cover must return 200');
+      totalRowsChecked += 1;
+
+      // 3. Manager A uploads 2 gallery images
+      const galleryForm = new FormData();
+      galleryForm.append('images', dummyPng(), 'gal1.png');
+      galleryForm.append('images', dummyPng(), 'gal2.png');
+      const uploadGalRes = await makeRequest({
+        method: 'POST',
+        path: `/admin/events/${mediaEventA1.id}/gallery`,
+        host: 'lbrce.localhost',
+        token: tokenManagerA,
+        body: galleryForm,
+      });
+      assert.strictEqual(uploadGalRes.status, 200, 'FAIL: POST /admin/events/:eventId/gallery must return 200');
+      const evWithGal = uploadGalRes.body.event || uploadGalRes.body.data?.event || uploadGalRes.body.data;
+      assert.strictEqual(evWithGal.gallery.length, 2, 'FAIL: Event gallery must contain 2 images');
+      const firstImgPublicId = evWithGal.gallery[0].publicId;
+      totalRowsChecked += 2;
+
+      // Verify in DB
+      await withTenant(collegeA.id, async (tx) => {
+        const count = await tx.eventGalleryImage.count({ where: { eventId: mediaEventA1.id } });
+        assert.strictEqual(count, 2);
+        totalRowsChecked += 1;
+      });
+
+      // 4. Manager A deletes 1 gallery image
+      const delGalRes = await makeRequest({
+        method: 'DELETE',
+        path: `/admin/events/${mediaEventA1.id}/gallery/${encodeURIComponent(firstImgPublicId)}`,
+        host: 'lbrce.localhost',
+        token: tokenManagerA,
+      });
+      assert.strictEqual(delGalRes.status, 200, 'FAIL: DELETE /admin/events/:eventId/gallery/:publicId must return 200');
+      const evAfterDelGal = delGalRes.body.event || delGalRes.body.data?.event || delGalRes.body.data;
+      assert.strictEqual(evAfterDelGal.gallery.length, 1);
+      totalRowsChecked += 1;
+
+      console.log('  ✔ Event cover and gallery image upload/delete lifecycle verified.');
+    }
+
+    // -------------------------------------------------------------------------
+    // TEST 20: Deletion Verification Code Request & Lifecycle
+    // -------------------------------------------------------------------------
+    console.log('\n[TEST 20] Testing Deletion Verification Code Request & Lifecycle...');
+    {
+      // 1. Request deletion code for regularUserA
+      const reqCodeRes = await makeRequest({
+        method: 'POST',
+        path: `/admin/users/${regularUserA.id}/delete/request-code`,
+        host: 'lbrce.localhost',
+        token: tokenAdminA,
+      });
+      assert.strictEqual(reqCodeRes.status, 200, 'FAIL: Request deletion code must return 200');
+
+      // Verify in DB: deletion_verifications row exists with valid properties
+      let initialVerif;
+      await withTenant(collegeA.id, async (tx) => {
+        initialVerif = await tx.deletionVerification.findFirst({
+          where: {
+            collegeId: collegeA.id,
+            adminId: adminUserA.id,
+            targetType: 'USER',
+            targetId: regularUserA.id,
+            consumed: false,
+          },
+        });
+        assert.ok(initialVerif, 'FAIL: Deletion verification record must exist in DB');
+        assert.strictEqual(initialVerif.consumed, false);
+        assert.ok(initialVerif.codeHash);
+        assert.ok(initialVerif.expiresAt > new Date());
+        totalRowsChecked += 1;
+      });
+
+      // 2. Request deletion code again -> old one is marked consumed: true
+      const reqCode2Res = await makeRequest({
+        method: 'POST',
+        path: `/admin/users/${regularUserA.id}/delete/request-code`,
+        host: 'lbrce.localhost',
+        token: tokenAdminA,
+      });
+      assert.strictEqual(reqCode2Res.status, 200);
+
+      await withTenant(collegeA.id, async (tx) => {
+        const oldCheck = await tx.deletionVerification.findUnique({
+          where: { id: initialVerif.id },
+        });
+        assert.strictEqual(oldCheck.consumed, true, 'FAIL: Previous unconsumed code must be invalidated');
+        totalRowsChecked += 1;
+      });
+
+      // 3. Attempting deletion with invalid 6-digit code -> 400
+      const badCodeRes = await makeRequest({
+        method: 'DELETE',
+        path: `/admin/users/${regularUserA.id}`,
+        host: 'lbrce.localhost',
+        token: tokenAdminA,
+        body: { code: '000000' },
+      });
+      assert.strictEqual(badCodeRes.status, 400, 'FAIL: Deletion with wrong code must return 400');
+
+      // 4. Admin cannot delete admin account -> 403
+      const delAdminReq = await makeRequest({
+        method: 'POST',
+        path: `/admin/users/${adminUserA.id}/delete/request-code`,
+        host: 'lbrce.localhost',
+        token: tokenAdminA,
+      });
+      assert.strictEqual(delAdminReq.status, 403, 'FAIL: Cannot request deletion code for admin accounts');
+
+      console.log('  ✔ Deletion verification code generation, invalidation, and protection rules verified.');
+    }
+
+    // -------------------------------------------------------------------------
+    // TEST 21: Deletion Execution & Single-Use Verification (User Deletion)
+    // -------------------------------------------------------------------------
+    console.log('\n[TEST 21] Testing Deletion Execution & Single-Use Verification (User Deletion)...');
+    {
+      const knownCode = '654321';
+      const knownHash = await bcrypt.hash(knownCode, 10);
+
+      // Set active verification record with known code in DB
+      await withTenant(collegeA.id, async (tx) => {
+        const activeVerif = await tx.deletionVerification.findFirst({
+          where: {
+            collegeId: collegeA.id,
+            adminId: adminUserA.id,
+            targetType: 'USER',
+            targetId: regularUserA.id,
+            consumed: false,
+          },
+        });
+        assert.ok(activeVerif);
+        await tx.deletionVerification.update({
+          where: { id: activeVerif.id },
+          data: { codeHash: knownHash },
+        });
+      });
+
+      // 1. Admin A deletes user with valid code
+      const delUserRes = await makeRequest({
+        method: 'DELETE',
+        path: `/admin/users/${regularUserA.id}`,
+        host: 'lbrce.localhost',
+        token: tokenAdminA,
+        body: { code: knownCode },
+      });
+      assert.strictEqual(delUserRes.status, 200, 'FAIL: DELETE /admin/users/:id with valid code must return 200');
+
+      // Verify user is deleted in DB
+      await withTenant(collegeA.id, async (tx) => {
+        const u = await tx.user.findUnique({ where: { id: regularUserA.id } });
+        assert.strictEqual(u, null, 'FAIL: User must be deleted from DB');
+        totalRowsChecked += 1;
+      });
+
+      // 2. Single-use check: create user2, attach consumed verification code, verify deletion returns 400
+      let user2;
+      await withTenant(collegeA.id, async (tx) => {
+        user2 = await tx.user.create({
+          data: {
+            collegeId: collegeA.id,
+            name: 'P3B User 2',
+            email: 'user2_p3b@example.test',
+            passwordHash,
+            role: 'USER',
+            isActive: true,
+          },
+        });
+        await tx.deletionVerification.create({
+          data: {
+            collegeId: collegeA.id,
+            adminId: adminUserA.id,
+            targetType: 'USER',
+            targetId: user2.id,
+            codeHash: knownHash,
+            expiresAt: new Date(Date.now() + 600000),
+            consumed: true, // Already consumed!
+          },
+        });
+      });
+
+      const reuseCodeRes = await makeRequest({
+        method: 'DELETE',
+        path: `/admin/users/${user2.id}`,
+        host: 'lbrce.localhost',
+        token: tokenAdminA,
+        body: { code: knownCode },
+      });
+      assert.strictEqual(reuseCodeRes.status, 400, 'FAIL: Consumed deletion code must return 400');
+      totalRowsChecked += 1;
+      console.log('  ✔ User deletion execution and code single-use enforcement verified.');
+    }
+
+    // -------------------------------------------------------------------------
+    // TEST 22: Club Deletion Execution & Blocking Event Safeguards
+    // -------------------------------------------------------------------------
+    console.log('\n[TEST 22] Testing Club Deletion Execution & Blocking Event Safeguards...');
+    {
+      // 1. Create a temporary club with an active event
+      let delClub, delEvent;
+      await withTenant(collegeA.id, async (tx) => {
+        delClub = await tx.club.create({
+          data: {
+            collegeId: collegeA.id,
+            name: 'P3B Destructive Test Club',
+            description: 'To be deleted',
+            clubType: 'DEPARTMENTAL',
+            createdByUserId: adminUserA.id,
+          },
+        });
+        delEvent = await tx.event.create({
+          data: {
+            collegeId: collegeA.id,
+            clubId: delClub.id,
+            title: 'P3B Blocking Event',
+            description: 'Blocks deletion',
+            location: 'Room 101',
+            startAt: new Date(Date.now() + 86400000),
+          },
+        });
+      });
+
+      // 2. Request deletion code while active event exists -> 409 Conflict
+      const blockedCodeRes = await makeRequest({
+        method: 'POST',
+        path: `/admin/clubs/${delClub.id}/delete/request-code`,
+        host: 'lbrce.localhost',
+        token: tokenAdminA,
+      });
+      assert.strictEqual(blockedCodeRes.status, 409, 'FAIL: Requesting code for club with active events must return 409');
+
+      // 3. Cancel the blocking event
+      await withTenant(collegeA.id, async (tx) => {
+        await tx.event.update({
+          where: { id: delEvent.id },
+          data: { cancelledAt: new Date() },
+        });
+      });
+
+      // 4. Request deletion code now that event is cancelled -> 200 OK
+      const allowedCodeRes = await makeRequest({
+        method: 'POST',
+        path: `/admin/clubs/${delClub.id}/delete/request-code`,
+        host: 'lbrce.localhost',
+        token: tokenAdminA,
+      });
+      assert.strictEqual(allowedCodeRes.status, 200, 'FAIL: Requesting deletion code after cancellation must return 200');
+
+      // 5. Set known code in DB
+      const clubDelCode = '112233';
+      const clubDelHash = await bcrypt.hash(clubDelCode, 10);
+      await withTenant(collegeA.id, async (tx) => {
+        const verif = await tx.deletionVerification.findFirst({
+          where: {
+            collegeId: collegeA.id,
+            adminId: adminUserA.id,
+            targetType: 'CLUB',
+            targetId: delClub.id,
+            consumed: false,
+          },
+        });
+        assert.ok(verif);
+        await tx.deletionVerification.update({
+          where: { id: verif.id },
+          data: { codeHash: clubDelHash },
+        });
+      });
+
+      // 6. Delete the club
+      const delClubRes = await makeRequest({
+        method: 'DELETE',
+        path: `/admin/clubs/${delClub.id}`,
+        host: 'lbrce.localhost',
+        token: tokenAdminA,
+        body: { code: clubDelCode },
+      });
+      assert.strictEqual(delClubRes.status, 200, 'FAIL: DELETE /admin/clubs/:clubId must return 200');
+
+      // Verify club and cancelled event are deleted from DB
+      await withTenant(collegeA.id, async (tx) => {
+        const c = await tx.club.findUnique({ where: { id: delClub.id } });
+        assert.strictEqual(c, null);
+        const e = await tx.event.findUnique({ where: { id: delEvent.id } });
+        assert.strictEqual(e, null);
+        totalRowsChecked += 2;
+      });
+
+      console.log('  ✔ Club deletion with event blocking safeguards and cascading cleanup verified.');
+    }
+
+    // -------------------------------------------------------------------------
+    // TEST 23: Cross-Tenant Media & Deletion Boundary
+    // -------------------------------------------------------------------------
+    console.log('\n[TEST 23] Testing Cross-Tenant Media & Deletion Boundary...');
+    {
+      const dummyPng = () => new Blob([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])], { type: 'image/png' });
+
+      // 1. Admin A attempts to upload logo to College B's club on College A host -> 404
+      const crossLogoForm = new FormData();
+      crossLogoForm.append('logo', dummyPng(), 'cross.png');
+      const crossLogoRes = await makeRequest({
+        method: 'POST',
+        path: `/admin/clubs/${clubB1.id}/logo`,
+        host: 'lbrce.localhost',
+        token: tokenAdminA,
+        body: crossLogoForm,
+      });
+      assert.strictEqual(crossLogoRes.status, 404, 'FAIL: Modifying College B club logo from College A must return 404');
+
+      // 2. Admin A attempts to request deletion code for College B's club -> 404
+      const crossDelClubCodeRes = await makeRequest({
+        method: 'POST',
+        path: `/admin/clubs/${clubB1.id}/delete/request-code`,
+        host: 'lbrce.localhost',
+        token: tokenAdminA,
+      });
+      assert.strictEqual(crossDelClubCodeRes.status, 404, 'FAIL: Requesting deletion code for other college club must return 404');
+
+      // 3. Admin A attempts to request deletion code for College B's manager -> 404
+      const crossDelUserCodeRes = await makeRequest({
+        method: 'POST',
+        path: `/admin/users/${managerUserB.id}/delete/request-code`,
+        host: 'lbrce.localhost',
+        token: tokenAdminA,
+      });
+      assert.strictEqual(crossDelUserCodeRes.status, 404, 'FAIL: Requesting deletion code for other college user must return 404');
+
+      // 4. Admin A attempts to delete College B's club directly -> 404
+      const crossDelClubRes = await makeRequest({
+        method: 'DELETE',
+        path: `/admin/clubs/${clubB1.id}`,
+        host: 'lbrce.localhost',
+        token: tokenAdminA,
+        body: { code: '123456' },
+      });
+      assert.strictEqual(crossDelClubRes.status, 404, 'FAIL: Deleting other college club must return 404');
+
+      totalRowsChecked += 4;
+      console.log('  ✔ Complete cross-tenant isolation on media and deletion operations strictly enforced.');
+    }
+
+    // -------------------------------------------------------------------------
     // Final Assertions & Row Count Verification
     // -------------------------------------------------------------------------
     console.log('\n[SUMMARY] Non-Vacuous Row Count Assertion:');
     console.log(`  Total database rows and API items checked across Phase 3b: ${totalRowsChecked}`);
-    assert.ok(totalRowsChecked >= 25, `FAIL: Expected at least 25 rows checked, got ${totalRowsChecked}`);
+    assert.ok(totalRowsChecked >= 45, `FAIL: Expected at least 45 rows checked, got ${totalRowsChecked}`);
     console.log('  ✔ Verified non-vacuous assertion: total rows checked > 0.');
 
     console.log('\n======================================================================');
-    console.log('ALL PHASE 3B MILESTONES 1 & 2 TESTS PASSED SUCCESSFULLY (0 FAILURES)');
+    console.log('ALL PHASE 3B MILESTONES 1, 2 & 3 TESTS PASSED SUCCESSFULLY (0 FAILURES)');
     console.log('======================================================================');
   } finally {
     if (server) {
