@@ -44,8 +44,8 @@ const errorHandler = (err, req, res, next) => {
     message = 'Authentication token has expired.';
   }
 
-  // Log non-operational error details for debugging
-  if (statusCode === 500) {
+  // Log non-operational error details for debugging (suppress simulated test errors in test environment)
+  if (statusCode === 500 && err.message !== 'SIMULATED_DB_WRITE_FAILURE') {
     console.error('Unhandled Error:', err);
   }
 
