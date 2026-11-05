@@ -111,6 +111,14 @@ exports.createEvent = asyncHandler(async (req, res) => {
   const endAt = body.endAt == null ? null : validDate(body.endAt, 'endAt');
   if (endAt) validDateRange(startAt, endAt);
 
+  let capacity = null;
+  if (body.capacity !== undefined && body.capacity !== null) {
+    if (typeof body.capacity !== 'number' || !Number.isInteger(body.capacity) || body.capacity <= 0) {
+      throw new AppError('capacity must be a positive integer or null', 400);
+    }
+    capacity = body.capacity;
+  }
+
   const eventWithStatus = await withTenant(req.collegeId, async (tx) => {
     await ensureClubExists(tx, req.collegeId, clubId);
 
@@ -123,6 +131,7 @@ exports.createEvent = asyncHandler(async (req, res) => {
         location: requiredText(body.location, 'location'),
         startAt,
         endAt,
+        capacity,
         registrationUrl: body.registrationUrl ? body.registrationUrl.trim() : null,
       },
     });
@@ -158,7 +167,7 @@ exports.updateEvent = asyncHandler(async (req, res) => {
     throw new AppError('Update data must be an object', 400);
   }
 
-  const allowedFields = ['title', 'description', 'location', 'startAt', 'endAt', 'status', 'registrationUrl'];
+  const allowedFields = ['title', 'description', 'location', 'startAt', 'endAt', 'status', 'registrationUrl', 'capacity'];
   const fields = Object.keys(body);
   if (!fields.length) throw new AppError('At least one event field is required', 400);
   const unexpected = fields.find((field) => !allowedFields.includes(field));
@@ -170,6 +179,13 @@ exports.updateEvent = asyncHandler(async (req, res) => {
   });
   if (body.registrationUrl !== undefined) {
     data.registrationUrl = body.registrationUrl ? body.registrationUrl.trim() : null;
+  }
+
+  if (body.capacity !== undefined) {
+    if (body.capacity !== null && (typeof body.capacity !== 'number' || !Number.isInteger(body.capacity) || body.capacity <= 0)) {
+      throw new AppError('capacity must be a positive integer or null', 400);
+    }
+    data.capacity = body.capacity;
   }
 
   // Handle status update: if client cancels, set cancelledAt
@@ -189,6 +205,10 @@ exports.updateEvent = asyncHandler(async (req, res) => {
     });
     if (!existing) throw new AppError('Event not found', 404);
 
+    if (data.capacity !== undefined && data.capacity !== null && data.capacity < existing.registeredCount) {
+      throw new AppError(`Capacity cannot be reduced below current registered count (${existing.registeredCount})`, 400);
+    }
+
     const startAt = body.startAt === undefined ? existing.startAt : validDate(body.startAt, 'startAt');
     const endAt = body.endAt === undefined
       ? existing.endAt
@@ -201,10 +221,17 @@ exports.updateEvent = asyncHandler(async (req, res) => {
       data.endAt = endAt;
     }
 
-    await tx.event.update({
-      where: { id: eventId },
-      data,
-    });
+    try {
+      await tx.event.update({
+        where: { id: eventId },
+        data,
+      });
+    } catch (updateErr) {
+      if (updateErr.message && (updateErr.message.includes('chk_events_capacity_limit') || updateErr.message.includes('check_violation'))) {
+        throw new AppError(`Capacity cannot be reduced below current registered count (${existing.registeredCount})`, 400);
+      }
+      throw updateErr;
+    }
 
     const gallery = await tx.eventGalleryImage.findMany({
       where: { eventId, collegeId: req.collegeId },
