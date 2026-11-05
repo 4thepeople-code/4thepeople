@@ -139,6 +139,11 @@ export const managerApi = {
     return res.data;
   },
 
+  getEventAttendees: async (clubId, eventId, params) => {
+    const res = await api.get(`/manager/clubs/${clubId}/events/${eventId}/registrations`, { params });
+    return res.data;
+  },
+
   deleteEvent: async (eventId) => {
     const res = await api.delete(`/admin/events/${eventId}`);
     return res.data;
