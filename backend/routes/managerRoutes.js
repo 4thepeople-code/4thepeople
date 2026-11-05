@@ -10,9 +10,10 @@ const {
   deleteManagerAvatar,
 } = require('../controllers/managerController');
 const { createEvent, updateEvent, cancelEvent, listManagedClubEvents } = require('../controllers/eventController');
+const { getEventAttendees } = require('../controllers/registrationController');
 const { singleImage } = require('../middleware/uploadMiddleware');
 const { validate } = require('../middleware/validate');
-const { clubParams, clubEventParams, updateClubBody, createEventBody, updateEventBody } = require('../validators/schemas');
+const { clubParams, clubEventParams, updateClubBody, createEventBody, updateEventBody, attendeeQuery } = require('../validators/schemas');
 const { uploadLimiter } = require('../middleware/rateLimiters');
 
 // Profile routes
@@ -32,5 +33,6 @@ router.get('/clubs/:clubId/events', validate({ params: clubParams }), requireAdm
 router.post('/clubs/:clubId/events', validate({ params: clubParams, body: createEventBody }), authenticateToken, requireClubManager('clubId'), createEvent);
 router.patch('/clubs/:clubId/events/:eventId', validate({ params: clubEventParams, body: updateEventBody }), authenticateToken, requireClubManager('clubId'), updateEvent);
 router.patch('/clubs/:clubId/events/:eventId/cancel', validate({ params: clubEventParams }), authenticateToken, requireClubManager('clubId'), cancelEvent);
+router.get('/clubs/:clubId/events/:eventId/registrations', validate({ params: clubEventParams, query: attendeeQuery }), requireAdminOrClubManager('clubId'), getEventAttendees);
 
 module.exports = router;
