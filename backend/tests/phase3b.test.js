@@ -2222,7 +2222,89 @@ async function runPhase3bTests() {
         assert.ok(u, 'User 2 must NOT be deleted');
       });
 
-      totalRowsChecked += 10;
+      // Part 3: Burst test: 50 parallel wrong guesses must evaluate at most max_attempts
+      let burstUser;
+      const burstCode = '556677';
+      const burstHash = await bcrypt.hash(burstCode, 10);
+
+      await withTenant(collegeA.id, async (tx) => {
+        burstUser = await tx.user.create({
+          data: {
+            collegeId: collegeA.id,
+            email: 'burst_user@example.test',
+            name: 'Burst Test User',
+            role: 'USER',
+            isActive: true,
+          },
+        });
+
+        await tx.deletionVerification.create({
+          data: {
+            collegeId: collegeA.id,
+            adminId: adminUserA.id,
+            targetType: 'USER',
+            targetId: burstUser.id,
+            codeHash: burstHash,
+            expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+            consumed: false,
+            attempts: 0,
+            maxAttempts: 5,
+          },
+        });
+      });
+
+      // Hook bcrypt.compare to count exact evaluations
+      let burstCompareEvals = 0;
+      const realCompare = bcrypt.compare;
+      bcrypt.compare = async function (data, encrypted) {
+        burstCompareEvals++;
+        return realCompare.call(this, data, encrypted);
+      };
+
+      try {
+        // Fire 50 concurrent wrong guesses
+        const burstResults = await Promise.all(
+          Array.from({ length: 50 }).map(() =>
+            makeRequest({
+              method: 'DELETE',
+              path: `/admin/users/${burstUser.id}`,
+              host: 'lbrce.localhost',
+              token: tokenAdminA,
+              body: { code: '000000' },
+            })
+          )
+        );
+
+        // Every request must be rejected (400)
+        assert.strictEqual(burstResults.length, 50);
+        burstResults.forEach((res) => {
+          assert.strictEqual(res.status, 400, 'Every burst request must be rejected with 400');
+        });
+
+        // Assert at most max_attempts (5) bcrypt comparisons evaluated
+        assert.ok(
+          burstCompareEvals <= 5,
+          `FAIL: Burst test must evaluate at most 5 bcrypt comparisons, got ${burstCompareEvals}`
+        );
+
+        // Verify in DB that attempts is exactly 5 and code is consumed
+        await withTenant(collegeA.id, async (tx) => {
+          const v = await tx.deletionVerification.findFirst({
+            where: { targetId: burstUser.id, collegeId: collegeA.id },
+          });
+          assert.strictEqual(v.attempts, 5, `FAIL: DB attempts must be 5, got ${v.attempts}`);
+          assert.strictEqual(v.consumed, true, 'FAIL: DB code must be marked consumed');
+
+          // User must still exist
+          const u = await tx.user.findUnique({ where: { id: burstUser.id } });
+          assert.ok(u, 'Burst user must still exist in DB');
+        });
+      } finally {
+        bcrypt.compare = realCompare;
+      }
+
+      totalRowsChecked += 15;
+      console.log(`  ✔ Burst test: 50 parallel wrong guesses evaluated ${burstCompareEvals} comparisons (<= 5) and DB attempts=5.`);
       console.log('  ✔ Brute-force attempt tracking, persistence, 5-attempt invalidation, and rejection verified.');
     }
 

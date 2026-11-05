@@ -82,7 +82,8 @@ const getClubDeletionTarget = async (tx, collegeId, clubId) => {
 };
 
 const verifyDeletionCode = async (collegeId, adminId, targetType, targetId, code) => {
-  const verification = await withTenant(collegeId, async (tx) => {
+  // 1. Locate candidate verification
+  const candidate = await withTenant(collegeId, async (tx) => {
     return tx.deletionVerification.findFirst({
       where: {
         collegeId,
@@ -93,29 +94,52 @@ const verifyDeletionCode = async (collegeId, adminId, targetType, targetId, code
         expiresAt: { gt: new Date() },
       },
       orderBy: { createdAt: 'desc' },
+      select: { id: true },
     });
   });
 
-  if (!verification || verification.attempts >= verification.maxAttempts) {
+  if (!candidate) {
     throw new AppError(invalidDeletionCodeMessage, 400);
   }
 
-  const isMatch = await bcrypt.compare(code, verification.codeHash);
+  // 2. Claim attempt atomically before comparing:
+  // UPDATE ... SET attempts = attempts + 1 WHERE id, consumed = false, attempts < max_attempts RETURNING
+  const claimedRows = await withTenant(collegeId, async (tx) => {
+    return await tx.$queryRaw`
+      UPDATE deletion_verifications
+      SET attempts = attempts + 1
+      WHERE id = ${candidate.id}::uuid
+        AND college_id = ${collegeId}::uuid
+        AND consumed = false
+        AND attempts < max_attempts
+      RETURNING id, code_hash AS "codeHash", attempts, max_attempts AS "maxAttempts", consumed;
+    `;
+  });
+
+  if (!claimedRows || claimedRows.length === 0) {
+    // Attempt limit reached or code already consumed
+    throw new AppError(invalidDeletionCodeMessage, 400);
+  }
+
+  const claimed = claimedRows[0];
+
+  // 3. Compare AFTER claiming
+  const isMatch = await bcrypt.compare(code, claimed.codeHash);
   if (!isMatch) {
-    // Atomically increment failed attempts and invalidate if maxAttempts is reached.
-    // This transaction commits BEFORE throwing AppError so the attempt count persists.
-    await withTenant(collegeId, async (tx) => {
-      await tx.$executeRaw`
-        UPDATE deletion_verifications
-        SET attempts = attempts + 1,
-            consumed = (attempts + 1 >= max_attempts)
-        WHERE id = ${verification.id}::uuid AND college_id = ${collegeId}::uuid
-      `;
-    });
+    // Invalidate code if maximum attempts reached
+    if (claimed.attempts >= claimed.maxAttempts) {
+      await withTenant(collegeId, async (tx) => {
+        await tx.deletionVerification.updateMany({
+          where: { id: claimed.id, consumed: false },
+          data: { consumed: true },
+        });
+      });
+    }
     throw new AppError(invalidDeletionCodeMessage, 400);
   }
 
-  return verification;
+  // 4. Return claimed verification so caller can consume only on a match
+  return claimed;
 };
 
 const consumeDeletionVerification = async (tx, verificationIdOrCollegeId, maxAttemptsOrAdminId, targetType, targetId, code) => {
@@ -126,7 +150,7 @@ const consumeDeletionVerification = async (tx, verificationIdOrCollegeId, maxAtt
       where: {
         id: verificationId,
         consumed: false,
-        attempts: { lt: maxAttempts },
+        attempts: { lte: maxAttempts },
         expiresAt: { gt: new Date() },
       },
       data: { consumed: true },
