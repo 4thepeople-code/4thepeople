@@ -58,16 +58,26 @@ async function runTests() {
   console.log(`  Current Database : ${dbMeta.current_database}`);
   console.log(`  Current User     : ${dbMeta.current_user}`);
 
-  // Identify whether endpoint is connection pooler or direct host (without printing host itself)
-  let endpointType = 'Direct Database Endpoint';
+  // Identify whether endpoint is Local, Pooler, or Direct
+  let endpointType = 'Direct';
   try {
     const parsedUrl = new URL(process.env.TEST_DATABASE_URL);
-    if (parsedUrl.hostname.includes('-pooler') || parsedUrl.searchParams.get('pgbouncer') === 'true') {
-      endpointType = 'PgBouncer Pooler Endpoint (pgbouncer=true)';
+    const host = parsedUrl.hostname.toLowerCase();
+    if (host === '127.0.0.1' || host === 'localhost') {
+      endpointType = 'Local';
+    } else if (host.includes('-pooler')) {
+      endpointType = 'Pooler';
+    } else {
+      endpointType = 'Direct';
     }
   } catch {
-    if (process.env.TEST_DATABASE_URL.includes('-pooler') || process.env.TEST_DATABASE_URL.includes('pgbouncer=true')) {
-      endpointType = 'PgBouncer Pooler Endpoint (pgbouncer=true)';
+    const raw = process.env.TEST_DATABASE_URL || '';
+    if (raw.includes('127.0.0.1') || raw.includes('localhost')) {
+      endpointType = 'Local';
+    } else if (raw.includes('-pooler')) {
+      endpointType = 'Pooler';
+    } else {
+      endpointType = 'Direct';
     }
   }
   console.log(`  Endpoint Type    : ${endpointType}`);
