@@ -1,7 +1,13 @@
 const { withTenant } = require('../config/db');
 const asyncHandler = require('../utils/asyncHandler');
 const { AppError } = require('../middleware/errorHandler');
-const { uploadBuffer, deleteAsset } = require('../utils/cloudinaryUpload');
+const {
+  uploadBuffer,
+  deleteAsset,
+  deleteAssetsBestEffort,
+  logCompensationFailure,
+  logOrphanCleanupFailure,
+} = require('../utils/cloudinaryUpload');
 const { clubDepartmentsSelect, serializeClub } = require('../utils/clubDepartments');
 
 const UUID_REGEX = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
@@ -107,7 +113,15 @@ exports.uploadClubLogo = asyncHandler(async (req, res) => {
     try {
       await deleteAsset(uploadResult.publicId);
     } catch (cleanupErr) {
-      console.error('Failed to compensate newly uploaded club logo after DB failure:', cleanupErr.message);
+      logCompensationFailure({
+        publicId: uploadResult.publicId,
+        action: 'compensate_upload',
+        entityType: 'club',
+        entityId: clubId,
+        collegeId: req.collegeId,
+        field: 'logo',
+        error: cleanupErr.message || String(cleanupErr),
+      });
     }
     throw dbError;
   }
@@ -117,7 +131,15 @@ exports.uploadClubLogo = asyncHandler(async (req, res) => {
     try {
       await deleteAsset(oldLogoPublicId);
     } catch (e) {
-      console.warn('Failed to delete old club logo asset:', e.message);
+      logOrphanCleanupFailure({
+        publicId: oldLogoPublicId,
+        action: 'cleanup_replaced_asset',
+        entityType: 'club',
+        entityId: clubId,
+        collegeId: req.collegeId,
+        field: 'logo',
+        error: e.message || String(e),
+      });
     }
   }
 
@@ -165,7 +187,15 @@ exports.deleteClubLogo = asyncHandler(async (req, res) => {
     try {
       await deleteAsset(oldLogoPublicId);
     } catch (e) {
-      console.warn('Failed to delete club logo asset:', e.message);
+      logOrphanCleanupFailure({
+        publicId: oldLogoPublicId,
+        action: 'cleanup_deleted_asset',
+        entityType: 'club',
+        entityId: clubId,
+        collegeId: req.collegeId,
+        field: 'logo',
+        error: e.message || String(e),
+      });
     }
   }
 
@@ -220,7 +250,15 @@ exports.uploadClubCover = asyncHandler(async (req, res) => {
     try {
       await deleteAsset(uploadResult.publicId);
     } catch (cleanupErr) {
-      console.error('Failed to compensate newly uploaded club cover after DB failure:', cleanupErr.message);
+      logCompensationFailure({
+        publicId: uploadResult.publicId,
+        action: 'compensate_upload',
+        entityType: 'club',
+        entityId: clubId,
+        collegeId: req.collegeId,
+        field: 'coverImage',
+        error: cleanupErr.message || String(cleanupErr),
+      });
     }
     throw dbError;
   }
@@ -230,7 +268,15 @@ exports.uploadClubCover = asyncHandler(async (req, res) => {
     try {
       await deleteAsset(oldCoverPublicId);
     } catch (e) {
-      console.warn('Failed to delete old club cover asset:', e.message);
+      logOrphanCleanupFailure({
+        publicId: oldCoverPublicId,
+        action: 'cleanup_replaced_asset',
+        entityType: 'club',
+        entityId: clubId,
+        collegeId: req.collegeId,
+        field: 'coverImage',
+        error: e.message || String(e),
+      });
     }
   }
 
@@ -278,7 +324,15 @@ exports.deleteClubCover = asyncHandler(async (req, res) => {
     try {
       await deleteAsset(oldCoverPublicId);
     } catch (e) {
-      console.warn('Failed to delete club cover asset:', e.message);
+      logOrphanCleanupFailure({
+        publicId: oldCoverPublicId,
+        action: 'cleanup_deleted_asset',
+        entityType: 'club',
+        entityId: clubId,
+        collegeId: req.collegeId,
+        field: 'coverImage',
+        error: e.message || String(e),
+      });
     }
   }
 
@@ -338,7 +392,15 @@ exports.uploadEventCover = asyncHandler(async (req, res) => {
     try {
       await deleteAsset(uploadResult.publicId);
     } catch (cleanupErr) {
-      console.error('Failed to compensate newly uploaded event cover after DB failure:', cleanupErr.message);
+      logCompensationFailure({
+        publicId: uploadResult.publicId,
+        action: 'compensate_upload',
+        entityType: 'event',
+        entityId: eventId,
+        collegeId: req.collegeId,
+        field: 'coverImage',
+        error: cleanupErr.message || String(cleanupErr),
+      });
     }
     throw dbError;
   }
@@ -348,7 +410,15 @@ exports.uploadEventCover = asyncHandler(async (req, res) => {
     try {
       await deleteAsset(oldCoverPublicId);
     } catch (e) {
-      console.warn('Failed to delete old event cover asset:', e.message);
+      logOrphanCleanupFailure({
+        publicId: oldCoverPublicId,
+        action: 'cleanup_replaced_asset',
+        entityType: 'event',
+        entityId: eventId,
+        collegeId: req.collegeId,
+        field: 'coverImage',
+        error: e.message || String(e),
+      });
     }
   }
 
@@ -399,7 +469,15 @@ exports.deleteEventCover = asyncHandler(async (req, res) => {
     try {
       await deleteAsset(oldCoverPublicId);
     } catch (e) {
-      console.warn('Failed to delete event cover asset:', e.message);
+      logOrphanCleanupFailure({
+        publicId: oldCoverPublicId,
+        action: 'cleanup_deleted_asset',
+        entityType: 'event',
+        entityId: eventId,
+        collegeId: req.collegeId,
+        field: 'coverImage',
+        error: e.message || String(e),
+      });
     }
   }
 
@@ -472,7 +550,19 @@ exports.uploadEventGallery = asyncHandler(async (req, res) => {
     eventView = result.eventView;
     gallery = result.gallery;
   } catch (dbError) {
-    await Promise.allSettled(uploadedImages.map((img) => deleteAsset(img.publicId)));
+    const compensationResults = await Promise.allSettled(uploadedImages.map((img) => deleteAsset(img.publicId)));
+    compensationResults.forEach((res, idx) => {
+      if (res.status === 'rejected') {
+        logCompensationFailure({
+          publicId: uploadedImages[idx].publicId,
+          action: 'compensate_gallery_upload',
+          entityType: 'event',
+          entityId: eventId,
+          collegeId: req.collegeId,
+          error: res.reason?.message || String(res.reason),
+        });
+      }
+    });
     throw dbError;
   }
 
@@ -522,7 +612,14 @@ exports.deleteEventGalleryImage = asyncHandler(async (req, res) => {
   try {
     await deleteAsset(publicId);
   } catch (e) {
-    console.warn('Failed to delete gallery image asset:', e.message);
+    logOrphanCleanupFailure({
+      publicId,
+      action: 'cleanup_deleted_gallery_image',
+      entityType: 'event',
+      entityId: eventId,
+      collegeId: req.collegeId,
+      error: e.message || String(e),
+    });
   }
 
   res.status(200).json({

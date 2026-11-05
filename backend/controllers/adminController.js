@@ -6,7 +6,13 @@ const { AppError } = require('../middleware/errorHandler');
 const { sendInviteEmail, sendDeletionVerificationCode } = require('../services/emailService');
 const { sanitizeUser } = require('../utils/sanitizeUser');
 const { clubDepartmentsSelect, getClubDepartments, serializeClub } = require('../utils/clubDepartments');
-const { uploadBuffer, deleteAsset, deleteAssetsBestEffort } = require('../utils/cloudinaryUpload');
+const {
+  uploadBuffer,
+  deleteAsset,
+  deleteAssetsBestEffort,
+  logCompensationFailure,
+  logOrphanCleanupFailure,
+} = require('../utils/cloudinaryUpload');
 
 const deletionCodeExpiryMs = 10 * 60 * 1000;
 const invalidDeletionCodeMessage = 'Invalid or expired verification code. Request a new one.';
@@ -1084,12 +1090,20 @@ exports.deleteUser = asyncHandler(async (req, res) => {
     return { deletedUser, avatarPublicId: existing.avatarPublicId };
   });
 
-  // 2. Clean up avatar in Cloudinary outside transaction
+  // 4. Clean up avatar in Cloudinary outside transaction
   if (result.avatarPublicId) {
     try {
       await deleteAsset(result.avatarPublicId);
     } catch (e) {
-      console.warn('Failed to delete avatar asset:', e.message);
+      logOrphanCleanupFailure({
+        publicId: result.avatarPublicId,
+        action: 'cleanup_deleted_user_avatar',
+        entityType: 'user',
+        entityId: id,
+        collegeId: req.collegeId,
+        field: 'avatar',
+        error: e.message || String(e),
+      });
     }
   }
 
@@ -1347,7 +1361,15 @@ exports.uploadAdminAvatar = asyncHandler(async (req, res) => {
     try {
       await deleteAsset(uploadResult.publicId);
     } catch (cleanupErr) {
-      console.error('Failed to compensate newly uploaded admin avatar after DB failure:', cleanupErr.message);
+      logCompensationFailure({
+        publicId: uploadResult.publicId,
+        action: 'compensate_upload',
+        entityType: 'user',
+        entityId: userId,
+        collegeId: req.collegeId,
+        field: 'avatar',
+        error: cleanupErr.message || String(cleanupErr),
+      });
     }
     throw dbError;
   }
@@ -1357,7 +1379,15 @@ exports.uploadAdminAvatar = asyncHandler(async (req, res) => {
     try {
       await deleteAsset(oldAvatarPublicId);
     } catch (e) {
-      console.warn('Failed to delete old avatar asset:', e.message);
+      logOrphanCleanupFailure({
+        publicId: oldAvatarPublicId,
+        action: 'cleanup_replaced_asset',
+        entityType: 'user',
+        entityId: userId,
+        collegeId: req.collegeId,
+        field: 'avatar',
+        error: e.message || String(e),
+      });
     }
   }
 
@@ -1410,7 +1440,15 @@ exports.deleteAdminAvatar = asyncHandler(async (req, res) => {
     try {
       await deleteAsset(oldAvatarPublicId);
     } catch (e) {
-      console.warn('Failed to delete avatar asset:', e.message);
+      logOrphanCleanupFailure({
+        publicId: oldAvatarPublicId,
+        action: 'cleanup_deleted_asset',
+        entityType: 'user',
+        entityId: userId,
+        collegeId: req.collegeId,
+        field: 'avatar',
+        error: e.message || String(e),
+      });
     }
   }
 

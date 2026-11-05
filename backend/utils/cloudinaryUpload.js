@@ -55,17 +55,43 @@ const deleteAsset = (publicId) => {
   });
 };
 
+const logCompensationFailure = (details) => {
+  console.error('[COMPENSATION_FAILURE]', JSON.stringify({
+    timestamp: new Date().toISOString(),
+    ...details,
+  }));
+};
+
+const logOrphanCleanupFailure = (details) => {
+  console.warn('[ORPHAN_CLEANUP_FAILURE]', JSON.stringify({
+    timestamp: new Date().toISOString(),
+    ...details,
+  }));
+};
+
 // Asset deletion must not prevent a related database record from being deleted.
-// Any failed cleanup is logged for later recovery instead of aborting the delete.
-const deleteAssetsBestEffort = async (publicIds, context) => {
+// Any failed cleanup is logged with structured metadata for reliable later recovery.
+const deleteAssetsBestEffort = async (publicIds, context, metadata = {}) => {
   const assets = publicIds.filter(Boolean);
   const results = await Promise.allSettled(assets.map((publicId) => deleteAsset(publicId)));
 
-  results.forEach((result) => {
+  results.forEach((result, idx) => {
     if (result.status === 'rejected') {
-      console.error(`Failed to delete Cloudinary asset for ${context}:`, result.reason);
+      logOrphanCleanupFailure({
+        publicId: assets[idx],
+        context,
+        error: result.reason?.message || String(result.reason),
+        ...metadata,
+      });
     }
   });
 };
 
-module.exports = { uploadBuffer, deleteAsset, deleteAssetsBestEffort, mockJournal };
+module.exports = {
+  uploadBuffer,
+  deleteAsset,
+  deleteAssetsBestEffort,
+  logCompensationFailure,
+  logOrphanCleanupFailure,
+  mockJournal,
+};

@@ -2,7 +2,12 @@ const bcrypt = require('bcryptjs');
 const { withTenant } = require('../config/db');
 const asyncHandler = require('../utils/asyncHandler');
 const { AppError } = require('../middleware/errorHandler');
-const { uploadBuffer, deleteAsset } = require('../utils/cloudinaryUpload');
+const {
+  uploadBuffer,
+  deleteAsset,
+  logCompensationFailure,
+  logOrphanCleanupFailure,
+} = require('../utils/cloudinaryUpload');
 const { sanitizeUser } = require('../utils/sanitizeUser');
 const { serializeClub } = require('../utils/clubDepartments');
 
@@ -300,7 +305,15 @@ exports.uploadManagerAvatar = asyncHandler(async (req, res) => {
     try {
       await deleteAsset(uploadResult.publicId);
     } catch (cleanupErr) {
-      console.error('Failed to compensate newly uploaded manager avatar after DB failure:', cleanupErr.message);
+      logCompensationFailure({
+        publicId: uploadResult.publicId,
+        action: 'compensate_upload',
+        entityType: 'user',
+        entityId: userId,
+        collegeId: req.collegeId,
+        field: 'avatar',
+        error: cleanupErr.message || String(cleanupErr),
+      });
     }
     throw dbError;
   }
@@ -310,7 +323,15 @@ exports.uploadManagerAvatar = asyncHandler(async (req, res) => {
     try {
       await deleteAsset(oldAvatarPublicId);
     } catch (e) {
-      console.warn('Failed to delete old avatar asset:', e.message);
+      logOrphanCleanupFailure({
+        publicId: oldAvatarPublicId,
+        action: 'cleanup_replaced_asset',
+        entityType: 'user',
+        entityId: userId,
+        collegeId: req.collegeId,
+        field: 'avatar',
+        error: e.message || String(e),
+      });
     }
   }
 
@@ -363,7 +384,15 @@ exports.deleteManagerAvatar = asyncHandler(async (req, res) => {
     try {
       await deleteAsset(oldAvatarPublicId);
     } catch (e) {
-      console.warn('Failed to delete avatar asset:', e.message);
+      logOrphanCleanupFailure({
+        publicId: oldAvatarPublicId,
+        action: 'cleanup_deleted_asset',
+        entityType: 'user',
+        entityId: userId,
+        collegeId: req.collegeId,
+        field: 'avatar',
+        error: e.message || String(e),
+      });
     }
   }
 
