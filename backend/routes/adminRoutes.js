@@ -4,7 +4,7 @@ const { requireAdmin } = require('../middleware/authMiddleware');
 const { validate } = require('../middleware/validate');
 const { inviteLimiter, destructiveLimiter, uploadLimiter } = require('../middleware/rateLimiters');
 const {
-  idParams, clubParams, managerInviteBody, createClubBody, updateClubBody,
+  idParam, userParams, membershipParams, clubParams, managerInviteBody, createClubBody, updateClubBody,
   departmentParams, createDepartmentBody, updateDepartmentBody, clubIdsBody, departmentIdsBody,
   membershipBody, existingManagerBody, deletionVerificationBody,
 } = require('../validators/schemas');
@@ -56,17 +56,17 @@ router.delete('/profile/avatar', uploadLimiter, deleteAdminAvatar);
 router.post('/managers', inviteLimiter, validate({ body: managerInviteBody }), createManager);
 
 // POST /admin/managers/:userId/resend-invite
-router.post('/managers/:userId/resend-invite', inviteLimiter, validate({ params: idParams('userId') }), resendInvite);
+router.post('/managers/:userId/resend-invite', inviteLimiter, validate({ params: userParams }), resendInvite);
 
 // User management routes
 router.get('/viewAllUsers', viewAllUsers);
-router.get('/viewUser/:id', validate({ params: idParams('id') }), viewUser);
-router.post('/users/:userId/delete/request-code', destructiveLimiter, validate({ params: idParams('userId') }), requestUserDeletionCode);
-router.delete('/users/:userId', destructiveLimiter, validate({ params: idParams('userId'), body: deletionVerificationBody }), (req, res, next) => {
+router.get('/viewUser/:id', validate({ params: idParam }), viewUser);
+router.post('/users/:userId/delete/request-code', destructiveLimiter, validate({ params: userParams }), requestUserDeletionCode);
+router.delete('/users/:userId', destructiveLimiter, validate({ params: userParams, body: deletionVerificationBody }), (req, res, next) => {
   req.params.id = req.params.userId;
   return deleteUser(req, res, next);
 });
-router.delete('/deleteUser/:id', destructiveLimiter, validate({ params: idParams('id'), body: deletionVerificationBody }), deleteUser);
+router.delete('/deleteUser/:id', destructiveLimiter, validate({ params: idParam, body: deletionVerificationBody }), deleteUser);
 
 // Club management routes
 // POST /admin/clubs
@@ -83,10 +83,10 @@ router.put('/departments/:departmentId/clubs', validate({ params: departmentPara
 router.put('/clubs/:clubId/departments', validate({ params: clubParams, body: departmentIdsBody }), replaceClubDepartments);
 
 // PATCH /admin/memberships/:membershipId
-router.patch('/memberships/:membershipId', validate({ params: idParams('membershipId'), body: membershipBody }), updateMembership);
+router.patch('/memberships/:membershipId', validate({ params: membershipParams, body: membershipBody }), updateMembership);
 
 // DELETE /admin/memberships/:membershipId
-router.delete('/memberships/:membershipId', destructiveLimiter, validate({ params: idParams('membershipId') }), deleteMembership);
+router.delete('/memberships/:membershipId', destructiveLimiter, validate({ params: membershipParams }), deleteMembership);
 
 // GET /admin/clubs/:clubId/managers
 router.get('/clubs/:clubId/managers', validate({ params: clubParams }), getClubManagers);
@@ -108,8 +108,8 @@ router.post('/clubs/:clubId/delete/request-code', destructiveLimiter, validate({
 router.delete('/clubs/:clubId', destructiveLimiter, validate({ params: clubParams, body: deletionVerificationBody }), deleteClub);
 
 router.get('/viewAllClubs', viewAllClubs);
-router.get('/viewClub/:id', validate({ params: idParams('id') }), viewClub);
-router.delete('/deleteClub/:id', destructiveLimiter, validate({ params: idParams('id'), body: deletionVerificationBody }), deleteClub);
+router.get('/viewClub/:id', validate({ params: idParam }), viewClub);
+router.delete('/deleteClub/:id', destructiveLimiter, validate({ params: idParam, body: deletionVerificationBody }), deleteClub);
 
 // Verify token route (used by frontend ProtectedRoute)
 router.get('/verify', (req, res) => {

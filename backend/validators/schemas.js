@@ -1,6 +1,5 @@
 const { z } = require('zod');
 
-const objectId = z.string().regex(/^[a-fA-F0-9]{24}$/, 'Invalid MongoDB ObjectId');
 const uuid = z.string().regex(/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/, 'Invalid UUID');
 const email = z.string().trim().toLowerCase().email('Invalid email address').max(254);
 const password = z.string().min(6, 'Password must be at least 6 characters').max(128);
@@ -12,7 +11,10 @@ const departmentShortCode = z.string().trim().min(1, 'Department short code is r
 const text = (label, max) => z.string().trim().min(1, `${label} is required`).max(max);
 const inviteToken = z.string().regex(/^[a-fA-F0-9]{64}$/, 'Invalid invitation token');
 
-const idParams = (key) => z.object({ [key]: z.union([uuid, objectId]) });
+const idParam = z.object({ id: uuid });
+const userParams = z.object({ userId: uuid });
+const membershipParams = z.object({ membershipId: uuid });
+const idParams = (key) => z.object({ [key]: uuid });
 const clubParams = z.object({ clubId: uuid });
 const departmentParams = z.object({ departmentId: uuid });
 const eventParams = z.object({ eventId: uuid });
@@ -96,7 +98,7 @@ const attendeeQuery = z.object({
 });
 
 module.exports = {
-  objectId, inviteToken, idParams, clubParams, departmentParams, eventParams, clubEventParams,
+  uuid, inviteToken, idParam, userParams, membershipParams, idParams, clubParams, departmentParams, eventParams, clubEventParams,
   loginBody, forgotPasswordBody, resetPasswordBody, deletionVerificationBody, adminRegisterBody, managerInviteBody,
   createClubBody, updateClubBody, createDepartmentBody, updateDepartmentBody, clubIdsBody, departmentIdsBody,
   membershipBody, existingManagerBody, acceptInviteBody, createEventBody, updateEventBody, attendeeQuery,
