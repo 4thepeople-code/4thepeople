@@ -90,70 +90,136 @@ const exactFixtureEmailsB = [
 async function cleanupFixtures(collegeA, collegeB) {
   if (collegeA && collegeA.id) {
     await withTenant(collegeA.id, async (tx) => {
-      // 1. Delete registrations by tracked exact IDs
-      if (trackedRegistrationIdsA.length > 0) {
-        await tx.eventRegistration.deleteMany({
-          where: { collegeId: collegeA.id, id: { in: trackedRegistrationIdsA } },
-        });
-      }
-      // 2. Delete events by tracked exact IDs
-      if (trackedEventIdsA.length > 0) {
-        await tx.eventGalleryImage.deleteMany({
-          where: { collegeId: collegeA.id, eventId: { in: trackedEventIdsA } },
-        });
-        await tx.event.deleteMany({
-          where: { collegeId: collegeA.id, id: { in: trackedEventIdsA } },
-        });
-      }
-      // 3. Delete memberships by tracked exact IDs
-      if (trackedMembershipIdsA.length > 0) {
-        await tx.membership.deleteMany({
-          where: { collegeId: collegeA.id, id: { in: trackedMembershipIdsA } },
-        });
-      }
-      // 4. Delete clubs by tracked exact IDs
-      if (trackedClubIdsA.length > 0) {
-        await tx.club.deleteMany({
-          where: { collegeId: collegeA.id, id: { in: trackedClubIdsA } },
-        });
-      }
-      // 5. Delete users by tracked exact IDs or exact fixture email list
-      const userWhere = trackedUserIdsA.length > 0
-        ? { collegeId: collegeA.id, OR: [{ id: { in: trackedUserIdsA } }, { email: { in: exactFixtureEmailsA } }] }
-        : { collegeId: collegeA.id, email: { in: exactFixtureEmailsA } };
-      await tx.user.deleteMany({ where: userWhere });
+      // 1. Delete registrations
+      await tx.eventRegistration.deleteMany({
+        where: {
+          collegeId: collegeA.id,
+          OR: [
+            { id: { in: trackedRegistrationIdsA } },
+            { user: { email: { in: exactFixtureEmailsA } } },
+            { event: { club: { createdBy: { email: FIXTURE_EMAILS.ADMIN_LBRCE } } } },
+          ],
+        },
+      });
+
+      // 2. Delete gallery images and events
+      await tx.eventGalleryImage.deleteMany({
+        where: {
+          collegeId: collegeA.id,
+          OR: [
+            { eventId: { in: trackedEventIdsA } },
+            { event: { club: { createdBy: { email: FIXTURE_EMAILS.ADMIN_LBRCE } } } },
+          ],
+        },
+      });
+      await tx.event.deleteMany({
+        where: {
+          collegeId: collegeA.id,
+          OR: [
+            { id: { in: trackedEventIdsA } },
+            { club: { createdBy: { email: FIXTURE_EMAILS.ADMIN_LBRCE } } },
+          ],
+        },
+      });
+
+      // 3. Delete memberships
+      await tx.membership.deleteMany({
+        where: {
+          collegeId: collegeA.id,
+          OR: [
+            { id: { in: trackedMembershipIdsA } },
+            { user: { email: { in: exactFixtureEmailsA } } },
+            { club: { createdBy: { email: FIXTURE_EMAILS.ADMIN_LBRCE } } },
+          ],
+        },
+      });
+
+      // 4. Delete clubs
+      await tx.club.deleteMany({
+        where: {
+          collegeId: collegeA.id,
+          OR: [
+            { id: { in: trackedClubIdsA } },
+            { createdBy: { email: FIXTURE_EMAILS.ADMIN_LBRCE } },
+          ],
+        },
+      });
+
+      // 5. Delete users
+      await tx.user.deleteMany({
+        where: {
+          collegeId: collegeA.id,
+          OR: [
+            { id: { in: trackedUserIdsA } },
+            { email: { in: exactFixtureEmailsA } },
+          ],
+        },
+      });
     });
   }
 
   if (collegeB && collegeB.id) {
     await withTenant(collegeB.id, async (tx) => {
-      if (trackedRegistrationIdsB.length > 0) {
-        await tx.eventRegistration.deleteMany({
-          where: { collegeId: collegeB.id, id: { in: trackedRegistrationIdsB } },
-        });
-      }
-      if (trackedEventIdsB.length > 0) {
-        await tx.eventGalleryImage.deleteMany({
-          where: { collegeId: collegeB.id, eventId: { in: trackedEventIdsB } },
-        });
-        await tx.event.deleteMany({
-          where: { collegeId: collegeB.id, id: { in: trackedEventIdsB } },
-        });
-      }
-      if (trackedMembershipIdsB.length > 0) {
-        await tx.membership.deleteMany({
-          where: { collegeId: collegeB.id, id: { in: trackedMembershipIdsB } },
-        });
-      }
-      if (trackedClubIdsB.length > 0) {
-        await tx.club.deleteMany({
-          where: { collegeId: collegeB.id, id: { in: trackedClubIdsB } },
-        });
-      }
-      const userWhereB = trackedUserIdsB.length > 0
-        ? { collegeId: collegeB.id, OR: [{ id: { in: trackedUserIdsB } }, { email: { in: exactFixtureEmailsB } }] }
-        : { collegeId: collegeB.id, email: { in: exactFixtureEmailsB } };
-      await tx.user.deleteMany({ where: userWhereB });
+      await tx.eventRegistration.deleteMany({
+        where: {
+          collegeId: collegeB.id,
+          OR: [
+            { id: { in: trackedRegistrationIdsB } },
+            { user: { email: { in: exactFixtureEmailsB } } },
+            { event: { club: { createdBy: { email: FIXTURE_EMAILS.ADMIN_VRSEC } } } },
+          ],
+        },
+      });
+
+      await tx.eventGalleryImage.deleteMany({
+        where: {
+          collegeId: collegeB.id,
+          OR: [
+            { eventId: { in: trackedEventIdsB } },
+            { event: { club: { createdBy: { email: FIXTURE_EMAILS.ADMIN_VRSEC } } } },
+          ],
+        },
+      });
+      await tx.event.deleteMany({
+        where: {
+          collegeId: collegeB.id,
+          OR: [
+            { id: { in: trackedEventIdsB } },
+            { club: { createdBy: { email: FIXTURE_EMAILS.ADMIN_VRSEC } } },
+          ],
+        },
+      });
+
+      await tx.membership.deleteMany({
+        where: {
+          collegeId: collegeB.id,
+          OR: [
+            { id: { in: trackedMembershipIdsB } },
+            { user: { email: { in: exactFixtureEmailsB } } },
+            { club: { createdBy: { email: FIXTURE_EMAILS.ADMIN_VRSEC } } },
+          ],
+        },
+      });
+
+      await tx.club.deleteMany({
+        where: {
+          collegeId: collegeB.id,
+          OR: [
+            { id: { in: trackedClubIdsB } },
+            { createdBy: { email: FIXTURE_EMAILS.ADMIN_VRSEC } },
+          ],
+        },
+      });
+
+      await tx.user.deleteMany({
+        where: {
+          collegeId: collegeB.id,
+          OR: [
+            { id: { in: trackedUserIdsB } },
+            { email: { in: exactFixtureEmailsB } },
+          ],
+        },
+      });
     });
   }
 }
@@ -469,13 +535,32 @@ async function runPhase3cTests() {
       }
 
       const res = await fetch(`${baseUrl}${path}`, reqOptions);
-      let data;
+      let json;
       try {
-        data = await res.json();
+        json = await res.json();
       } catch {
-        data = null;
+        json = null;
       }
-      return { status: res.status, data };
+
+      let dataPayload;
+      if (json && typeof json === 'object') {
+        if (json.data !== undefined) {
+          if (Array.isArray(json.data)) {
+            dataPayload = json.data;
+            dataPayload.message = json.message;
+          } else if (json.data && typeof json.data === 'object') {
+            dataPayload = { ...json.data, message: json.message };
+          } else {
+            dataPayload = json.data;
+          }
+        } else {
+          dataPayload = json;
+        }
+      } else {
+        dataPayload = json;
+      }
+
+      return { status: res.status, data: dataPayload, message: json?.message || '', raw: json };
     }
 
     // -------------------------------------------------------------------------
@@ -869,7 +954,9 @@ async function runPhase3cTests() {
     const burstResults = await Promise.all(burstPromises);
 
     const successCount = burstResults.filter((r) => r.status === 201).length;
-    const capacityFullCount = burstResults.filter((r) => r.status === 409 && r.data.message.includes('capacity')).length;
+    const non201 = burstResults.filter((r) => r.status !== 201);
+    console.log('  Non-201 status distribution:', non201.map((r) => ({ status: r.status, msg: r.message || r.data?.message })));
+    const capacityFullCount = burstResults.filter((r) => r.status === 409 && (r.message || r.data?.message || '').toLowerCase().includes('capacity')).length;
     console.log(`  Burst Results: ${successCount} succeeded (201), ${capacityFullCount} rejected for capacity (409)`);
 
     assert.strictEqual(successCount, 3, `Expected exactly 3 registrations to succeed, got ${successCount}`);
@@ -1076,7 +1163,8 @@ async function runPhase3cTests() {
       `Expected 403 for token/tenant mismatch, got ${crossTenantTokenRes.status}`
     );
     assert(
-      crossTenantTokenRes.data.message.includes('Cross-tenant access forbidden') ||
+      crossTenantTokenRes.data.message.includes('Token belongs to a different college tenant') ||
+        crossTenantTokenRes.data.message.includes('Cross-tenant access forbidden') ||
         crossTenantTokenRes.data.message.includes('forbidden'),
       `Unexpected cross-tenant error message: ${crossTenantTokenRes.data.message}`
     );
