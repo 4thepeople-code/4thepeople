@@ -332,6 +332,8 @@ CREATE TABLE deletion_verifications (
     code_hash TEXT NOT NULL,
     expires_at TIMESTAMPTZ NOT NULL,
     consumed BOOLEAN NOT NULL DEFAULT false,
+    attempts INTEGER NOT NULL DEFAULT 0,
+    max_attempts INTEGER NOT NULL DEFAULT 5,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     CONSTRAINT fk_del_verif_admin FOREIGN KEY (college_id, admin_id) REFERENCES users(college_id, id) ON DELETE CASCADE
 );

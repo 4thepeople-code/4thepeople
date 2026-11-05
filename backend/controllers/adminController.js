@@ -75,7 +75,66 @@ const getClubDeletionTarget = async (tx, collegeId, clubId) => {
   return existingClub;
 };
 
-const consumeDeletionVerification = async (tx, collegeId, adminId, targetType, targetId, code) => {
+const verifyDeletionCode = async (collegeId, adminId, targetType, targetId, code) => {
+  const verification = await withTenant(collegeId, async (tx) => {
+    return tx.deletionVerification.findFirst({
+      where: {
+        collegeId,
+        adminId,
+        targetType,
+        targetId,
+        consumed: false,
+        expiresAt: { gt: new Date() },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  });
+
+  if (!verification || verification.attempts >= verification.maxAttempts) {
+    throw new AppError(invalidDeletionCodeMessage, 400);
+  }
+
+  const isMatch = await bcrypt.compare(code, verification.codeHash);
+  if (!isMatch) {
+    // Atomically increment failed attempts and invalidate if maxAttempts is reached.
+    // This transaction commits BEFORE throwing AppError so the attempt count persists.
+    await withTenant(collegeId, async (tx) => {
+      await tx.$executeRaw`
+        UPDATE deletion_verifications
+        SET attempts = attempts + 1,
+            consumed = (attempts + 1 >= max_attempts)
+        WHERE id = ${verification.id}::uuid AND college_id = ${collegeId}::uuid
+      `;
+    });
+    throw new AppError(invalidDeletionCodeMessage, 400);
+  }
+
+  return verification;
+};
+
+const consumeDeletionVerification = async (tx, verificationIdOrCollegeId, maxAttemptsOrAdminId, targetType, targetId, code) => {
+  if (typeof verificationIdOrCollegeId === 'string' && typeof maxAttemptsOrAdminId === 'number') {
+    const verificationId = verificationIdOrCollegeId;
+    const maxAttempts = maxAttemptsOrAdminId;
+    const updateResult = await tx.deletionVerification.updateMany({
+      where: {
+        id: verificationId,
+        consumed: false,
+        attempts: { lt: maxAttempts },
+        expiresAt: { gt: new Date() },
+      },
+      data: { consumed: true },
+    });
+
+    if (updateResult.count !== 1) {
+      throw new AppError(invalidDeletionCodeMessage, 400);
+    }
+    return;
+  }
+
+  // Fallback for direct calls with original signature
+  const collegeId = verificationIdOrCollegeId;
+  const adminId = maxAttemptsOrAdminId;
   const verifications = await tx.deletionVerification.findMany({
     where: {
       collegeId,
@@ -84,6 +143,7 @@ const consumeDeletionVerification = async (tx, collegeId, adminId, targetType, t
       targetId,
       consumed: false,
       expiresAt: { gt: new Date() },
+      attempts: { lt: 5 },
     },
     orderBy: { createdAt: 'desc' },
     take: 1,
@@ -99,12 +159,11 @@ const consumeDeletionVerification = async (tx, collegeId, adminId, targetType, t
     throw new AppError(invalidDeletionCodeMessage, 400);
   }
 
-  // Atomically consume: only update if consumed is still false and not expired.
-  // Requires count === 1 to ensure that racing concurrent requests cannot both consume the code.
   const updateResult = await tx.deletionVerification.updateMany({
     where: {
       id: verification.id,
       consumed: false,
+      attempts: { lt: verification.maxAttempts },
       expiresAt: { gt: new Date() },
     },
     data: { consumed: true },
@@ -1005,10 +1064,18 @@ exports.deleteUser = asyncHandler(async (req, res) => {
     throw new AppError('Verification code is required', 400);
   }
 
-  // 1. Verify code and perform deletion under withTenant
+  // 1. Verify target exists in this tenant first (returns 404 if not found)
+  await withTenant(req.collegeId, async (tx) => {
+    await getUserDeletionTarget(tx, req.collegeId, id);
+  });
+
+  // 2. Verify code and track attempts outside the main deletion transaction
+  const verification = await verifyDeletionCode(req.collegeId, req.user.id, 'USER', id, code);
+
+  // 3. Perform deletion under withTenant, atomically consuming the code
   const result = await withTenant(req.collegeId, async (tx) => {
     const existing = await getUserDeletionTarget(tx, req.collegeId, id);
-    await consumeDeletionVerification(tx, req.collegeId, req.user.id, 'USER', id, code);
+    await consumeDeletionVerification(tx, verification.id, verification.maxAttempts);
 
     // Remove memberships and delete user
     await tx.membership.deleteMany({ where: { userId: id, collegeId: req.collegeId } });
@@ -1048,10 +1115,18 @@ exports.deleteClub = asyncHandler(async (req, res) => {
     throw new AppError('Verification code is required', 400);
   }
 
-  // 1. Verify code, check eligibility, collect publicIds and delete club inside transaction
+  // 1. Verify target exists in this tenant first (returns 404 if not found)
+  await withTenant(req.collegeId, async (tx) => {
+    await getClubDeletionTarget(tx, req.collegeId, clubId);
+  });
+
+  // 2. Verify code and track attempts outside the main deletion transaction
+  const verification = await verifyDeletionCode(req.collegeId, req.user.id, 'CLUB', clubId, code);
+
+  // 3. Check eligibility, collect publicIds and delete club inside transaction
   const { deletedClub, assetIds } = await withTenant(req.collegeId, async (tx) => {
     const existingClub = await getClubDeletionTarget(tx, req.collegeId, clubId);
-    await consumeDeletionVerification(tx, req.collegeId, req.user.id, 'CLUB', clubId, code);
+    await consumeDeletionVerification(tx, verification.id, verification.maxAttempts);
 
     // Re-verify no active/completed events exist before deleting
     const concurrentBlockingEventCount = await tx.event.count({
@@ -1345,3 +1420,6 @@ exports.deleteAdminAvatar = asyncHandler(async (req, res) => {
     data: sanitizeUser(updatedUser),
   });
 });
+
+exports.consumeDeletionVerification = consumeDeletionVerification;
+exports.verifyDeletionCode = verifyDeletionCode;

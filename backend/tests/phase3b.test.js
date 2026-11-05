@@ -2002,6 +2002,165 @@ async function runPhase3bTests() {
     }
 
     // -------------------------------------------------------------------------
+    // 26. Deletion Verification Brute-Force Protection & Attempt Limiting (Item 1)
+    // -------------------------------------------------------------------------
+    {
+      console.log('\n[TEST 26] Testing Deletion Verification Brute-Force Protection & Attempt Limiting (Item 1)...');
+
+      // Part 1: Four incorrect attempts followed by a correct attempt (succeeds)
+      let bfUser1;
+      const code1 = '445566';
+      const codeHash1 = await bcrypt.hash(code1, 10);
+
+      await withTenant(collegeA.id, async (tx) => {
+        bfUser1 = await tx.user.create({
+          data: {
+            collegeId: collegeA.id,
+            email: 'bf_user1@example.test',
+            name: 'Brute Force User 1',
+            role: 'USER',
+            isActive: true,
+          },
+        });
+
+        await tx.deletionVerification.create({
+          data: {
+            collegeId: collegeA.id,
+            adminId: adminUserA.id,
+            targetType: 'USER',
+            targetId: bfUser1.id,
+            codeHash: codeHash1,
+            expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+            consumed: false,
+            attempts: 0,
+            maxAttempts: 5,
+          },
+        });
+      });
+
+      // Submit 4 incorrect attempts
+      for (let i = 1; i <= 4; i++) {
+        const badRes = await makeRequest({
+          method: 'DELETE',
+          path: `/admin/users/${bfUser1.id}`,
+          host: 'lbrce.localhost',
+          token: tokenAdminA,
+          body: { code: '000000' },
+        });
+        assert.strictEqual(badRes.status, 400, `FAIL: Bad attempt ${i} must return 400`);
+
+        // Verify attempt count committed in DB
+        await withTenant(collegeA.id, async (tx) => {
+          const v = await tx.deletionVerification.findFirst({
+            where: { targetId: bfUser1.id, collegeId: collegeA.id },
+          });
+          assert.strictEqual(v.attempts, i, `DB attempts must be ${i} after attempt ${i}`);
+          assert.strictEqual(v.consumed, false, `Code must not be consumed after ${i} attempts`);
+        });
+      }
+
+      // 5th attempt with CORRECT code must succeed
+      const goodRes = await makeRequest({
+        method: 'DELETE',
+        path: `/admin/users/${bfUser1.id}`,
+        host: 'lbrce.localhost',
+        token: tokenAdminA,
+        body: { code: code1 },
+      });
+      assert.strictEqual(goodRes.status, 200, 'FAIL: 5th attempt with correct code must succeed (200)');
+
+      // Verify user deleted and code consumed
+      await withTenant(collegeA.id, async (tx) => {
+        const u = await tx.user.findUnique({ where: { id: bfUser1.id } });
+        assert.strictEqual(u, null, 'User 1 must be deleted');
+        const v = await tx.deletionVerification.findFirst({
+          where: { targetId: bfUser1.id, collegeId: collegeA.id },
+        });
+        assert.strictEqual(v.consumed, true, 'Code 1 must be marked consumed');
+      });
+
+      // Part 2: Fifth incorrect attempt invalidates the code, sixth attempt rejected
+      let bfUser2;
+      const code2 = '778899';
+      const codeHash2 = await bcrypt.hash(code2, 10);
+
+      await withTenant(collegeA.id, async (tx) => {
+        bfUser2 = await tx.user.create({
+          data: {
+            collegeId: collegeA.id,
+            email: 'bf_user2@example.test',
+            name: 'Brute Force User 2',
+            role: 'USER',
+            isActive: true,
+          },
+        });
+
+        await tx.deletionVerification.create({
+          data: {
+            collegeId: collegeA.id,
+            adminId: adminUserA.id,
+            targetType: 'USER',
+            targetId: bfUser2.id,
+            codeHash: codeHash2,
+            expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+            consumed: false,
+            attempts: 0,
+            maxAttempts: 5,
+          },
+        });
+      });
+
+      // Submit 4 incorrect attempts
+      for (let i = 1; i <= 4; i++) {
+        const badRes = await makeRequest({
+          method: 'DELETE',
+          path: `/admin/users/${bfUser2.id}`,
+          host: 'lbrce.localhost',
+          token: tokenAdminA,
+          body: { code: '000000' },
+        });
+        assert.strictEqual(badRes.status, 400);
+      }
+
+      // 5th incorrect attempt -> must return 400 AND invalidate the code in DB
+      const fifthBadRes = await makeRequest({
+        method: 'DELETE',
+        path: `/admin/users/${bfUser2.id}`,
+        host: 'lbrce.localhost',
+        token: tokenAdminA,
+        body: { code: '000000' },
+      });
+      assert.strictEqual(fifthBadRes.status, 400, 'FAIL: 5th incorrect attempt must return 400');
+
+      await withTenant(collegeA.id, async (tx) => {
+        const v = await tx.deletionVerification.findFirst({
+          where: { targetId: bfUser2.id, collegeId: collegeA.id },
+        });
+        assert.strictEqual(v.attempts, 5, 'DB attempts must be 5');
+        assert.strictEqual(v.consumed, true, 'Code must be marked consumed on 5th failed attempt');
+      });
+
+      // 6th attempt with CORRECT code -> MUST be rejected because code is invalidated
+      const sixthGoodRes = await makeRequest({
+        method: 'DELETE',
+        path: `/admin/users/${bfUser2.id}`,
+        host: 'lbrce.localhost',
+        token: tokenAdminA,
+        body: { code: code2 },
+      });
+      assert.strictEqual(sixthGoodRes.status, 400, 'FAIL: 6th attempt even with correct code must be rejected (400)');
+
+      // Verify user was NOT deleted
+      await withTenant(collegeA.id, async (tx) => {
+        const u = await tx.user.findUnique({ where: { id: bfUser2.id } });
+        assert.ok(u, 'User 2 must NOT be deleted');
+      });
+
+      totalRowsChecked += 10;
+      console.log('  ✔ Brute-force attempt tracking, persistence, 5-attempt invalidation, and rejection verified.');
+    }
+
+    // -------------------------------------------------------------------------
     // Final Assertions & Row Count Verification
     // -------------------------------------------------------------------------
     console.log('\n[SUMMARY] Non-Vacuous Row Count Assertion:');
