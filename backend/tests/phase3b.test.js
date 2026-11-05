@@ -54,7 +54,10 @@ async function cleanupFixtures(collegeA, collegeB) {
   if (collegeA && collegeA.id) {
     await withTenant(collegeA.id, async (tx) => {
       await tx.deletionVerification.deleteMany({
-        where: { collegeId: collegeA.id },
+        where: {
+          collegeId: collegeA.id,
+          admin: { email: FIXTURE_EMAILS.ADMIN_LBRCE },
+        },
       });
       await tx.eventGalleryImage.deleteMany({
         where: { collegeId: collegeA.id, event: { title: { startsWith: 'P3B ' } } },
@@ -63,13 +66,19 @@ async function cleanupFixtures(collegeA, collegeB) {
         where: { collegeId: collegeA.id, title: { startsWith: 'P3B ' } },
       });
       await tx.membership.deleteMany({
-        where: { collegeId: collegeA.id, user: { email: { endsWith: '@example.test' } } },
+        where: {
+          collegeId: collegeA.id,
+          OR: [
+            { user: { email: { endsWith: '_p3b@example.test' } } },
+            { club: { name: { startsWith: 'P3B ' } } },
+          ],
+        },
       });
       await tx.club.deleteMany({
         where: { collegeId: collegeA.id, name: { startsWith: 'P3B ' } },
       });
       await tx.user.deleteMany({
-        where: { collegeId: collegeA.id, email: { endsWith: '@example.test' } },
+        where: { collegeId: collegeA.id, email: { endsWith: '_p3b@example.test' } },
       });
     });
   }
@@ -77,7 +86,10 @@ async function cleanupFixtures(collegeA, collegeB) {
   if (collegeB && collegeB.id) {
     await withTenant(collegeB.id, async (tx) => {
       await tx.deletionVerification.deleteMany({
-        where: { collegeId: collegeB.id },
+        where: {
+          collegeId: collegeB.id,
+          admin: { email: FIXTURE_EMAILS.ADMIN_VRSEC },
+        },
       });
       await tx.eventGalleryImage.deleteMany({
         where: { collegeId: collegeB.id, event: { title: { startsWith: 'P3B ' } } },
@@ -86,13 +98,19 @@ async function cleanupFixtures(collegeA, collegeB) {
         where: { collegeId: collegeB.id, title: { startsWith: 'P3B ' } },
       });
       await tx.membership.deleteMany({
-        where: { collegeId: collegeB.id, user: { email: { endsWith: '@example.test' } } },
+        where: {
+          collegeId: collegeB.id,
+          OR: [
+            { user: { email: { endsWith: '_p3b@example.test' } } },
+            { club: { name: { startsWith: 'P3B ' } } },
+          ],
+        },
       });
       await tx.club.deleteMany({
         where: { collegeId: collegeB.id, name: { startsWith: 'P3B ' } },
       });
       await tx.user.deleteMany({
-        where: { collegeId: collegeB.id, email: { endsWith: '@example.test' } },
+        where: { collegeId: collegeB.id, email: { endsWith: '_p3b@example.test' } },
       });
     });
   }
@@ -1998,7 +2016,7 @@ async function runPhase3bTests() {
         concurrentUser = await tx.user.create({
           data: {
             collegeId: collegeA.id,
-            email: 'concurrent_del@example.test',
+            email: 'concurrent_del_p3b@example.test',
             name: 'Concurrent User',
             role: 'USER',
             isActive: true,
@@ -2082,7 +2100,7 @@ async function runPhase3bTests() {
         bfUser1 = await tx.user.create({
           data: {
             collegeId: collegeA.id,
-            email: 'bf_user1@example.test',
+            email: 'bf_user1_p3b@example.test',
             name: 'Brute Force User 1',
             role: 'USER',
             isActive: true,
@@ -2154,7 +2172,7 @@ async function runPhase3bTests() {
         bfUser2 = await tx.user.create({
           data: {
             collegeId: collegeA.id,
-            email: 'bf_user2@example.test',
+            email: 'bf_user2_p3b@example.test',
             name: 'Brute Force User 2',
             role: 'USER',
             isActive: true,
@@ -2231,7 +2249,7 @@ async function runPhase3bTests() {
         burstUser = await tx.user.create({
           data: {
             collegeId: collegeA.id,
-            email: 'burst_user@example.test',
+            email: 'burst_user_p3b@example.test',
             name: 'Burst Test User',
             role: 'USER',
             isActive: true,

@@ -528,9 +528,16 @@ async function runTests() {
   let fixtureUserAId, fixtureUserBId;
 
   await withTenant(collegeA.id, async (tx) => {
-    await tx.membership.deleteMany({ where: { user: { email: { endsWith: '@example.test' } } } });
+    await tx.membership.deleteMany({
+      where: {
+        OR: [
+          { user: { email: 'phase1_fixture_a@example.test' } },
+          { club: { name: { startsWith: 'Phase1 Fixture' } } },
+        ],
+      },
+    });
     await tx.club.deleteMany({ where: { name: { startsWith: 'Phase1 Fixture' } } });
-    await tx.user.deleteMany({ where: { email: { endsWith: '@example.test' } } });
+    await tx.user.deleteMany({ where: { email: 'phase1_fixture_a@example.test' } });
 
     const uA = await tx.user.create({
       data: {
@@ -554,9 +561,16 @@ async function runTests() {
   });
 
   await withTenant(collegeB.id, async (tx) => {
-    await tx.membership.deleteMany({ where: { user: { email: { endsWith: '@example.test' } } } });
+    await tx.membership.deleteMany({
+      where: {
+        OR: [
+          { user: { email: 'phase1_fixture_b@example.test' } },
+          { club: { name: { startsWith: 'Phase1 Fixture' } } },
+        ],
+      },
+    });
     await tx.club.deleteMany({ where: { name: { startsWith: 'Phase1 Fixture' } } });
-    await tx.user.deleteMany({ where: { email: { endsWith: '@example.test' } } });
+    await tx.user.deleteMany({ where: { email: 'phase1_fixture_b@example.test' } });
 
     const uB = await tx.user.create({
       data: {
@@ -698,14 +712,28 @@ async function runTests() {
     console.log('  Cleaning up @example.test concurrency fixtures...');
     try {
       await withTenant(collegeA.id, async (tx) => {
-        await tx.membership.deleteMany({ where: { user: { email: { endsWith: '@example.test' } } } });
+        await tx.membership.deleteMany({
+          where: {
+            OR: [
+              { user: { email: 'phase1_fixture_a@example.test' } },
+              { club: { name: { startsWith: 'Phase1 Fixture' } } },
+            ],
+          },
+        });
         await tx.club.deleteMany({ where: { name: { startsWith: 'Phase1 Fixture' } } });
-        await tx.user.deleteMany({ where: { email: { endsWith: '@example.test' } } });
+        await tx.user.deleteMany({ where: { email: 'phase1_fixture_a@example.test' } });
       });
       await withTenant(collegeB.id, async (tx) => {
-        await tx.membership.deleteMany({ where: { user: { email: { endsWith: '@example.test' } } } });
+        await tx.membership.deleteMany({
+          where: {
+            OR: [
+              { user: { email: 'phase1_fixture_b@example.test' } },
+              { club: { name: { startsWith: 'Phase1 Fixture' } } },
+            ],
+          },
+        });
         await tx.club.deleteMany({ where: { name: { startsWith: 'Phase1 Fixture' } } });
-        await tx.user.deleteMany({ where: { email: { endsWith: '@example.test' } } });
+        await tx.user.deleteMany({ where: { email: 'phase1_fixture_b@example.test' } });
       });
       console.log('  ✔ Fixtures cleaned up successfully.');
     } catch (cleanupErr) {

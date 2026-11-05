@@ -48,19 +48,37 @@ async function cleanupFixtures(collegeA, collegeB) {
   if (collegeA && collegeA.id) {
     await withTenant(collegeA.id, async (tx) => {
       await tx.clubDepartment.deleteMany({
-        where: { collegeId: collegeA.id },
+        where: {
+          collegeId: collegeA.id,
+          OR: [
+            { club: { name: { startsWith: 'P3A ' } } },
+            { department: { name: { startsWith: 'P3A ' } } },
+          ],
+        },
       });
       await tx.membership.deleteMany({
-        where: { collegeId: collegeA.id, user: { email: { endsWith: '@example.test' } } },
+        where: {
+          collegeId: collegeA.id,
+          OR: [
+            { user: { email: FIXTURE_EMAILS.ADMIN_LBRCE } },
+            { club: { name: { startsWith: 'P3A ' } } },
+          ],
+        },
       });
       await tx.club.deleteMany({
         where: { collegeId: collegeA.id, name: { startsWith: 'P3A ' } },
       });
       await tx.department.deleteMany({
-        where: { collegeId: collegeA.id, name: { startsWith: 'P3A ' } },
+        where: {
+          collegeId: collegeA.id,
+          OR: [
+            { name: { startsWith: 'P3A ' } },
+            { shortCode: { startsWith: 'P3A_' } },
+          ],
+        },
       });
       await tx.user.deleteMany({
-        where: { collegeId: collegeA.id, email: { endsWith: '@example.test' } },
+        where: { collegeId: collegeA.id, email: FIXTURE_EMAILS.ADMIN_LBRCE },
       });
     });
   }
@@ -68,19 +86,37 @@ async function cleanupFixtures(collegeA, collegeB) {
   if (collegeB && collegeB.id) {
     await withTenant(collegeB.id, async (tx) => {
       await tx.clubDepartment.deleteMany({
-        where: { collegeId: collegeB.id },
+        where: {
+          collegeId: collegeB.id,
+          OR: [
+            { club: { name: { startsWith: 'P3A ' } } },
+            { department: { name: { startsWith: 'P3A ' } } },
+          ],
+        },
       });
       await tx.membership.deleteMany({
-        where: { collegeId: collegeB.id, user: { email: { endsWith: '@example.test' } } },
+        where: {
+          collegeId: collegeB.id,
+          OR: [
+            { user: { email: FIXTURE_EMAILS.ADMIN_VRSEC } },
+            { club: { name: { startsWith: 'P3A ' } } },
+          ],
+        },
       });
       await tx.club.deleteMany({
         where: { collegeId: collegeB.id, name: { startsWith: 'P3A ' } },
       });
       await tx.department.deleteMany({
-        where: { collegeId: collegeB.id, name: { startsWith: 'P3A ' } },
+        where: {
+          collegeId: collegeB.id,
+          OR: [
+            { name: { startsWith: 'P3A ' } },
+            { shortCode: { startsWith: 'P3A_' } },
+          ],
+        },
       });
       await tx.user.deleteMany({
-        where: { collegeId: collegeB.id, email: { endsWith: '@example.test' } },
+        where: { collegeId: collegeB.id, email: FIXTURE_EMAILS.ADMIN_VRSEC },
       });
     });
   }

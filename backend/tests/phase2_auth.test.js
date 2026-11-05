@@ -87,21 +87,45 @@ async function cleanupFixtures(collegeA, collegeB) {
   clearAllLoginThrottling();
   clearUsedTotpCache();
 
+  const collegeAEmails = [
+    FIXTURE_EMAILS.ADMIN_LBRCE,
+    FIXTURE_EMAILS.MANAGER_LBRCE,
+    FIXTURE_EMAILS.USER_LBRCE,
+    FIXTURE_EMAILS.INACTIVE_LBRCE,
+    FIXTURE_EMAILS.INVITED_LBRCE,
+    FIXTURE_EMAILS.EXPIRED_INVITE_LBRCE,
+  ];
+
+  const collegeBEmails = [
+    FIXTURE_EMAILS.ADMIN_VRSEC,
+  ];
+
+  const platformEmails = [
+    FIXTURE_EMAILS.PLATFORM_ADMIN,
+    FIXTURE_EMAILS.PLATFORM_NO_TOTP,
+  ];
+
   if (collegeA && collegeA.id) {
     await withTenant(collegeA.id, async (tx) => {
       await tx.membership.deleteMany({
         where: {
-          user: { email: { endsWith: '@example.test' } },
+          collegeId: collegeA.id,
+          OR: [
+            { user: { email: { in: collegeAEmails } } },
+            { club: { name: { startsWith: 'Test Auth Fixture' } } },
+          ],
         },
       });
       await tx.club.deleteMany({
         where: {
+          collegeId: collegeA.id,
           name: { startsWith: 'Test Auth Fixture' },
         },
       });
       await tx.user.deleteMany({
         where: {
-          email: { endsWith: '@example.test' },
+          collegeId: collegeA.id,
+          email: { in: collegeAEmails },
         },
       });
     });
@@ -111,17 +135,23 @@ async function cleanupFixtures(collegeA, collegeB) {
     await withTenant(collegeB.id, async (tx) => {
       await tx.membership.deleteMany({
         where: {
-          user: { email: { endsWith: '@example.test' } },
+          collegeId: collegeB.id,
+          OR: [
+            { user: { email: { in: collegeBEmails } } },
+            { club: { name: { startsWith: 'Test Auth Fixture' } } },
+          ],
         },
       });
       await tx.club.deleteMany({
         where: {
+          collegeId: collegeB.id,
           name: { startsWith: 'Test Auth Fixture' },
         },
       });
       await tx.user.deleteMany({
         where: {
-          email: { endsWith: '@example.test' },
+          collegeId: collegeB.id,
+          email: { in: collegeBEmails },
         },
       });
     });
@@ -129,7 +159,7 @@ async function cleanupFixtures(collegeA, collegeB) {
 
   await platformPrisma.platformAdmin.deleteMany({
     where: {
-      email: { endsWith: '@example.test' },
+      email: { in: platformEmails },
     },
   });
 }
