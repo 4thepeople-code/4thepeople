@@ -32,6 +32,27 @@ export const publicApi = {
     const res = await api.get(`/clubs/${clubId}/events/${eventId}`);
     return res.data;
   },
+
+  // Event Registrations
+  registerForEvent: async (eventId) => {
+    const res = await api.post(`/events/${eventId}/register`);
+    return res.data;
+  },
+
+  cancelRegistration: async (eventId) => {
+    const res = await api.delete(`/events/${eventId}/register`);
+    return res.data;
+  },
+
+  getMyRegistrationStatus: async (eventId) => {
+    const res = await api.get(`/events/${eventId}/my-registration`);
+    return res.data;
+  },
+
+  getMyRegistrations: async () => {
+    const res = await api.get('/events/my-registrations');
+    return res.data;
+  },
 };
 
 export default publicApi;

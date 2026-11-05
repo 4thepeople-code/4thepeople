@@ -4,6 +4,7 @@ import { publicApi } from '../../api/publicApi';
 import PublicLayout from '../../components/public/PublicLayout';
 import GalleryLightbox from '../../components/public/GalleryLightbox';
 import { useTheme } from '../../context/ThemeContext';
+import { useAuth } from '../../context/AuthContext';
 import {
   ArrowLeft,
   ArrowRight,
@@ -51,6 +52,10 @@ const PublicEventDetailPage = () => {
   const { clubId, eventId } = useParams();
   const navigate = useNavigate();
   const { isDark } = useTheme();
+  const { user, token } = useAuth();
+  const [registering, setRegistering] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+  const [regError, setRegError] = useState(null);
 
   const [event, setEvent] = useState(null);
   const [club, setClub] = useState(null);
@@ -121,6 +126,24 @@ const PublicEventDetailPage = () => {
     fetchEventData();
     window.scrollTo(0, 0);
   }, [clubId, eventId]);
+  useEffect(() => {
+    const checkRegistration = async () => {
+      if (!event?.id || !token) {
+        setRegistered(false);
+        return;
+      }
+      try {
+        const res = await publicApi.getMyRegistrationStatus(event.id);
+        if (res && typeof res.isRegistered === 'boolean') {
+          setRegistered(res.isRegistered);
+        }
+      } catch {
+        setRegistered(false);
+      }
+    };
+    checkRegistration();
+  }, [event?.id, token]);
+
 
   const dateInfo = formatDateParts(event?.startAt || event?.startDate || event?.date);
   const eventTime = formatEventTime(event?.startAt || event?.startDate || event?.date, event?.endAt || event?.endDate);
@@ -137,13 +160,42 @@ const PublicEventDetailPage = () => {
   const rawRegistrationUrl = event?.registrationUrl || event?.url || event?.formUrl || event?.link || event?.externalUrl;
   const validRegistrationUrl = getValidUrl(rawRegistrationUrl);
 
-  const handleRegister = () => {
+  const handleRegister = async () => {
     if (validRegistrationUrl) {
       window.open(validRegistrationUrl, '_blank', 'noopener,noreferrer');
       return;
     }
-    setRegistered(true);
-    setShowModal(true);
+    if (!token) {
+      navigate('/login', { state: { from: window.location.pathname } });
+      return;
+    }
+    try {
+      setRegistering(true);
+      setRegError(null);
+      await publicApi.registerForEvent(event.id);
+      setRegistered(true);
+      setShowModal(true);
+      setEvent((prev) => (prev ? { ...prev, registeredCount: (prev.registeredCount || 0) + 1 } : prev));
+    } catch (err) {
+      setRegError(err.response?.data?.message || err.message || 'Failed to register for event');
+    } finally {
+      setRegistering(false);
+    }
+  };
+
+  const handleCancelRegistration = async () => {
+    if (!token || !event?.id) return;
+    try {
+      setCancelling(true);
+      setRegError(null);
+      await publicApi.cancelRegistration(event.id);
+      setRegistered(false);
+      setEvent((prev) => (prev ? { ...prev, registeredCount: Math.max(0, (prev.registeredCount || 1) - 1) } : prev));
+    } catch (err) {
+      setRegError(err.response?.data?.message || err.message || 'Failed to cancel registration');
+    } finally {
+      setCancelling(false);
+    }
   };
 
   const handleShare = async () => {
@@ -311,6 +363,12 @@ const PublicEventDetailPage = () => {
 
                   {/* Action CTA Buttons */}
                   <div className="pt-2 flex flex-col gap-2.5">
+                    {regError && (
+                      <div className="p-3 rounded-xl bg-red-500/15 border border-red-500/30 text-xs font-semibold text-red-400 flex items-center gap-2">
+                        <AlertCircle className="w-4 h-4 shrink-0" />
+                        <span>{regError}</span>
+                      </div>
+                    )}
                     <div className="flex flex-wrap items-center gap-3">
                       {validRegistrationUrl ? (
                         <a
@@ -323,20 +381,40 @@ const PublicEventDetailPage = () => {
                           <span>Register for Event</span>
                           <ExternalLink className="w-4 h-4 shrink-0" />
                         </a>
+                      ) : registered ? (
+                        <div className="flex-1 flex flex-wrap items-center gap-2">
+                          <div className="flex-1 min-w-[160px] py-3.5 px-6 rounded-full font-extrabold text-xs uppercase tracking-wider shadow-lg bg-emerald-500 text-black flex items-center justify-center gap-2 cursor-default">
+                            <CheckCircle2 className="w-4 h-4" />
+                            <span>RSVP Confirmed</span>
+                          </div>
+                          <button
+                            onClick={handleCancelRegistration}
+                            disabled={cancelling}
+                            className="py-3 px-4 rounded-full font-bold text-xs uppercase tracking-wider border border-red-500/30 text-red-400 hover:bg-red-500/10 transition cursor-pointer"
+                            title="Cancel RSVP"
+                          >
+                            {cancelling ? 'Cancelling...' : 'Cancel RSVP'}
+                          </button>
+                        </div>
                       ) : (
                         <button
                           onClick={handleRegister}
-                          disabled={registered}
+                          disabled={registering || (event.capacity !== null && event.capacity !== undefined && (event.registeredCount || 0) >= event.capacity)}
                           className={`flex-1 min-w-[200px] py-3.5 px-6 rounded-full font-extrabold text-xs uppercase tracking-wider shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer ${
-                            registered
-                              ? 'bg-emerald-500 text-black cursor-default'
+                            event.capacity !== null && event.capacity !== undefined && (event.registeredCount || 0) >= event.capacity
+                              ? 'bg-gray-600 text-gray-300 cursor-not-allowed'
                               : 'bg-[#00F0FF] hover:bg-[#38f2ff] text-black shadow-cyan-500/30'
                           }`}
                         >
-                          {registered ? (
+                          {registering ? (
                             <>
-                              <CheckCircle2 className="w-4 h-4" />
-                              <span>RSVP Confirmed</span>
+                              <RefreshCw className="w-4 h-4 animate-spin" />
+                              <span>Registering...</span>
+                            </>
+                          ) : event.capacity !== null && event.capacity !== undefined && (event.registeredCount || 0) >= event.capacity ? (
+                            <>
+                              <AlertCircle className="w-4 h-4" />
+                              <span>Event Full (Capacity Reached)</span>
                             </>
                           ) : (
                             <>
@@ -370,7 +448,14 @@ const PublicEventDetailPage = () => {
 
                   {/* Registration Count Note */}
                   <div className={`text-xs font-semibold ${isDark ? 'text-gray-400' : 'text-slate-500'}`}>
-                    <span className={`font-extrabold ${isDark ? 'text-white' : 'text-[#0F172A]'}`}>{event.attendeesCount || 120}+ Students</span> already registered • Direct Club RSVP
+                    <span className={`font-extrabold ${isDark ? 'text-white' : 'text-[#0F172A]'}`}>
+                      {event.capacity !== null && event.capacity !== undefined
+                        ? `${event.registeredCount ?? 0} / ${event.capacity} spots filled`
+                        : `${event.registeredCount ?? 0} Students registered`}
+                    </span>
+                    {event.capacity !== null && event.capacity !== undefined && (event.registeredCount ?? 0) >= event.capacity
+                      ? ' • Capacity Full'
+                      : ' • Direct Club RSVP'}
                   </div>
                 </div>
 
