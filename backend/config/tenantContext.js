@@ -8,6 +8,9 @@ const TX_TIMEOUT_MS = 10000; // 10s max execution time for tenant transaction
 
 let failTransactionConfig = null;
 function __setFailTransaction(config) {
+  if (process.env.NODE_ENV !== 'test') {
+    throw new Error('Test hooks are only accessible when NODE_ENV === "test"');
+  }
   if (!config) {
     failTransactionConfig = null;
   } else if (config instanceof Error || typeof config === 'string') {
@@ -100,9 +103,14 @@ async function withTenant(collegeId, callback, options = {}) {
   );
 }
 
-module.exports = {
+const exportsObj = {
   withTenant,
   TX_MAX_WAIT_MS,
   TX_TIMEOUT_MS,
-  __setFailTransaction,
 };
+
+if (process.env.NODE_ENV === 'test') {
+  exportsObj.__setFailTransaction = __setFailTransaction;
+}
+
+module.exports = exportsObj;
