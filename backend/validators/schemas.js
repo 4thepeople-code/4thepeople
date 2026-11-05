@@ -75,6 +75,7 @@ const createEventBody = z.object({
   startAt: z.coerce.date(),
   endAt: z.coerce.date().nullable().optional(),
   registrationUrl: z.string().trim().nullable().optional(),
+  capacity: z.number().int().positive('Capacity must be a positive integer').nullable().optional(),
 }).refine((value) => !value.endAt || value.endAt > value.startAt, {
   message: 'endAt must be after startAt', path: ['endAt'],
 });
@@ -86,12 +87,18 @@ const updateEventBody = z.object({
   endAt: z.coerce.date().nullable().optional(),
   status: z.enum(['UPCOMING', 'ONGOING', 'COMPLETED', 'CANCELLED']).optional(),
   registrationUrl: z.string().trim().nullable().optional(),
+  capacity: z.number().int().positive('Capacity must be a positive integer').nullable().optional(),
 }).refine((value) => Object.keys(value).length > 0, 'At least one event field is required');
+
+const attendeeQuery = z.object({
+  page: z.coerce.number().int().positive().optional(),
+  limit: z.coerce.number().int().positive().max(100).optional(),
+});
 
 module.exports = {
   objectId, inviteToken, idParams, clubParams, departmentParams, eventParams, clubEventParams,
   loginBody, forgotPasswordBody, resetPasswordBody, deletionVerificationBody, adminRegisterBody, managerInviteBody,
   createClubBody, updateClubBody, createDepartmentBody, updateDepartmentBody, clubIdsBody, departmentIdsBody,
-  membershipBody, existingManagerBody, acceptInviteBody, createEventBody, updateEventBody,
+  membershipBody, existingManagerBody, acceptInviteBody, createEventBody, updateEventBody, attendeeQuery,
   publicIdParams: z.object({ eventId: uuid, publicId: z.string().min(1).max(500) }),
 };
