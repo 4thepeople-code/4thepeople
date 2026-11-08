@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { AlertTriangle, X, ShieldAlert, RefreshCw, Mail, Loader2 } from 'lucide-react';
 
 export interface DeleteOtpModalProps {
@@ -37,47 +37,59 @@ export function DeleteOtpModal({
   const [isRequestingCode, setIsRequestingCode] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  const handleRequestCode = useCallback(async () => {
-    setIsRequestingCode(true);
-    setBlockedError('');
-    setInlineError('');
+  const onRequestCodeRef = useRef(onRequestCode);
+  onRequestCodeRef.current = onRequestCode;
 
-    try {
-      await onRequestCode();
-      setStage('code');
-      setNotice('A verification code has been sent to your admin email address.');
-    } catch (err: unknown) {
-      const errObj = err as { response?: { status?: number; data?: { message?: string; error?: string } } };
-      const message =
-        errObj.response?.data?.message ||
-        errObj.response?.data?.error ||
-        'Unable to request deletion verification code.';
+  const onConfirmRef = useRef(onConfirm || onConfirmDelete);
+  onConfirmRef.current = onConfirm || onConfirmDelete;
 
-      setBlockedError(message);
-      setStage('blocked');
-    } finally {
-      setIsRequestingCode(false);
-    }
-  }, [onRequestCode]);
+  const hasRequestedRef = useRef(false);
 
   useEffect(() => {
     if (isOpen) {
+      if (!hasRequestedRef.current) {
+        hasRequestedRef.current = true;
+        setCode('');
+        setBlockedError('');
+        setInlineError('');
+        setNotice('');
+        setIsRequestingCode(true);
+
+        onRequestCodeRef.current()
+          .then(() => {
+            setStage('code');
+            setNotice('A verification code has been sent to your admin email address.');
+          })
+          .catch((err: unknown) => {
+            const errObj = err as { response?: { status?: number; data?: { message?: string; error?: string } } };
+            const message =
+              errObj.response?.data?.message ||
+              errObj.response?.data?.error ||
+              'Unable to request deletion verification code.';
+
+            setBlockedError(message);
+            setStage('blocked');
+          })
+          .finally(() => {
+            setIsRequestingCode(false);
+          });
+      }
+    } else {
+      hasRequestedRef.current = false;
+      setStage('requesting');
       setCode('');
       setBlockedError('');
       setInlineError('');
       setNotice('');
-      void handleRequestCode();
-    } else {
-      setStage('requesting');
     }
-  }, [isOpen, handleRequestCode]);
+  }, [isOpen]);
 
   const handleResendCode = async () => {
     setIsRequestingCode(true);
     setInlineError('');
     setNotice('');
     try {
-      await onRequestCode();
+      await onRequestCodeRef.current();
       setNotice('A new verification code has been sent to your email.');
     } catch (err: unknown) {
       const errObj = err as { response?: { data?: { message?: string } } };
@@ -95,7 +107,7 @@ export function DeleteOtpModal({
     setInlineError('');
 
     try {
-      const confirmFn = onConfirm || onConfirmDelete;
+      const confirmFn = onConfirmRef.current;
       if (confirmFn) {
         await confirmFn(code.trim());
       }

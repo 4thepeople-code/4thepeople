@@ -36,8 +36,15 @@ export function LoginPageClient({
   initialRollNumber = '',
 }: LoginPageClientProps) {
   const router = useRouter();
-  const { login } = useAuth();
+  const { user: currentUser, login } = useAuth();
   const { isDark } = useTheme();
+
+  // If college admin is already logged in, redirect them to admin workspace
+  React.useEffect(() => {
+    if (currentUser?.role === 'COLLEGE_ADMIN') {
+      router.replace(`/college/${slug}/admin`);
+    }
+  }, [currentUser, router, slug]);
 
   const collegeDisplay = slug.toUpperCase();
   const returnUrl = initialReturnUrl || `/college/${slug}/student`;
@@ -79,6 +86,13 @@ export function LoginPageClient({
       const token = resPayload.token || resPayload.data?.token;
 
       if (user) {
+        // If college admin logs in, route to admin portal directly
+        if (user.role === 'COLLEGE_ADMIN') {
+          login(user, token);
+          router.push(`/college/${slug}/admin`);
+          return;
+        }
+
         // Authoritative cookie-first login establishes session
         login(user, token);
         router.push(returnUrl);
@@ -147,6 +161,16 @@ export function LoginPageClient({
                       className="mt-2 inline-flex items-center gap-1 font-bold text-cyan-400 hover:text-cyan-300 underline"
                     >
                       <span>Activate your student account now</span>
+                      <ArrowRight className="w-3 h-3" />
+                    </Link>
+                  )}
+                  {errorMsg.toLowerCase().includes('admin') && (
+                    <Link
+                      href={`/college/${slug}/login/admin`}
+                      className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/20 text-red-200 hover:bg-red-500/30 font-bold tracking-wide"
+                    >
+                      <Shield className="w-3.5 h-3.5 text-red-400" />
+                      <span>Go to College Admin Portal</span>
                       <ArrowRight className="w-3 h-3" />
                     </Link>
                   )}
@@ -272,6 +296,17 @@ export function LoginPageClient({
                 >
                   <Shield className="w-3.5 h-3.5 text-purple-400" />
                   <span>Manager Portal</span>
+                </Link>
+              </div>
+
+              <div className="flex items-center justify-between text-xs pt-1">
+                <span className={isDark ? 'text-gray-400' : 'text-slate-500'}>College Administrator?</span>
+                <Link
+                  href={`/college/${slug}/login/admin`}
+                  className="font-semibold text-[#B08D57] hover:underline inline-flex items-center gap-1"
+                >
+                  <Shield className="w-3.5 h-3.5 text-[#B08D57]" />
+                  <span>Admin Portal</span>
                 </Link>
               </div>
             </div>

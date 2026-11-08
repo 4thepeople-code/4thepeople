@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Search, User as UserIcon, Trash2, Eye, RefreshCw, AlertCircle } from 'lucide-react';
@@ -35,6 +35,19 @@ export function CollegeAdminUsersClient({ slug }: CollegeAdminUsersClientProps) 
   const { data: users = [], isLoading, isError, refetch } = useAllUsersQuery(slug);
   const requestCodeMutation = useRequestUserDeletionCodeMutation();
   const deleteUserMutation = useDeleteUserMutation(slug);
+
+  const handleRequestDeletionCode = useCallback(async () => {
+    if (!userToDelete?.id) return;
+    return await requestCodeMutation.mutateAsync(userToDelete.id);
+  }, [userToDelete?.id, requestCodeMutation]);
+
+  const handleConfirmUserDelete = useCallback(
+    async (code: string) => {
+      if (!userToDelete?.id) return;
+      return await deleteUserMutation.mutateAsync({ userId: userToDelete.id, code });
+    },
+    [userToDelete?.id, deleteUserMutation]
+  );
 
   const filteredUsers = users.filter((u) => {
     const term = search.toLowerCase().trim();
@@ -194,10 +207,8 @@ export function CollegeAdminUsersClient({ slug }: CollegeAdminUsersClientProps) 
         <DeleteOtpModal
           isOpen={!!userToDelete}
           onClose={() => setUserToDelete(null)}
-          onRequestCode={() => requestCodeMutation.mutateAsync(userToDelete?.id || '')}
-          onConfirm={(code) =>
-            deleteUserMutation.mutateAsync({ userId: userToDelete?.id || '', code })
-          }
+          onRequestCode={handleRequestDeletionCode}
+          onConfirm={handleConfirmUserDelete}
           title="Delete User Account"
           itemName={userToDelete ? `${userToDelete.name} (${userToDelete.email})` : ''}
           warningText="This action cannot be undone. All user data, student activation links, and club memberships will be permanently removed."

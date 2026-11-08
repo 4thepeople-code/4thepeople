@@ -314,9 +314,12 @@ view EventsWithStatus {
   coverImagePublicId String?   @map("cover_image_public_id")
   registrationUrl    String?   @map("registration_url")
   legacyMongoId      String?   @map("legacy_mongo_id")
-  createdAt          DateTime  @map("created_at") @db.Timestamptz(6)
-  updatedAt          DateTime  @map("updated_at") @db.Timestamptz(6)
-  status             String
+  createdAt             DateTime              @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime              @map("updated_at") @db.Timestamptz(6)
+  status                String
+  registrationMode      EventRegistrationMode @default(INTERNAL) @map("registration_mode")
+  customFormDefinition  Json?                 @map("custom_form_definition")
+  registrationDeadline  DateTime?             @map("registration_deadline") @db.Timestamptz(6)
 
   @@map("events_with_status")
 }

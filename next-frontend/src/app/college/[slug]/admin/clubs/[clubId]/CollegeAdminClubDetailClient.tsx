@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import {
@@ -73,6 +73,17 @@ export function CollegeAdminClubDetailClient({
   const deleteMembershipMutation = useDeleteMembershipMutation(slug);
   const requestCodeMutation = useRequestClubDeletionCodeMutation();
   const deleteClubMutation = useDeleteClubMutation(slug);
+
+  const handleRequestDeletionCode = useCallback(async () => {
+    return await requestCodeMutation.mutateAsync(clubId);
+  }, [clubId, requestCodeMutation]);
+
+  const handleConfirmClubDelete = useCallback(
+    async (code: string) => {
+      return await deleteClubMutation.mutateAsync({ clubId, code });
+    },
+    [clubId, deleteClubMutation]
+  );
 
   const showSuccessNotice = (msg: string) => {
     setActionSuccess(msg);
@@ -378,8 +389,8 @@ export function CollegeAdminClubDetailClient({
         <DeleteOtpModal
           isOpen={deleteClubOpen}
           onClose={() => setDeleteClubOpen(false)}
-          onRequestCode={() => requestCodeMutation.mutateAsync(clubId)}
-          onConfirm={(code) => deleteClubMutation.mutateAsync({ clubId, code })}
+          onRequestCode={handleRequestDeletionCode}
+          onConfirm={handleConfirmClubDelete}
           title="Delete Club"
           itemType="Club"
           itemName={club.name}

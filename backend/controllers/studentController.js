@@ -638,6 +638,11 @@ exports.studentLogin = asyncHandler(async (req, res) => {
     throw new AppError('Invalid credentials', 401);
   }
 
+  // Option 1: College Admins must not log into Student Portal
+  if (user.role === 'COLLEGE_ADMIN') {
+    throw new AppError('College Administrators must sign in through the Admin Portal at /login/admin', 403);
+  }
+
   // Generate JWT token
   const token = generateStudentToken(user, req.collegeId);
 

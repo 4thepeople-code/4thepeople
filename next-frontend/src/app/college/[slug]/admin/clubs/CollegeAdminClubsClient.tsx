@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
@@ -47,6 +47,19 @@ export function CollegeAdminClubsClient({ slug }: CollegeAdminClubsClientProps) 
   const { data: clubs = [], isLoading, isError, refetch } = useAdminClubsQuery(slug);
   const requestCodeMutation = useRequestClubDeletionCodeMutation();
   const deleteClubMutation = useDeleteClubMutation(slug);
+
+  const handleRequestDeletionCode = useCallback(async () => {
+    if (!clubToDelete?.id) return;
+    return await requestCodeMutation.mutateAsync(clubToDelete.id);
+  }, [clubToDelete?.id, requestCodeMutation]);
+
+  const handleConfirmClubDelete = useCallback(
+    async (code: string) => {
+      if (!clubToDelete?.id) return;
+      return await deleteClubMutation.mutateAsync({ clubId: clubToDelete.id, code });
+    },
+    [clubToDelete?.id, deleteClubMutation]
+  );
 
   const filteredClubs = clubs.filter((c) => {
     const term = search.toLowerCase().trim();
@@ -241,10 +254,8 @@ export function CollegeAdminClubsClient({ slug }: CollegeAdminClubsClientProps) 
         <DeleteOtpModal
           isOpen={!!clubToDelete}
           onClose={() => setClubToDelete(null)}
-          onRequestCode={() => requestCodeMutation.mutateAsync(clubToDelete?.id || '')}
-          onConfirm={(code) =>
-            deleteClubMutation.mutateAsync({ clubId: clubToDelete?.id || '', code })
-          }
+          onRequestCode={handleRequestDeletionCode}
+          onConfirm={handleConfirmClubDelete}
           title="Delete Club"
           itemType="Club"
           itemName={clubToDelete?.name}

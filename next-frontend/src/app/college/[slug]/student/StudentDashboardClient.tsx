@@ -11,6 +11,7 @@ import {
   useCancelRegistrationMutation,
 } from '@/lib/api/events';
 import { useMeQuery } from '@/lib/api/auth';
+import { useMyClubsQuery } from '@/lib/api/manager';
 import PublicLayout from '@/components/public/PublicLayout';
 import {
   GraduationCap,
@@ -27,6 +28,7 @@ import {
   RefreshCw,
   ArrowRight,
   Shield,
+  Building2,
 } from 'lucide-react';
 import type { EventRegistration } from '@/types/models';
 
@@ -84,12 +86,17 @@ export function StudentDashboardClient({ slug, initialTab = 'registrations' }: S
     isLoading: profileLoading,
   } = useMeQuery(slug);
 
+  const { data: myClubs = [] } = useMyClubsQuery(slug, Boolean(user && user.role !== 'COLLEGE_ADMIN'));
+  const isManager = myClubs.length > 0;
+
   const cancelMutation = useCancelRegistrationMutation(slug);
 
-  // Auth Protection: Redirect unauthenticated students to login
+  // Auth Protection: Redirect unauthenticated students to login, and College Admins to Admin Workspace
   useEffect(() => {
     if (!authLoading && !user) {
       router.push(`/college/${slug}/login?returnUrl=/college/${slug}/student`);
+    } else if (!authLoading && user?.role === 'COLLEGE_ADMIN') {
+      router.replace(`/college/${slug}/admin`);
     }
   }, [authLoading, user, slug, router]);
 
@@ -139,13 +146,13 @@ export function StudentDashboardClient({ slug, initialTab = 'registrations' }: S
     router.push(`/college/${slug}`);
   };
 
-  if (authLoading) {
+  if (authLoading || (user && user.role === 'COLLEGE_ADMIN')) {
     return (
       <PublicLayout collegeSlug={slug} collegeName={collegeDisplay}>
         <div className="min-h-[calc(100vh-200px)] flex flex-col items-center justify-center p-8">
           <RefreshCw className="w-8 h-8 text-[#00F0FF] animate-spin mb-4" />
           <p className={`text-xs font-bold uppercase tracking-wider ${isDark ? 'text-gray-400' : 'text-slate-500'}`}>
-            Verifying Student Session...
+            {user?.role === 'COLLEGE_ADMIN' ? 'Redirecting to College Admin Workspace...' : 'Verifying Student Session...'}
           </p>
         </div>
       </PublicLayout>
@@ -159,20 +166,28 @@ export function StudentDashboardClient({ slug, initialTab = 'registrations' }: S
   return (
     <PublicLayout collegeSlug={slug} collegeName={collegeDisplay}>
       <div className="py-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
-        {/* Role Warning if logged in user is Manager/Admin */}
-        {!isStudent && (
-          <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between gap-4 text-amber-300">
+        {/* Manager Workspace Banner if user has active club manager memberships */}
+        {isManager && (
+          <div className="p-4 rounded-2xl bg-gradient-to-r from-cyan-500/10 via-blue-500/10 to-purple-500/10 border border-cyan-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-              <Shield className="w-5 h-5 text-amber-400 shrink-0" />
-              <p className="text-xs">
-                You are currently signed in as <strong>{user.role}</strong>. This dashboard is tailored for enrolled students.
-              </p>
+              <div className="p-2.5 rounded-xl bg-cyan-500/20 text-[#00F0FF] shrink-0">
+                <Building2 className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wider text-[#00F0FF]">
+                  Club Manager Workspace Available
+                </p>
+                <p className="text-xs text-gray-300">
+                  You are an authorized manager for <strong>{myClubs.length} {myClubs.length === 1 ? 'club' : 'clubs'}</strong>. Switch anytime to create events and manage member registrations.
+                </p>
+              </div>
             </div>
             <Link
               href={`/college/${slug}/manager`}
-              className="px-3 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 text-xs font-bold uppercase tracking-wider transition whitespace-nowrap"
+              className="px-4 py-2 rounded-xl bg-[#00F0FF] hover:bg-[#38f2ff] text-black text-xs font-extrabold uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 shadow-md shadow-cyan-500/20 whitespace-nowrap shrink-0"
             >
-              Go to Manager Portal
+              <span>Switch to Manager Workspace</span>
+              <ArrowRight className="w-3.5 h-3.5" />
             </Link>
           </div>
         )}
@@ -184,9 +199,17 @@ export function StudentDashboardClient({ slug, initialTab = 'registrations' }: S
           }`}
         >
           <div className="space-y-2">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/10 text-cyan-600 dark:text-[#00F0FF] text-[11px] font-bold uppercase tracking-wider">
-              <GraduationCap className="w-3.5 h-3.5" />
-              <span>Student Account • {collegeDisplay}</span>
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/10 text-cyan-600 dark:text-[#00F0FF] text-[11px] font-bold uppercase tracking-wider">
+                <GraduationCap className="w-3.5 h-3.5" />
+                <span>Student Account • {collegeDisplay}</span>
+              </div>
+              {isManager && (
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-500/10 text-purple-400 border border-purple-500/20 text-[11px] font-bold uppercase tracking-wider">
+                  <Shield className="w-3.5 h-3.5 text-purple-400" />
+                  <span>Club Manager ({myClubs.length})</span>
+                </div>
+              )}
             </div>
             <h1
               className={`font-['Syne',sans-serif] text-2xl sm:text-4xl font-extrabold uppercase tracking-tight ${
@@ -210,7 +233,16 @@ export function StudentDashboardClient({ slug, initialTab = 'registrations' }: S
           </div>
 
           {/* Quick Header Actions */}
-          <div className="flex items-center gap-3 shrink-0">
+          <div className="flex items-center gap-3 shrink-0 flex-wrap">
+            {isManager && (
+              <Link
+                href={`/college/${slug}/manager`}
+                className="px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider bg-[#00F0FF] hover:bg-[#38f2ff] text-black transition-all flex items-center gap-1.5 shadow-sm shadow-cyan-500/20"
+              >
+                <Building2 className="w-3.5 h-3.5" />
+                <span>Manager Workspace</span>
+              </Link>
+            )}
             <Link
               href={`/college/${slug}`}
               className={`px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider border transition-all ${

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import {
@@ -56,6 +56,17 @@ export function CollegeAdminUserDetailClient({
   const resendInviteMutation = useResendInviteMutation();
   const requestCodeMutation = useRequestUserDeletionCodeMutation();
   const deleteUserMutation = useDeleteUserMutation(slug);
+
+  const handleRequestDeletionCode = useCallback(async () => {
+    return await requestCodeMutation.mutateAsync(userId);
+  }, [userId, requestCodeMutation]);
+
+  const handleConfirmUserDelete = useCallback(
+    async (code: string) => {
+      return await deleteUserMutation.mutateAsync({ userId, code });
+    },
+    [userId, deleteUserMutation]
+  );
 
   const handleResendInvite = async () => {
     setResendSuccess('');
@@ -303,8 +314,8 @@ export function CollegeAdminUserDetailClient({
         <DeleteOtpModal
           isOpen={confirmDeleteOpen}
           onClose={() => setConfirmDeleteOpen(false)}
-          onRequestCode={() => requestCodeMutation.mutateAsync(userId)}
-          onConfirm={(code) => deleteUserMutation.mutateAsync({ userId, code })}
+          onRequestCode={handleRequestDeletionCode}
+          onConfirm={handleConfirmUserDelete}
           title="Delete User Account"
           itemName={user ? `${user.name} (${user.email})` : ''}
           warningText="This action cannot be undone. All associated memberships will be permanently removed."

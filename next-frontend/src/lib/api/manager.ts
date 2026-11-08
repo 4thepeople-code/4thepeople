@@ -58,18 +58,26 @@ export interface ManagerProfileData extends Partial<User> {
  * Backend: GET /manager/my-clubs
  */
 export async function fetchMyClubs(): Promise<Club[]> {
-  const response = await apiClient.get('/manager/my-clubs');
-  const res = response.data;
-  if (Array.isArray(res)) return res as Club[];
-  if (res && typeof res === 'object') {
-    const obj = res as Record<string, unknown>;
-    if (Array.isArray(obj.clubs)) return obj.clubs as Club[];
-    if (obj.data && typeof obj.data === 'object') {
-      const nested = obj.data as Record<string, unknown>;
-      if (Array.isArray(nested.clubs)) return nested.clubs as Club[];
+  try {
+    const response = await apiClient.get('/manager/my-clubs');
+    const res = response.data;
+    if (Array.isArray(res)) return res as Club[];
+    if (res && typeof res === 'object') {
+      const obj = res as Record<string, unknown>;
+      if (Array.isArray(obj.clubs)) return obj.clubs as Club[];
+      if (obj.data && typeof obj.data === 'object') {
+        const nested = obj.data as Record<string, unknown>;
+        if (Array.isArray(nested.clubs)) return nested.clubs as Club[];
+      }
     }
+    return [];
+  } catch (err: unknown) {
+    const status = (err as { response?: { status?: number } })?.response?.status;
+    if (status === 403 || status === 401) {
+      return [];
+    }
+    throw err;
   }
-  return [];
 }
 
 export function useMyClubsQuery(slug: string, enabled = true) {
