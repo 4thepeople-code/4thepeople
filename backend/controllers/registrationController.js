@@ -251,7 +251,11 @@ exports.listMyRegistrations = asyncHandler(async (req, res) => {
     const list = await tx.eventRegistration.findMany({
       where: { userId: req.user.id, collegeId: req.collegeId },
       orderBy: { registeredAt: 'desc' },
-      include: {
+      select: {
+        id: true,
+        eventId: true,
+        registeredAt: true,
+        formAnswers: true,
         event: {
           select: {
             id: true,
