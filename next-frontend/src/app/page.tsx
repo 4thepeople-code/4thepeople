@@ -97,7 +97,10 @@ export default function PublicDirectoryPage() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             {partnerColleges.map((col) => {
-              const devUrl = `http://${col.slug}.localhost:3000`;
+              const portalUrl =
+                process.env.NODE_ENV === 'development'
+                  ? `http://${col.slug}.localhost:3000`
+                  : `https://${col.slug}.4thepeople-eys5.vercel.app`;
               return (
                 <div
                   key={col.slug}
@@ -146,7 +149,7 @@ export default function PublicDirectoryPage() {
                       </div>
 
                       <a
-                        href={devUrl}
+                        href={portalUrl}
                         className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-[#00F0FF] hover:bg-[#38f2ff] text-black font-extrabold text-xs uppercase tracking-wider transition-all shadow-sm"
                       >
                         <span>Open Portal</span>
