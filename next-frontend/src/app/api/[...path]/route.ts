@@ -48,6 +48,10 @@ async function proxyRequest(request: NextRequest, { params }: { params: Promise<
       }
     }
 
+    if (subPath.startsWith('platform/')) {
+      hostType = 'PLATFORM_ADMIN';
+    }
+
     const isProduction = process.env.NODE_ENV === 'production';
     const proto =
       request.headers.get('x-forwarded-proto') ||
