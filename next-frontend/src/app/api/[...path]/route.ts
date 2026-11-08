@@ -28,8 +28,25 @@ async function proxyRequest(request: NextRequest, { params }: { params: Promise<
       normalizeHost(request.headers.get('host')) ||
       'localhost';
 
-    const tenantSlug = request.headers.get('x-yuva-tenant-slug');
-    const hostType = request.headers.get('x-yuva-host-type');
+    let tenantSlug = request.headers.get('x-yuva-tenant-slug');
+    let hostType = request.headers.get('x-yuva-host-type');
+
+    // Fallback: If not set by subdomain (e.g. path-based routing on Vercel preview https://.../college/lbrce):
+    if (!tenantSlug) {
+      const referer = request.headers.get('referer');
+      if (referer) {
+        try {
+          const refererUrl = new URL(referer);
+          const match = refererUrl.pathname.match(/^\/college\/([a-z0-9-]+)/i);
+          if (match) {
+            tenantSlug = match[1].toLowerCase();
+            hostType = 'COLLEGE';
+          } else if (refererUrl.pathname.startsWith('/admin')) {
+            hostType = 'PLATFORM_ADMIN';
+          }
+        } catch {}
+      }
+    }
 
     const isProduction = process.env.NODE_ENV === 'production';
     const proto =
@@ -40,7 +57,14 @@ async function proxyRequest(request: NextRequest, { params }: { params: Promise<
     const forwardHeaders = new Headers();
 
     // 1. Host and Tenant forwarding (used by backend resolveCollege.js)
-    forwardHeaders.set('x-forwarded-host', cleanHost);
+    let effectiveHost = cleanHost;
+    if (tenantSlug && hostType === 'COLLEGE' && !cleanHost.includes(tenantSlug)) {
+      effectiveHost = `${tenantSlug}.4thepeople.in`;
+    } else if (hostType === 'PLATFORM_ADMIN' && !cleanHost.startsWith('admin.')) {
+      effectiveHost = 'admin.4thepeople.in';
+    }
+
+    forwardHeaders.set('x-forwarded-host', effectiveHost);
     forwardHeaders.set('x-forwarded-proto', proto);
 
     if (tenantSlug && hostType === 'COLLEGE') {

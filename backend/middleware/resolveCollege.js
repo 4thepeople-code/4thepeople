@@ -133,7 +133,17 @@ function extractSubdomain(host) {
 async function resolveCollege(req, res, next) {
   try {
     const host = getTrustedHost(req);
-    const slug = extractSubdomain(host);
+    let slug = extractSubdomain(host);
+
+    // Support trusted proxy tenant headers (e.g. from Next.js BFF proxy during path-based preview routing)
+    if (!slug && req.headers['x-yuva-tenant-slug']) {
+      slug = req.headers['x-yuva-tenant-slug'].toLowerCase().trim();
+    } else if (!slug && req.headers['x-yuva-host-type'] === 'PLATFORM_ADMIN') {
+      req.isPlatform = true;
+      req.college = null;
+      req.collegeId = null;
+      return next();
+    }
 
     // 1. Root / Directory Context (no subdomain, or www)
     if (!slug || slug === 'www') {
