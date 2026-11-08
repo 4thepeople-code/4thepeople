@@ -304,6 +304,8 @@ export function ManagerClubDetailClient({ slug, clubId }: ManagerClubDetailClien
       setEventEndAt('');
       setEventUrl('');
       showToast('Event created successfully!');
+      void refetchEvents();
+      void refetchClub();
     } catch (err: unknown) {
       const message = (err as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Failed to create event.';
       setEventError(message);
