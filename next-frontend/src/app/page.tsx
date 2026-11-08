@@ -97,7 +97,7 @@ export default function PublicDirectoryPage() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             {partnerColleges.map((col) => {
-              const portalUrl =`https://${col.slug}.4thepeople-eys5.vercel.app`;
+              const portalUrl = `/college/${col.slug}`;
               return (
                 <div
                   key={col.slug}

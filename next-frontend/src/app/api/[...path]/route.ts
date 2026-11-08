@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { normalizeHost } from '@/lib/routing/hostResolver';
 
 const BACKEND_INTERNAL_URL =
-  process.env.BACKEND_INTERNAL_URL ||
   process.env.BACKEND_URL ||
   'http://localhost:5000';
 
@@ -29,6 +28,9 @@ async function proxyRequest(request: NextRequest, { params }: { params: Promise<
       normalizeHost(request.headers.get('host')) ||
       'localhost';
 
+    const tenantSlug = request.headers.get('x-yuva-tenant-slug');
+    const hostType = request.headers.get('x-yuva-host-type');
+
     const isProduction = process.env.NODE_ENV === 'production';
     const proto =
       request.headers.get('x-forwarded-proto') ||
@@ -40,6 +42,14 @@ async function proxyRequest(request: NextRequest, { params }: { params: Promise<
     // 1. Host and Tenant forwarding (used by backend resolveCollege.js)
     forwardHeaders.set('x-forwarded-host', cleanHost);
     forwardHeaders.set('x-forwarded-proto', proto);
+
+    if (tenantSlug && hostType === 'COLLEGE') {
+      forwardHeaders.set('x-yuva-tenant-slug', tenantSlug);
+    }
+
+    if (hostType) {
+      forwardHeaders.set('x-yuva-host-type', hostType);
+    }
 
     const clientIp =
       request.headers.get('x-forwarded-for')?.split(',')[0].trim() ||
