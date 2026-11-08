@@ -128,12 +128,23 @@ const sendEmail = async ({ toEmail, toName, subject, html }) => {
  * @param {string} name
  * @param {string} inviteToken
  */
-const sendInviteEmail = async (toEmail, name, inviteToken) => {
-  const frontendUrl =
-    process.env.FRONTEND_URL || 'http://localhost:5173';
+const sendInviteEmail = async (toEmail, name, inviteToken, collegeSlug = null) => {
+  const rawFrontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+  const frontendUrl = rawFrontendUrl.replace(/\/$/, '');
 
-  const inviteLink =
-    `${frontendUrl}/accept-invite/${inviteToken}`;
+  const isCustomDomain =
+    process.env.CUSTOM_DOMAIN_ENABLED === 'true' &&
+    !frontendUrl.includes('vercel.app') &&
+    !frontendUrl.includes('localhost');
+
+  let inviteLink;
+  if (isCustomDomain && collegeSlug) {
+    inviteLink = `https://${collegeSlug}.4thepeople.in/accept-invite/${inviteToken}`;
+  } else if (collegeSlug) {
+    inviteLink = `${frontendUrl}/college/${collegeSlug}/accept-invite/${inviteToken}`;
+  } else {
+    inviteLink = `${frontendUrl}/accept-invite/${inviteToken}`;
+  }
 
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 32px; background-color: #0B0F17; color: #F8FAFC; border: 1px solid #1E293B; border-radius: 20px;">
@@ -319,10 +330,15 @@ const sendDeletionVerificationCode = async (
  * @param {string} options.inviteToken
  */
 const sendCollegeAdminInviteEmail = async ({ toEmail, name, collegeName, collegeSlug, inviteToken }) => {
-  const isProduction = process.env.NODE_ENV === 'production';
-  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+  const rawFrontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+  const frontendUrl = rawFrontendUrl.replace(/\/$/, '');
 
-  const inviteLink = isProduction
+  const isCustomDomain =
+    process.env.CUSTOM_DOMAIN_ENABLED === 'true' &&
+    !frontendUrl.includes('vercel.app') &&
+    !frontendUrl.includes('localhost');
+
+  const inviteLink = isCustomDomain
     ? `https://${collegeSlug}.4thepeople.in/accept-invite/${inviteToken}`
     : `${frontendUrl}/college/${collegeSlug}/accept-invite/${inviteToken}`;
 

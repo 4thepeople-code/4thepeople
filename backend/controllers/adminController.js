@@ -323,7 +323,7 @@ exports.createManager = asyncHandler(async (req, res) => {
 
   // Send invitation email OUTSIDE transaction
   try {
-    await sendInviteEmail(user.email, user.name, rawInviteToken);
+    await sendInviteEmail(user.email, user.name, rawInviteToken, req.college ? req.college.slug : null);
   } catch (emailError) {
     console.error('Failed to send invite email:', emailError);
   }
@@ -373,7 +373,7 @@ exports.resendInvite = asyncHandler(async (req, res) => {
 
   // Send invitation email OUTSIDE transaction
   try {
-    await sendInviteEmail(updatedUser.email, updatedUser.name, rawInviteToken);
+    await sendInviteEmail(updatedUser.email, updatedUser.name, rawInviteToken, req.college ? req.college.slug : null);
   } catch (emailError) {
     console.error('Failed to send invite email:', emailError);
   }
@@ -727,7 +727,7 @@ exports.inviteManagerToClub = asyncHandler(async (req, res) => {
 
   // Send invitation email OUTSIDE transaction
   try {
-    await sendInviteEmail(user.email, user.name, rawInviteToken);
+    await sendInviteEmail(user.email, user.name, rawInviteToken, req.college ? req.college.slug : null);
   } catch (emailError) {
     console.error('Failed to send invite email:', emailError);
   }
