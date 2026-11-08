@@ -3,7 +3,15 @@ const jwt = require('jsonwebtoken');
 const { platformPrisma } = require('../config/platformDb');
 const asyncHandler = require('../utils/asyncHandler');
 const { AppError } = require('../middleware/errorHandler');
-const { verifyTotp, recordAndCheckTotpUsage } = require('../utils/totp');
+const {
+  verifyTotp,
+  recordAndCheckTotpUsage,
+  generateTotpSecret,
+  encryptTotpSecret,
+  generateOtpauthUrl,
+  base32Decode,
+  generateHotp,
+} = require('../utils/totp');
 const {
   checkLoginThrottled,
   recordFailedLogin,
@@ -34,14 +42,114 @@ const getEffectivePlatformSecret = () => {
 };
 
 /**
+ * GET /api/platform/auth/setup-status
+ * Checks whether the platform has been initialized with at least one super-administrator.
+ * Used by the frontend to render the First-Run Initialization Wizard when 0 admins exist.
+ */
+exports.getPlatformSetupStatus = asyncHandler(async (req, res) => {
+  if (!req.isPlatform) {
+    throw new AppError('Platform authentication is only allowed on the platform administration host', 403);
+  }
+
+  const count = await platformPrisma.platformAdmin.count();
+  res.status(200).json({
+    success: true,
+    isInitialized: count > 0,
+    count,
+  });
+});
+
+/**
+ * POST /api/platform/auth/setup-initial
+ * Provisions the initial root Platform Super-Administrator when database count === 0.
+ * Once at least 1 administrator exists, this endpoint is permanently locked.
+ */
+exports.setupInitialPlatformAdmin = asyncHandler(async (req, res) => {
+  if (!req.isPlatform) {
+    throw new AppError('Platform authentication is only allowed on the platform administration host', 403);
+  }
+
+  const count = await platformPrisma.platformAdmin.count();
+  if (count > 0) {
+    throw new AppError('Platform has already been initialized. Initial setup is locked.', 403);
+  }
+
+  const { name, email, password } = req.body;
+  if (!name || !email || !password) {
+    throw new AppError('Please provide name, email, and password', 400);
+  }
+
+  if (password.length < 8) {
+    throw new AppError('Password must be at least 8 characters long', 400);
+  }
+
+  const normalizedEmail = email.toLowerCase().trim();
+  const passwordHash = await bcrypt.hash(password, 10);
+
+  // Generate initial TOTP keypair
+  const plainSecret = generateTotpSecret();
+  const encryptedSecret = encryptTotpSecret(plainSecret);
+  const otpauthUrl = generateOtpauthUrl(normalizedEmail, plainSecret, '4THEPEOPLE Platform');
+
+  const admin = await platformPrisma.platformAdmin.create({
+    data: {
+      name: name.trim(),
+      email: normalizedEmail,
+      passwordHash,
+      totpSecret: encryptedSecret,
+      isActive: true,
+    },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      isActive: true,
+      createdAt: true,
+    },
+  });
+
+  const secretBuf = base32Decode(plainSecret);
+  const counter = Math.floor(Date.now() / 1000 / 30);
+  const liveCode = generateHotp(secretBuf, counter, 6);
+  const secondsRemaining = 30 - (Math.floor(Date.now() / 1000) % 30);
+
+  const token = jwt.sign(
+    {
+      platformAdminId: admin.id,
+      id: admin.id,
+      email: admin.email,
+      name: admin.name,
+      role: 'PLATFORM_SUPER_ADMIN',
+      type: 'platform',
+    },
+    getEffectivePlatformSecret(),
+    { expiresIn: process.env.PLATFORM_JWT_EXPIRES_IN || '4h' }
+  );
+
+  res.cookie('yuva_platform_token', token, getPlatformCookieOptions());
+
+  res.status(201).json({
+    success: true,
+    message: 'Root Platform Super-Administrator initialized successfully.',
+    admin: {
+      ...admin,
+      role: 'PLATFORM_SUPER_ADMIN',
+    },
+    totp: {
+      secret: plainSecret,
+      otpauthUrl,
+      liveCode,
+      secondsRemaining,
+    },
+  });
+});
+
+/**
  * POST /api/platform/auth/login
- * Privileged Platform Super-Administrator Login.
- * Authenticates against platform_admins using platform_ops database client.
- * Enforces:
- * 1. Host check (must be admin.4thepeople.in or admin.localhost)
- * 2. Per-account + IP throttling
- * 3. Constant-time response pad for unknown accounts
- * 4. TOTP 2FA verification when totpSecret is configured
+ * Privileged Platform Super-Administrator Login supporting:
+ * 1. Step 1 (Credentials Only): Returns { requiresTotp: true } or { requiresTotpSetup: true, setup: {...} }
+ * 2. Step 2 (2FA Code or Setup Confirmation): Verifies TOTP, sets host-only cookie, and logs in.
+ * 3. 1-Step (Backwards-compatible): Verifies email, password, and TOTP code in a single request.
  */
 exports.platformLogin = asyncHandler(async (req, res) => {
   // Reject platform login on college or directory hosts
@@ -49,7 +157,7 @@ exports.platformLogin = asyncHandler(async (req, res) => {
     throw new AppError('Platform authentication is only allowed on the platform administration host', 403);
   }
 
-  const { email, password, totpCode, totp } = req.body;
+  const { email, password, totpCode, totp, setupSecret } = req.body;
 
   if (!email || !password) {
     throw new AppError('Please provide both email and password', 400);
@@ -87,15 +195,66 @@ exports.platformLogin = asyncHandler(async (req, res) => {
     throw new AppError('Invalid platform administrator credentials', 401);
   }
 
-  // In production, refuse platform login if TOTP is not enrolled
-  if (process.env.NODE_ENV === 'production' && !admin.totpSecret) {
-    recordFailedLogin(normalizedEmail, clientIp);
-    throw new AppError('Platform administrator must have two-factor authentication (TOTP) enrolled in production', 403);
+  const code = totpCode || totp;
+
+  // Case A: 2-Step Login — User submitted email & password without a TOTP code yet
+  if (!code && !setupSecret) {
+    // If admin already has TOTP enrolled, ask for the code
+    if (admin.totpSecret) {
+      return res.status(200).json({
+        success: true,
+        requiresTotp: true,
+        message: 'Password verified. Please enter the 6-digit code from your authenticator app.',
+        admin: {
+          email: admin.email,
+          name: admin.name,
+        },
+      });
+    }
+
+    // If admin has NOT enrolled TOTP yet, generate setup credentials right now!
+    const plainSecret = generateTotpSecret();
+    const otpauthUrl = generateOtpauthUrl(admin.email, plainSecret, '4THEPEOPLE Platform');
+    const secretBuf = base32Decode(plainSecret);
+    const counter = Math.floor(Date.now() / 1000 / 30);
+    const liveCode = generateHotp(secretBuf, counter, 6);
+    const secondsRemaining = 30 - (Math.floor(Date.now() / 1000) % 30);
+
+    return res.status(200).json({
+      success: true,
+      requiresTotpSetup: true,
+      message: 'Password verified. Please configure your two-factor authenticator.',
+      admin: {
+        email: admin.email,
+        name: admin.name,
+      },
+      setup: {
+        secret: plainSecret,
+        otpauthUrl,
+        liveCode,
+        secondsRemaining,
+      },
+    });
   }
 
-  // TOTP 2FA verification if totpSecret exists
+  // Case B: Admin is enrolling TOTP during login (submitting setupSecret + code)
+  if (!admin.totpSecret && setupSecret && code) {
+    const isTotpValid = verifyTotp(code, setupSecret.trim());
+    if (!isTotpValid) {
+      recordFailedLogin(normalizedEmail, clientIp);
+      throw new AppError('Invalid two-factor authentication code for setup key', 401);
+    }
+
+    const encryptedSecret = encryptTotpSecret(setupSecret.trim());
+    await platformPrisma.platformAdmin.update({
+      where: { id: admin.id },
+      data: { totpSecret: encryptedSecret },
+    });
+    admin.totpSecret = encryptedSecret;
+  }
+
+  // Case C: Standard TOTP Verification (admin has enrolled totpSecret)
   if (admin.totpSecret) {
-    const code = totpCode || totp;
     if (!code) {
       recordFailedLogin(normalizedEmail, clientIp);
       throw new AppError('Two-factor authentication code required', 400);

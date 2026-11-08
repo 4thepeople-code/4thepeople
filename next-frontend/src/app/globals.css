@@ -1,0 +1,77 @@
+@import url('https://fonts.googleapis.com/css2?family=Gelasio:ital,wght@0,400..700;1,400..700&family=Google+Sans:ital,opsz,wght@0,17..18,400..700;1,17..18,400..700&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&family=Roboto:ital,wght@0,100..900;1,100..900&family=Syne:wght@400..800&display=swap');
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-serif: "Inter", serif;
+  --font-sans: "Google Sans", system-ui, -apple-system, sans-serif;
+  --font-display: "Google Sans", sans-serif;
+}
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+/* Custom Figma Event Card Box Shadow */
+.figma-card-shadow {
+  box-shadow: 
+    0px -8px 80px rgba(0, 0, 0, 0.07),
+    0px -2.92013px 29.2013px rgba(0, 0, 0, 0.0482987),
+    0px -1.41767px 14.1767px rgba(0, 0, 0, 0.0389404),
+    0px -0.694968px 6.94968px rgba(0, 0, 0, 0.0310596),
+    0px -0.274791px 2.74791px rgba(0, 0, 0, 0.0217013);
+}
+
+/* Native calendar and time pickers styling */
+input[type="date"],
+input[type="time"],
+input[type="datetime-local"] {
+  color-scheme: light;
+}
+
+.dark input[type="date"],
+.dark input[type="time"],
+.dark input[type="datetime-local"] {
+  color-scheme: dark;
+}
+
+.dark ::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  filter: invert(0.8) sepia(100%) hue-rotate(220deg);
+}
+
+::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+}
+
+/* Infinite Marquee Ticker */
+@keyframes marquee {
+  0% { transform: translateX(0%); }
+  100% { transform: translateX(-50%); }
+}
+
+.animate-marquee {
+  display: flex;
+  width: max-content;
+  animation: marquee 45s linear infinite;
+  will-change: transform;
+}
+
+.animate-marquee:hover {
+  animation-play-state: paused;
+}
+
+@keyframes scroll-x {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%); 
+  }
+}
+
+.animate-scroll-x {
+  animation: scroll-x 20s linear infinite;
+}

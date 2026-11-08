@@ -24,6 +24,7 @@ dist-ssr
 *.sw?
 
 .env 
+*.env
 
 /src/components/public-demo/
 /src/pages/public-demo/

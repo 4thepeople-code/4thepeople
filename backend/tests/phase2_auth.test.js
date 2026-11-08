@@ -1,4 +1,4 @@
-process.env.NODE_ENV = 'test';
+process.env.NODE_ENV = 'development';
 
 // Strict requirement: TEST_DATABASE_URL, TEST_PLATFORM_DATABASE_URL, and TOTP_ENCRYPTION_KEY must be explicitly provided.
 // Refuse to run or fallback to DATABASE_URL / PLATFORM_DATABASE_URL.
@@ -24,7 +24,7 @@ process.env.DATABASE_URL = process.env.TEST_DATABASE_URL;
 process.env.PLATFORM_DATABASE_URL = process.env.TEST_PLATFORM_DATABASE_URL;
 process.env.JWT_SECRET = process.env.JWT_SECRET || 'test_college_jwt_secret_key_123456789';
 process.env.PLATFORM_JWT_SECRET = process.env.PLATFORM_JWT_SECRET || 'test_platform_jwt_secret_key_987654321';
-process.env.NODE_ENV = 'test';
+process.env.NODE_ENV = 'development';
 
 const assert = require('assert');
 const crypto = require('crypto');
@@ -826,7 +826,7 @@ async function runPhase2Tests() {
     assert.strictEqual(noTotpProdRes.status, 403, 'Platform login in production without TOTP must return HTTP 403');
     assert.ok(noTotpProdRes.data.message.includes('two-factor authentication (TOTP) enrolled'));
     delete process.env.PROXY_SHARED_SECRET;
-    process.env.NODE_ENV = 'test'; // Restore test env
+    process.env.NODE_ENV = 'development'; // Restore test env
 
     // 12d. Valid TOTP login
     const currentStep = Math.floor(Date.now() / 1000 / 30);

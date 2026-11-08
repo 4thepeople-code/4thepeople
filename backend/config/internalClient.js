@@ -2,22 +2,24 @@ const { PrismaClient } = require('@prisma/client');
 
 /**
  * Builds a connection URL ensuring pgbouncer=true is present
- * to support PgBouncer transaction pooling mode.
+ * when connecting through PgBouncer or Neon connection poolers,
+ * and configures safe connection limits to prevent pool starvation.
  */
 function getPooledDatabaseUrl(rawUrl) {
   if (!rawUrl) return rawUrl;
   try {
     const url = new URL(rawUrl);
-    if (!url.searchParams.has('pgbouncer')) {
-      url.searchParams.set('pgbouncer', 'true');
+    // If connecting through Neon pooler or port indicates PgBouncer, ensure pgbouncer=true
+    if (url.hostname.includes('-pooler') || url.port === '6543') {
+      if (!url.searchParams.has('pgbouncer')) {
+        url.searchParams.set('pgbouncer', 'true');
+      }
+    }
+    if (!url.searchParams.has('connection_limit')) {
+      url.searchParams.set('connection_limit', '5');
     }
     return url.toString();
   } catch {
-    // If URL parsing fails, append as fallback
-    if (!rawUrl.includes('pgbouncer=true')) {
-      const sep = rawUrl.includes('?') ? '&' : '?';
-      return `${rawUrl}${sep}pgbouncer=true`;
-    }
     return rawUrl;
   }
 }

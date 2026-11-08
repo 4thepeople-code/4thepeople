@@ -12,6 +12,8 @@
     "test:phase3a": "node tests/phase3a.test.js",
     "test:phase3b": "node tests/phase3b.test.js",
     "test:phase3c": "node tests/phase3c.test.js",
+    "test:phase_s1": "node tests/phase_s1_full_verification.test.js",
+    "test:phase_s1_closure": "node tests/phase_s1_closure_targeted.test.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

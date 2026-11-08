@@ -1,4 +1,4 @@
-process.env.NODE_ENV = 'test';
+process.env.NODE_ENV = 'development';
 
 // Strict requirement: TEST_DATABASE_URL and TEST_PLATFORM_DATABASE_URL must be explicitly provided.
 if (!process.env.TEST_DATABASE_URL) {

@@ -1,6 +1,6 @@
 const cloudinary = require('../config/cloudinary');
 
-const isTestEnv = process.env.NODE_ENV === 'test';
+const isTestEnv = process.env.NODE_ENV === 'development';
 
 const verifyTestSafety = () => {
   const dbUrl = process.env.TEST_DATABASE_URL || process.env.DATABASE_URL || '';

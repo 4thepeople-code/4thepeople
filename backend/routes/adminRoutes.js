@@ -8,6 +8,7 @@ const {
   departmentParams, createDepartmentBody, updateDepartmentBody, clubIdsBody, departmentIdsBody,
   membershipBody, existingManagerBody, deletionVerificationBody,
 } = require('../validators/schemas');
+const { uploadStudentRoster } = require('../controllers/studentController');
 const {
   createDepartment,
   updateDepartment,
@@ -115,5 +116,9 @@ router.delete('/deleteClub/:id', destructiveLimiter, validate({ params: idParam,
 router.get('/verify', (req, res) => {
   res.json({ success: true, message: 'Admin token is valid', user: req.user });
 });
+
+// Student roster import route
+// POST /admin/students/roster
+router.post('/students/roster', uploadStudentRoster);
 
 module.exports = router;

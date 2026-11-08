@@ -30,6 +30,7 @@ const managerRouter = require('./routes/managerRoutes');
 const registrationRouter = require('./routes/registrationRoutes');
 const publicRouter = require('./routes/publicRoutes');
 const platformAuthRouter = require('./platform/platformAuthRoutes');
+const platformAdminManagementRouter = require('./platform/platformAdminManagementRoutes');
 
 const trustProxySetting = process.env.TRUST_PROXY_HOPS !== undefined
   ? (/^\d+$/.test(process.env.TRUST_PROXY_HOPS)
@@ -95,8 +96,9 @@ app.get('/', (req, res) => {
   res.status(200).json({ success: true, message: 'Club Event Manager API is running...' });
 });
 
-// Platform Super-Administration Routes (/api/platform/auth/*)
+// Platform Super-Administration Routes (/api/platform/auth/*, /api/platform/admins/*)
 app.use('/api/platform/auth', platformAuthRouter);
+app.use('/api/platform/admins', platformAdminManagementRouter);
 
 // College Tenant API Routes
 app.use('/auth', authRouter);
@@ -130,7 +132,7 @@ app.use((req, res, next) => {
 // Central Error Handling Middleware (MUST be registered after all routes)
 app.use(errorHandler);
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 5000;
 if (process.env.NODE_ENV !== 'test') {
   app.listen(PORT, () => {
     console.log(`Server Running at http://localhost:${PORT}`);

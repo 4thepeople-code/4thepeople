@@ -28,21 +28,77 @@ exports.registerForEvent = asyncHandler(async (req, res) => {
 
   const registration = await withTenant(req.collegeId, async (tx) => {
     // 1. Check event existence and computed status
-    const event = await tx.eventsWithStatus.findFirst({
-      where: { id: eventId, collegeId: req.collegeId },
-    });
-    if (!event) {
+    const [eventStatusRow, event] = await Promise.all([
+      tx.eventsWithStatus.findFirst({
+        where: { id: eventId, collegeId: req.collegeId },
+        select: { status: true },
+      }),
+      tx.event.findFirst({
+        where: { id: eventId, collegeId: req.collegeId },
+        select: {
+          id: true,
+          registrationMode: true,
+          customFormDefinition: true,
+          registrationDeadline: true,
+          registrationUrl: true,
+        },
+      }),
+    ]);
+    if (!event || !eventStatusRow) {
       throw new AppError('Event not found', 404);
     }
 
-    if (event.status === 'CANCELLED') {
+    if (eventStatusRow.status === 'CANCELLED') {
       throw new AppError('Cannot register for a cancelled event', 400);
     }
-    if (event.status === 'COMPLETED') {
+    if (eventStatusRow.status === 'COMPLETED') {
       throw new AppError('Cannot register for a past event', 400);
     }
 
-    // 2. Check if user is already registered before trying to insert
+    // Check registration mode
+    if (event.registrationMode === 'NONE') {
+      throw new AppError('Registration is not open for this event', 400);
+    }
+    if (event.registrationMode === 'EXTERNAL') {
+      throw new AppError(`This event requires external registration at: ${event.registrationUrl || 'external link'}`, 400);
+    }
+
+    // Check registration deadline
+    if (event.registrationDeadline && new Date() > new Date(event.registrationDeadline)) {
+      throw new AppError('Registration deadline has passed', 400);
+    }
+
+    // 2. Validate custom form answers if form definition exists
+    const body = req.body || {};
+    let validatedAnswers = null;
+    if (event.customFormDefinition && Array.isArray(event.customFormDefinition.fields)) {
+      const answers = body.formAnswers || body.answers || {};
+      validatedAnswers = {};
+      for (const field of event.customFormDefinition.fields) {
+        const fieldKey = field.id || field.name;
+        const val = answers[fieldKey];
+        if (field.required && (val === undefined || val === null || val === '')) {
+          throw new AppError(`Field "${field.label || fieldKey}" is required`, 400);
+        }
+        if (val !== undefined && val !== null && val !== '') {
+          if (field.type === 'NUMBER' && isNaN(Number(val))) {
+            throw new AppError(`Field "${field.label || fieldKey}" must be a number`, 400);
+          }
+          if (
+            (field.type === 'SELECT' || field.type === 'RADIO') &&
+            Array.isArray(field.options) &&
+            !field.options.includes(val)
+          ) {
+            throw new AppError(`Invalid option selected for field "${field.label || fieldKey}"`, 400);
+          }
+          validatedAnswers[fieldKey] = val;
+        }
+      }
+    } else if (body.formAnswers || body.answers) {
+      validatedAnswers = body.formAnswers || body.answers;
+    }
+
+    // 3. Check if user is already registered before trying to insert
     const existing = await tx.eventRegistration.findFirst({
       where: { eventId, userId: req.user.id, collegeId: req.collegeId },
     });
@@ -50,7 +106,7 @@ exports.registerForEvent = asyncHandler(async (req, res) => {
       throw new AppError('You are already registered for this event', 409);
     }
 
-    // 3. Atomically insert registration. PostgreSQL trigger handle_registration_insert
+    // 4. Atomically insert registration. PostgreSQL trigger handle_registration_insert
     // row-locks the events table row FOR UPDATE, enforces capacity, and increments registered_count.
     try {
       return await tx.eventRegistration.create({
@@ -58,6 +114,7 @@ exports.registerForEvent = asyncHandler(async (req, res) => {
           collegeId: req.collegeId,
           eventId,
           userId: req.user.id,
+          formAnswers: validatedAnswers,
         },
       });
     } catch (err) {
@@ -308,4 +365,107 @@ exports.getEventAttendees = asyncHandler(async (req, res) => {
     success: true,
     ...result,
   });
+});
+
+/**
+ * GET /events/:eventId/export
+ * Exports attendee roster as CSV.
+ * Allowed for COLLEGE_ADMIN or club MANAGER.
+ */
+exports.exportEventRegistrations = asyncHandler(async (req, res) => {
+  if (!req.collegeId) {
+    throw new AppError('Tenant context required: request must be routed through a college subdomain', 400);
+  }
+  if (!req.user || !req.user.id) {
+    throw new AppError('Authentication required', 401);
+  }
+
+  const { eventId } = req.params;
+  validateUUID(eventId, 'event ID');
+
+  const { csvContent, filename } = await withTenant(req.collegeId, async (tx) => {
+    // 1. Fetch event and owning club
+    const event = await tx.event.findFirst({
+      where: { id: eventId, collegeId: req.collegeId },
+      select: { id: true, title: true, clubId: true },
+    });
+    if (!event) {
+      throw new AppError('Event not found', 404);
+    }
+
+    // 2. Authorization check: College Admin or Club Manager
+    if (req.user.role !== 'COLLEGE_ADMIN') {
+      const membership = await tx.membership.findFirst({
+        where: {
+          collegeId: req.collegeId,
+          clubId: event.clubId,
+          userId: req.user.id,
+          role: 'MANAGER',
+        },
+      });
+      if (!membership) {
+        throw new AppError('Forbidden: Only college administrators or club managers can export event registrations', 403);
+      }
+    }
+
+    // 3. Fetch all registrations with user and department info
+    const registrations = await tx.eventRegistration.findMany({
+      where: { eventId, collegeId: req.collegeId },
+      orderBy: { registeredAt: 'asc' },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            rollNumber: true,
+            department: {
+              select: { name: true, shortCode: true },
+            },
+          },
+        },
+      },
+    });
+
+    // 4. Build CSV
+    const rows = [
+      ['Registration ID', 'Roll Number', 'Student Name', 'Student Email', 'Department', 'Registered At', 'Form Answers']
+    ];
+
+    for (const r of registrations) {
+      const answersStr = r.formAnswers ? JSON.stringify(r.formAnswers) : '';
+      rows.push([
+        r.id,
+        r.user ? (r.user.rollNumber || '') : '',
+        r.user ? r.user.name : '',
+        r.user ? r.user.email : '',
+        r.user && r.user.department ? (r.user.department.shortCode || r.user.department.name) : '',
+        new Date(r.registeredAt).toISOString(),
+        answersStr,
+      ]);
+    }
+
+    const csvContent = rows
+      .map((row) =>
+        row
+          .map((cell) => {
+            const str = (cell === null || cell === undefined) ? '' : String(cell);
+            if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+              return `"${str.replace(/"/g, '""')}"`;
+            }
+            return str;
+          })
+          .join(',')
+      )
+      .join('\r\n');
+
+    const safeTitle = event.title.replace(/[^a-zA-Z0-9_-]/g, '_');
+    const filename = `registrations_${safeTitle}_${eventId.slice(0, 8)}.csv`;
+
+    return { csvContent, filename };
+  });
+
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+  res.status(200).send(csvContent);
 });

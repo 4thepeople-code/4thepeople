@@ -1,4 +1,4 @@
-process.env.NODE_ENV = 'test';
+process.env.NODE_ENV = 'development';
 
 // Strict requirement: TEST_DATABASE_URL must be explicitly provided. No fallback to DATABASE_URL.
 if (!process.env.TEST_DATABASE_URL) {
@@ -390,7 +390,7 @@ async function runTests() {
       `  [Case ${String(i + 1).padStart(2, ' ')}] ${tc.name.padEnd(45, ' ')}: host='${tc.host}' env='${tc.env}' -> slug='${actual}' (OK)`
     );
   }
-  process.env.NODE_ENV = 'test';
+  process.env.NODE_ENV = 'development';
 
   // 4b. Test admin/www context rejection for college routes
   console.log('\n  Testing admin/www context handling for college routes:');

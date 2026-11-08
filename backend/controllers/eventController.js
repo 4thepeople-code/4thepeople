@@ -84,6 +84,9 @@ const serializeEvent = (event, gallery = null) => {
     coverImage,
     gallery: formattedGallery,
     registrationUrl: event.registrationUrl || null,
+    registrationMode: event.registrationMode || 'INTERNAL',
+    customFormDefinition: event.customFormDefinition || null,
+    registrationDeadline: event.registrationDeadline || null,
     createdAt: event.createdAt,
     updatedAt: event.updatedAt,
     ...(event.club ? { club: { id: event.club.id, name: event.club.name, description: event.club.description } } : {}),
@@ -133,6 +136,11 @@ exports.createEvent = asyncHandler(async (req, res) => {
         endAt,
         capacity,
         registrationUrl: body.registrationUrl ? body.registrationUrl.trim() : null,
+        registrationMode: ['INTERNAL', 'EXTERNAL', 'NONE'].includes(body.registrationMode)
+          ? body.registrationMode
+          : (body.registrationUrl ? 'EXTERNAL' : 'INTERNAL'),
+        customFormDefinition: body.customFormDefinition || null,
+        registrationDeadline: body.registrationDeadline ? new Date(body.registrationDeadline) : null,
       },
     });
 
@@ -167,7 +175,10 @@ exports.updateEvent = asyncHandler(async (req, res) => {
     throw new AppError('Update data must be an object', 400);
   }
 
-  const allowedFields = ['title', 'description', 'location', 'startAt', 'endAt', 'status', 'registrationUrl', 'capacity'];
+  const allowedFields = [
+    'title', 'description', 'location', 'startAt', 'endAt', 'status',
+    'registrationUrl', 'capacity', 'registrationMode', 'customFormDefinition', 'registrationDeadline'
+  ];
   const fields = Object.keys(body);
   if (!fields.length) throw new AppError('At least one event field is required', 400);
   const unexpected = fields.find((field) => !allowedFields.includes(field));
@@ -179,6 +190,18 @@ exports.updateEvent = asyncHandler(async (req, res) => {
   });
   if (body.registrationUrl !== undefined) {
     data.registrationUrl = body.registrationUrl ? body.registrationUrl.trim() : null;
+  }
+  if (body.registrationMode !== undefined) {
+    if (!['INTERNAL', 'EXTERNAL', 'NONE'].includes(body.registrationMode)) {
+      throw new AppError('registrationMode must be INTERNAL, EXTERNAL, or NONE', 400);
+    }
+    data.registrationMode = body.registrationMode;
+  }
+  if (body.customFormDefinition !== undefined) {
+    data.customFormDefinition = body.customFormDefinition;
+  }
+  if (body.registrationDeadline !== undefined) {
+    data.registrationDeadline = body.registrationDeadline ? new Date(body.registrationDeadline) : null;
   }
 
   if (body.capacity !== undefined) {

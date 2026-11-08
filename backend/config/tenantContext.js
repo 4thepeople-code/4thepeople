@@ -3,13 +3,13 @@ const { prisma } = require('./internalClient');
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 // Explicit transaction timeout and pool acquisition wait settings (in milliseconds)
-const TX_MAX_WAIT_MS = 5000; // 5s max wait to acquire a connection from PgBouncer pool
-const TX_TIMEOUT_MS = 10000; // 10s max execution time for tenant transaction
+const TX_MAX_WAIT_MS = 10000; // 10s max wait to acquire a connection from pool
+const TX_TIMEOUT_MS = 15000; // 15s max execution time for tenant transaction
 
 let failTransactionConfig = null;
 function __setFailTransaction(config) {
-  if (process.env.NODE_ENV !== 'test') {
-    throw new Error('Test hooks are only accessible when NODE_ENV === "test"');
+  if (process.env.NODE_ENV !== 'development') {
+    throw new Error('Test hooks are only accessible when NODE_ENV === "development"');
   }
   if (!config) {
     failTransactionConfig = null;
@@ -77,30 +77,43 @@ async function withTenant(collegeId, callback, options = {}) {
   const maxWait = options.maxWait !== undefined ? options.maxWait : TX_MAX_WAIT_MS;
   const timeout = options.timeout !== undefined ? options.timeout : TX_TIMEOUT_MS;
 
-  return await prisma.$transaction(
-    async (tx) => {
-      // 1. Establish tenant context inside the transaction using parameterized SQL
-      await tx.$executeRaw`SELECT set_config('app.college_id', ${collegeId}, true)`;
+  const executeTransaction = async () => {
+    return await prisma.$transaction(
+      async (tx) => {
+        // 1. Establish tenant context inside the transaction using parameterized SQL
+        await tx.$executeRaw`SELECT set_config('app.college_id', ${collegeId}, true)`;
 
-      if (process.env.NODE_ENV === 'test' && failTransactionConfig) {
-        if (failTransactionConfig.skip > 0) {
-          failTransactionConfig.skip -= 1;
-        } else {
-          const err = failTransactionConfig.error;
-          failTransactionConfig = null;
-          throw err;
+        if (process.env.NODE_ENV === 'development' && failTransactionConfig) {
+          if (failTransactionConfig.skip > 0) {
+            failTransactionConfig.skip -= 1;
+          } else {
+            const err = failTransactionConfig.error;
+            failTransactionConfig = null;
+            throw err;
+          }
         }
-      }
 
-      // 2. Execute tenant-scoped database operations through tx
-      return await callback(tx);
-    },
-    {
-      maxWait,
-      timeout,
-      isolationLevel: 'ReadCommitted',
+        // 2. Execute tenant-scoped database operations through tx
+        return await callback(tx);
+      },
+      {
+        maxWait,
+        timeout,
+        isolationLevel: 'ReadCommitted',
+      }
+    );
+  };
+
+  try {
+    return await executeTransaction();
+  } catch (err) {
+    // Retry once for transient serverless disconnects / cold starts (P2028 or P1001)
+    if (err.code === 'P2028' || err.code === 'P1001' || (err.message && err.message.includes('Transaction not found'))) {
+      await new Promise((r) => setTimeout(r, 600));
+      return await executeTransaction();
     }
-  );
+    throw err;
+  }
 }
 
 const exportsObj = {
@@ -109,7 +122,7 @@ const exportsObj = {
   TX_TIMEOUT_MS,
 };
 
-if (process.env.NODE_ENV === 'test') {
+if (process.env.NODE_ENV === 'development') {
   exportsObj.__setFailTransaction = __setFailTransaction;
 }
 

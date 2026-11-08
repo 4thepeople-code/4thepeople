@@ -1,7 +1,7 @@
 const dotenv = require('dotenv');
 const { BrevoClient } = require('@getbrevo/brevo');
 
-if (process.env.NODE_ENV !== 'test') {
+if (process.env.NODE_ENV !== 'development') {
   dotenv.config();
 }
 
@@ -44,7 +44,7 @@ const verifyTestDatabaseHost = () => {
 };
 
 const getBrevoClient = () => {
-  if (process.env.NODE_ENV === 'test') {
+  if (process.env.NODE_ENV === 'development') {
     verifyTestDatabaseHost();
     return null;
   }
@@ -68,7 +68,7 @@ const getBrevoClient = () => {
  * Generic Brevo email sender
  */
 const sendEmail = async ({ toEmail, toName, subject, html }) => {
-  if (process.env.NODE_ENV === 'test') {
+  if (process.env.NODE_ENV === 'development') {
     verifyTestDatabaseHost();
     return { messageId: 'test-stub-message-id', success: true };
   }

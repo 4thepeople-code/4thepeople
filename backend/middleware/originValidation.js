@@ -79,7 +79,7 @@ function validateOriginOrReferer(req, res, next) {
   // If no Origin or Referer header was supplied on non-cookie requests:
   // In test environment, permit server-to-server tests (unless explicit Origin testing)
   if (!requestOrigin) {
-    if (process.env.NODE_ENV === 'test') {
+    if (process.env.NODE_ENV === 'development') {
       return next();
     }
     // In production, require an Origin or Referer for state-changing browser requests

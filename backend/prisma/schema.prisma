@@ -14,6 +14,8 @@ model College {
   slug                   String                 @unique(map: "uq_colleges_slug")
   createdAt              DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt              DateTime               @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  studentEmailDomain     String?                @map("student_email_domain")
+  studentEmailPattern    String?                @map("student_email_pattern")
   club_departments       ClubDepartment[]
   clubs                  Club[]
   deletion_verifications DeletionVerification[]
@@ -23,6 +25,8 @@ model College {
   events                 Event[]
   memberships            Membership[]
   users                  User[]
+  studentActivations     StudentActivation[]
+  emailOutbox            EmailOutbox[]
 
   @@map("colleges")
 }
@@ -56,16 +60,23 @@ model User {
   avatarUrl                 String?                @map("avatar_url")
   avatarPublicId            String?                @map("avatar_public_id")
   legacyMongoId             String?                @unique @map("legacy_mongo_id")
+  rollNumber                String?                @map("roll_number") @db.Citext
+  departmentId              String?                @map("department_id") @db.Uuid
+  admissionYear             Int?                   @map("admission_year")
+  claimedAt                 DateTime?              @map("claimed_at") @db.Timestamptz(6)
   createdAt                 DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt                 DateTime               @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
   createdClubs              Club[]                 @relation("ClubCreator")
   deletionVerifications     DeletionVerification[] @relation("DeletionVerificationAdmin")
   eventRegistrations        EventRegistration[]
   memberships               Membership[]
+  studentActivations        StudentActivation[]
   college                   College                @relation(fields: [collegeId], references: [id], onUpdate: NoAction, map: "users_college_id_fkey")
+  department                Department?            @relation(fields: [collegeId, departmentId], references: [collegeId, id], onDelete: SetNull, onUpdate: NoAction, map: "fk_users_department")
 
   @@unique([collegeId, email], map: "uq_users_college_email")
   @@unique([collegeId, id], map: "uq_users_college_id")
+  @@unique([collegeId, rollNumber], map: "uq_users_college_roll_number")
   @@index([collegeId, isActive], map: "idx_users_college_active")
   @@map("users")
 }
@@ -80,6 +91,7 @@ model Department {
   createdAt     DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt     DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
   clubs         ClubDepartment[]
+  users         User[]
   college       College          @relation(fields: [collegeId], references: [id], onUpdate: NoAction, map: "departments_college_id_fkey")
 
   @@unique([collegeId, name], map: "uq_departments_college_name")
@@ -152,27 +164,30 @@ model Membership {
 }
 
 model Event {
-  id                 String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  collegeId          String              @map("college_id") @db.Uuid
-  clubId             String              @map("club_id") @db.Uuid
-  title              String
-  description        String
-  location           String
-  startAt            DateTime            @map("start_at") @db.Timestamptz(6)
-  endAt              DateTime?           @map("end_at") @db.Timestamptz(6)
-  cancelledAt        DateTime?           @map("cancelled_at") @db.Timestamptz(6)
-  capacity           Int?
-  registeredCount    Int                 @default(0) @map("registered_count")
-  coverImageUrl      String?             @map("cover_image_url")
-  coverImagePublicId String?             @map("cover_image_public_id")
-  registrationUrl    String?             @map("registration_url")
-  legacyMongoId      String?             @unique @map("legacy_mongo_id")
-  createdAt          DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt          DateTime            @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
-  gallery            EventGalleryImage[]
-  registrations      EventRegistration[]
-  colleges           College             @relation(fields: [collegeId], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  club               Club                @relation(fields: [collegeId, clubId], references: [collegeId, id], onDelete: Cascade, onUpdate: NoAction, map: "fk_events_club")
+  id                   String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  collegeId            String                 @map("college_id") @db.Uuid
+  clubId               String                 @map("club_id") @db.Uuid
+  title                String
+  description          String
+  location             String
+  startAt              DateTime               @map("start_at") @db.Timestamptz(6)
+  endAt                DateTime?              @map("end_at") @db.Timestamptz(6)
+  cancelledAt          DateTime?              @map("cancelled_at") @db.Timestamptz(6)
+  capacity             Int?
+  registeredCount      Int                    @default(0) @map("registered_count")
+  coverImageUrl        String?                @map("cover_image_url")
+  coverImagePublicId   String?                @map("cover_image_public_id")
+  registrationUrl      String?                @map("registration_url")
+  registrationMode     EventRegistrationMode  @default(INTERNAL) @map("registration_mode")
+  customFormDefinition Json?                  @map("custom_form_definition")
+  registrationDeadline DateTime?              @map("registration_deadline") @db.Timestamptz(6)
+  legacyMongoId        String?                @unique @map("legacy_mongo_id")
+  createdAt            DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime               @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  gallery              EventGalleryImage[]
+  registrations        EventRegistration[]
+  colleges             College                @relation(fields: [collegeId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  club                 Club                   @relation(fields: [collegeId, clubId], references: [collegeId, id], onDelete: Cascade, onUpdate: NoAction, map: "fk_events_club")
 
   @@unique([collegeId, id], map: "uq_events_college_id")
   @@index([collegeId, startAt], map: "idx_events_college_start_at")
@@ -201,6 +216,7 @@ model EventRegistration {
   collegeId    String   @map("college_id") @db.Uuid
   eventId      String   @map("event_id") @db.Uuid
   userId       String   @map("user_id") @db.Uuid
+  formAnswers  Json?    @map("form_answers")
   registeredAt DateTime @default(now()) @map("registered_at") @db.Timestamptz(6)
   colleges     College  @relation(fields: [collegeId], references: [id], onDelete: Cascade, onUpdate: NoAction)
   event        Event    @relation(fields: [collegeId, eventId], references: [collegeId, id], onDelete: Cascade, onUpdate: NoAction, map: "fk_registrations_event")
@@ -210,6 +226,48 @@ model EventRegistration {
   @@index([collegeId, eventId], map: "idx_event_registrations_college_event")
   @@index([collegeId, userId], map: "idx_event_registrations_college_user")
   @@map("event_registrations")
+}
+
+model StudentActivation {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  collegeId   String   @map("college_id") @db.Uuid
+  userId      String   @map("user_id") @db.Uuid
+  codeHash    String   @map("code_hash")
+  attempts    Int      @default(0)
+  maxAttempts Int      @default(5) @map("max_attempts")
+  consumed    Boolean  @default(false)
+  expiresAt   DateTime @map("expires_at") @db.Timestamptz(6)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  college College @relation(fields: [collegeId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "fk_student_activations_college")
+  user    User    @relation(fields: [collegeId, userId], references: [collegeId, id], onDelete: Cascade, onUpdate: NoAction, map: "fk_student_activations_user")
+
+  @@index([collegeId, userId, consumed, expiresAt], map: "idx_student_activations_candidate")
+  @@map("student_activations")
+}
+
+model EmailOutbox {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  collegeId     String    @map("college_id") @db.Uuid
+  recipientEmail String   @map("recipient_email")
+  recipientName String    @map("recipient_name")
+  templateType  String    @map("template_type")
+  payload       Json
+  status        String    @default("PENDING")
+  attempts      Int       @default(0)
+  maxAttempts   Int       @default(3) @map("max_attempts")
+  claimToken    String?   @map("claim_token") @db.Uuid
+  lockedUntil   DateTime? @map("locked_until") @db.Timestamptz(6)
+  lastAttemptAt DateTime? @map("last_attempt_at") @db.Timestamptz(6)
+  deliveredAt   DateTime? @map("delivered_at") @db.Timestamptz(6)
+  errorMessage  String?   @map("error_message")
+  expiresAt     DateTime  @map("expires_at") @db.Timestamptz(6)
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  college College @relation(fields: [collegeId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+
+  @@index([status, expiresAt, lockedUntil], map: "idx_email_outbox_queue")
+  @@map("email_outbox")
 }
 
 model DeletionVerification {
@@ -284,4 +342,10 @@ enum DeletionTarget {
   @@map("deletion_target_enum")
 }
 
+enum EventRegistrationMode {
+  INTERNAL
+  EXTERNAL
+  NONE
 
+  @@map("event_registration_mode_enum")
+}
