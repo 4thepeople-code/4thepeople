@@ -79,7 +79,17 @@ export function resolveHost(
   }
 
   const cleanHost = normalizeHost(hostToInspect);
+  // 1. Explicitly authorized Vercel deployment domains.
+  // These resolve ONLY to the public platform landing page.
+  const allowedVercelHosts = getAllowedVercelHosts();
 
+  if (allowedVercelHosts.has(cleanHost)) {
+    return {
+      type: 'PUBLIC',
+      cleanHost,
+      isTrusted: true,
+    };
+  }
   if (!cleanHost) {
     return {
       type: 'INVALID',
@@ -217,3 +227,19 @@ export function resolveHost(
   };
 }
 
+/**
+ * Returns explicitly assigned Vercel deployment hostnames.
+ * Never trust arbitrary *.vercel.app domains.
+ */
+function getAllowedVercelHosts(): Set<string> {
+  const hosts = [
+    process.env.VERCEL_URL,
+    process.env.VERCEL_PROJECT_PRODUCTION_URL,
+  ];
+
+  return new Set(
+    hosts
+      .map((host) => normalizeHost(host))
+      .filter(Boolean)
+  );
+}
