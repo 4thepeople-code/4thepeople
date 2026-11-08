@@ -30,7 +30,7 @@ export interface ManagerLoginClientProps {
 }
 
 export function ManagerLoginClient({ slug, initialReturnUrl }: ManagerLoginClientProps) {
-  const { login } = useAuth();
+  const { user, login } = useAuth();
   const { isDark } = useTheme();
 
   const [email, setEmail] = useState('');
@@ -52,6 +52,16 @@ export function ManagerLoginClient({ slug, initialReturnUrl }: ManagerLoginClien
     (typeof window !== 'undefined' && window.location.pathname.startsWith(`/college/${slug}`)
       ? `/college/${slug}/manager`
       : '/manager');
+
+  // If already authenticated as College Admin, redirect to College Admin portal
+  React.useEffect(() => {
+    if (user && user.role === 'COLLEGE_ADMIN') {
+      const adminUrl = typeof window !== 'undefined' && window.location.pathname.startsWith(`/college/${slug}`)
+        ? `/college/${slug}/admin`
+        : '/admin';
+      window.location.href = adminUrl;
+    }
+  }, [user, slug]);
 
   const managerLoginMutation = useManagerLoginMutation(slug);
   const forgotPasswordMutation = useManagerForgotPasswordMutation();
@@ -88,7 +98,15 @@ export function ManagerLoginClient({ slug, initialReturnUrl }: ManagerLoginClien
 
       if (user) {
         login(user, token);
-        window.location.href = returnUrl;
+        if (user.role === 'COLLEGE_ADMIN') {
+          const adminUrl =
+            typeof window !== 'undefined' && window.location.pathname.startsWith(`/college/${slug}`)
+              ? `/college/${slug}/admin`
+              : '/admin';
+          window.location.href = adminUrl;
+        } else {
+          window.location.href = returnUrl;
+        }
       } else {
         setErrorMsg('Login succeeded but user payload was missing.');
       }

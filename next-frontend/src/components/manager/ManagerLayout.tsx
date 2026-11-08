@@ -71,13 +71,41 @@ export function ManagerLayout({ slug, children }: ManagerLayoutProps) {
     }
   };
 
+  // If user is a College Administrator, redirect them to the College Admin Command Center
+  React.useEffect(() => {
+    if (user && user.role === 'COLLEGE_ADMIN') {
+      const adminHref =
+        typeof window !== 'undefined' && window.location.pathname.startsWith(`/college/${slug}`)
+          ? `/college/${slug}/admin`
+          : '/admin';
+      router.replace(adminHref);
+    }
+  }, [user, slug, router]);
+
   // Fetch user's managed clubs to authorize role 'USER' with manager memberships
-  const { data: myClubs = [], isLoading: clubsLoading } = useMyClubsQuery(slug, !!user);
+  const { data: myClubs = [], isLoading: clubsLoading } = useMyClubsQuery(slug, !!user && user.role !== 'COLLEGE_ADMIN');
 
   // Auth Guard: In PostgreSQL RLS, manager user.role is 'USER' with active manager memberships
   const isManager = myClubs.length > 0;
-  const isAuthorized = user && (user.role === 'MANAGER' || user.role === 'COLLEGE_ADMIN' || isManager);
-  const validating = authLoading || (user && !isAuthorized && clubsLoading);
+  const isAuthorized = Boolean(user && (user.role === 'MANAGER' || isManager));
+  const validating = authLoading || (user && user.role !== 'COLLEGE_ADMIN' && !isAuthorized && clubsLoading);
+
+  if (user && user.role === 'COLLEGE_ADMIN') {
+    return (
+      <div
+        className={`min-h-screen flex items-center justify-center ${
+          isDark ? 'bg-[#0B0C10] text-white' : 'bg-[#FAF9F5] text-[#0F172A]'
+        }`}
+      >
+        <div className="text-center space-y-3">
+          <div className="w-10 h-10 border-2 border-[#B08D57] border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="text-xs font-bold uppercase tracking-wider text-[#B08D57]">
+            College Administrator detected. Redirecting to Admin Command Center...
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   if (validating) {
     return (
@@ -97,6 +125,12 @@ export function ManagerLayout({ slug, children }: ManagerLayoutProps) {
   }
 
   if (!isAuthorized) {
+    const isStudentWithoutClubs = Boolean(user && user.role === 'USER' && !isManager);
+    const studentHref =
+      typeof window !== 'undefined' && window.location.pathname.startsWith(`/college/${slug}`)
+        ? `/college/${slug}/student`
+        : '/student';
+
     return (
       <div
         className={`min-h-screen flex items-center justify-center p-6 ${
@@ -108,40 +142,76 @@ export function ManagerLayout({ slug, children }: ManagerLayoutProps) {
             isDark ? 'bg-[#12141C] border-white/10' : 'bg-white border-slate-200'
           }`}
         >
-          <div className="w-14 h-14 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-rose-400 flex items-center justify-center mx-auto">
+          <div
+            className={`w-14 h-14 rounded-2xl border flex items-center justify-center mx-auto ${
+              isStudentWithoutClubs
+                ? 'bg-amber-500/15 border-amber-500/30 text-amber-400'
+                : 'bg-rose-500/15 border-rose-500/30 text-rose-400'
+            }`}
+          >
             <ShieldAlert className="w-7 h-7" />
           </div>
 
           <div className="space-y-2">
             <h2 className="font-['Syne',sans-serif] text-xl font-black uppercase">
-              Manager Access Required
+              {isStudentWithoutClubs ? 'No Managed Clubs Assigned' : 'Manager Access Required'}
             </h2>
             <p className="text-xs text-gray-400 leading-relaxed">
-              This workspace is restricted to authorized Club and Event Managers of{' '}
-              <strong className="text-[#00F0FF]">{slug ? slug.toUpperCase() : 'this campus'}</strong>.
-              {user?.role === 'USER' && ' You are currently signed in as a student.'}
+              {isStudentWithoutClubs ? (
+                <>
+                  Your account is active, but you have not been assigned as a manager to any student clubs in{' '}
+                  <strong className="text-[#00F0FF]">{slug ? slug.toUpperCase() : 'this campus'}</strong> yet.
+                  Please ask your College Administrator to link you to a club in the College Admin Portal.
+                </>
+              ) : (
+                <>
+                  This workspace is restricted to authorized Club and Event Managers of{' '}
+                  <strong className="text-[#00F0FF]">{slug ? slug.toUpperCase() : 'this campus'}</strong>.
+                </>
+              )}
             </p>
           </div>
 
           <div className="pt-2 flex flex-col gap-2.5">
-            <Link
-              href={`${loginHref}?returnUrl=${encodeURIComponent(pathname)}`}
-              className="w-full inline-flex items-center justify-center gap-2 py-3 rounded-full bg-[#00F0FF] text-black font-extrabold text-xs uppercase tracking-wider shadow-lg shadow-cyan-500/20 hover:bg-cyan-300 transition"
-            >
-              <LogIn className="w-4 h-4" />
-              <span>Manager Portal Login</span>
-            </Link>
+            {isStudentWithoutClubs ? (
+              <>
+                <Link
+                  href={studentHref}
+                  className="w-full inline-flex items-center justify-center gap-2 py-3 rounded-full bg-[#00F0FF] text-black font-extrabold text-xs uppercase tracking-wider shadow-lg shadow-cyan-500/20 hover:bg-cyan-300 transition"
+                >
+                  <span>Go to Student Portal</span>
+                </Link>
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="w-full inline-flex items-center justify-center gap-2 py-3 rounded-full border border-rose-500/30 hover:bg-rose-500/10 text-rose-400 text-xs font-bold uppercase tracking-wider transition"
+                >
+                  <LogOut className="w-4 h-4" />
+                  <span>Sign Out</span>
+                </button>
+              </>
+            ) : (
+              <>
+                <Link
+                  href={`${loginHref}?returnUrl=${encodeURIComponent(pathname)}`}
+                  className="w-full inline-flex items-center justify-center gap-2 py-3 rounded-full bg-[#00F0FF] text-black font-extrabold text-xs uppercase tracking-wider shadow-lg shadow-cyan-500/20 hover:bg-cyan-300 transition"
+                >
+                  <LogIn className="w-4 h-4" />
+                  <span>Manager Portal Login</span>
+                </Link>
 
-            <Link
-              href={publicHref}
-              className={`w-full inline-flex items-center justify-center gap-2 py-3 rounded-full border text-xs font-bold uppercase tracking-wider transition ${
-                isDark
-                  ? 'border-white/10 text-gray-300 hover:bg-white/5'
-                  : 'border-slate-200 text-slate-700 hover:bg-slate-100'
-              }`}
-            >
-              <span>Return to Public Directory</span>
-            </Link>
+                <Link
+                  href={publicHref}
+                  className={`w-full inline-flex items-center justify-center gap-2 py-3 rounded-full border text-xs font-bold uppercase tracking-wider transition ${
+                    isDark
+                      ? 'border-white/10 text-gray-300 hover:bg-white/5'
+                      : 'border-slate-200 text-slate-700 hover:bg-slate-100'
+                  }`}
+                >
+                  <span>Return to Public Directory</span>
+                </Link>
+              </>
+            )}
           </div>
         </div>
       </div>
