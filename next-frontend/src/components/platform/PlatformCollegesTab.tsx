@@ -1139,3 +1139,4 @@ export default function PlatformCollegesTab() {
     </div>
   );
 }
+

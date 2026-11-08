@@ -30,3 +30,4 @@ router.post('/college-admins/:id/resend-invitation', resendCollegeAdminInvitatio
 router.patch('/college-admins/:id/status', toggleCollegeAdminStatus);
 
 module.exports = router;
+
