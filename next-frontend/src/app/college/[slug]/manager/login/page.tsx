@@ -8,3 +8,4 @@ export default async function ManagerLoginRedirectPage({ params }: ManagerLoginR
   const { slug } = await params;
   redirect(`/college/${slug}/login/manager`);
 }
+
