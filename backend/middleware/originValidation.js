@@ -1,7 +1,7 @@
 const { AppError } = require('./errorHandler');
 
 const PROD_ORIGIN_REGEX = /^https:\/\/([a-z0-9-]+\.)?4thepeople\.in$/i;
-const DEV_ORIGIN_REGEX = /^https?:\/\/([a-z0-9-]+\.)?(localhost|127\.0\.0\.1)(:\d+)?$/i;
+const VERCEL_ORIGIN_REGEX = /^https:\/\/([a-z0-9-]+\.)?vercel\.app$/i;
 
 /**
  * Validates whether an incoming HTTP Origin is an authorized origin for the application.
@@ -15,7 +15,7 @@ function isAllowedOrigin(origin) {
   const isProduction = process.env.NODE_ENV === 'production';
 
   // In production, strictly match *.4thepeople.in or 4thepeople.in over HTTPS
-  if (PROD_ORIGIN_REGEX.test(origin)) {
+  if (PROD_ORIGIN_REGEX.test(origin) || VERCEL_ORIGIN_REGEX.test(origin)) {
     return true;
   }
 
@@ -94,19 +94,22 @@ function validateOriginOrReferer(req, res, next) {
   // 2. Next, tenant-specific origin isolation:
   // Requests targeting a specific college tenant must originate from that exact college's origin
   // Requests targeting the platform administration host must originate from the platform admin origin
-  try {
+    try {
     const originHost = new URL(requestOrigin).hostname.toLowerCase();
     const reqHost = (req.hostname || (req.headers['host'] || '').split(':')[0]).toLowerCase();
 
-    // Check platform origin isolation
+    // 1. Check if request is coming from your Vercel deployment
+    const isVercel = VERCEL_ORIGIN_REGEX.test(requestOrigin);
+
+    // 2. Check platform origin isolation (skip subdomain check for Vercel)
     if (req.isPlatform) {
-      if (originHost !== 'admin.4thepeople.in' && originHost !== 'admin.localhost') {
+      if (!isVercel && originHost !== 'admin.4thepeople.in' && originHost !== 'admin.localhost') {
         return next(new AppError('Cross-tenant request blocked: Platform administration requests must originate from admin domain', 403));
       }
     }
 
-    // Check college tenant origin isolation
-    if (req.college && req.college.slug) {
+    // 3. Check college tenant origin isolation (skip subdomain check for Vercel)
+    if (!isVercel && req.college && req.college.slug) {
       const expectedSlug = req.college.slug.toLowerCase();
       const originSlug = originHost.split('.')[0];
 
