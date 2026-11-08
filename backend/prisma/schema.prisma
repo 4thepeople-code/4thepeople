@@ -12,10 +12,17 @@ model College {
   id                     String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   name                   String
   slug                   String                 @unique(map: "uq_colleges_slug")
-  createdAt              DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt              DateTime               @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  code                   String?                @unique(map: "uq_colleges_code")
+  officialEmail          String?                @map("official_email")
+  address                String?
+  city                   String?
+  state                  String?
+  contactNumber          String?                @map("contact_number")
+  isActive               Boolean                @default(true) @map("is_active")
   studentEmailDomain     String?                @map("student_email_domain")
   studentEmailPattern    String?                @map("student_email_pattern")
+  createdAt              DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt              DateTime               @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
   club_departments       ClubDepartment[]
   clubs                  Club[]
   deletion_verifications DeletionVerification[]

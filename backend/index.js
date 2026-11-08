@@ -31,6 +31,7 @@ const registrationRouter = require('./routes/registrationRoutes');
 const publicRouter = require('./routes/publicRoutes');
 const platformAuthRouter = require('./platform/platformAuthRoutes');
 const platformAdminManagementRouter = require('./platform/platformAdminManagementRoutes');
+const platformCollegeManagementRouter = require('./platform/platformCollegeManagementRoutes');
 
 const trustProxySetting = process.env.TRUST_PROXY_HOPS !== undefined
   ? (/^\d+$/.test(process.env.TRUST_PROXY_HOPS)
@@ -96,9 +97,10 @@ app.get('/', (req, res) => {
   res.status(200).json({ success: true, message: 'Club Event Manager API is running...' });
 });
 
-// Platform Super-Administration Routes (/api/platform/auth/*, /api/platform/admins/*)
+// Platform Super-Administration Routes (/api/platform/auth/*, /api/platform/admins/*, /api/platform/colleges/*)
 app.use('/api/platform/auth', platformAuthRouter);
 app.use('/api/platform/admins', platformAdminManagementRouter);
+app.use('/api/platform', platformCollegeManagementRouter);
 
 // College Tenant API Routes
 app.use('/auth', authRouter);

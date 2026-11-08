@@ -7,6 +7,13 @@ import type {
   UpdatePlatformAdminPayload,
   EnrollTotpPayload,
   EnrollTotpResponse,
+  PlatformCollege,
+  CreateCollegePayload,
+  UpdateCollegePayload,
+  ToggleCollegeStatusPayload,
+  ProvisionCollegeAdminPayload,
+  ResendCollegeAdminInvitePayload,
+  ToggleCollegeAdminStatusPayload,
 } from '@/types/platform';
 import type { ApiResponse } from '@/types/api';
 
@@ -106,4 +113,163 @@ export function useEnrollOwnTotpMutation() {
     },
   });
 }
+
+/**
+ * Hook to fetch registered colleges with their assigned administrators.
+ * Calls GET /api/platform/colleges.
+ */
+export function usePlatformCollegesQuery(params?: { search?: string; status?: string; adminStatus?: string }) {
+  return useQuery({
+    queryKey: [...queryKeys.platform.colleges(), params || {}],
+    queryFn: async () => {
+      const searchParams = new URLSearchParams();
+      if (params?.search) searchParams.set('search', params.search);
+      if (params?.status && params.status !== 'all') searchParams.set('status', params.status);
+      if (params?.adminStatus && params.adminStatus !== 'all') searchParams.set('adminStatus', params.adminStatus);
+
+      const qs = searchParams.toString();
+      const url = qs ? `/platform/colleges?${qs}` : '/platform/colleges';
+
+      const response = await apiClient.get<ApiResponse<PlatformCollege[]>>(url);
+      return response.data.data || [];
+    },
+    staleTime: 30 * 1000,
+  });
+}
+
+/**
+ * Hook to fetch single college details with assigned admins.
+ * Calls GET /api/platform/colleges/:id.
+ */
+export function usePlatformCollegeDetailQuery(id: string) {
+  return useQuery({
+    queryKey: queryKeys.platform.collegeDetail(id),
+    queryFn: async () => {
+      const response = await apiClient.get<ApiResponse<PlatformCollege>>(`/platform/colleges/${id}`);
+      return response.data.data;
+    },
+    enabled: Boolean(id),
+  });
+}
+
+/**
+ * Mutation hook to create a new college (optionally with an administrator).
+ * Calls POST /api/platform/colleges.
+ */
+export function useCreateCollegeMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: CreateCollegePayload) => {
+      const response = await apiClient.post<ApiResponse<{ college: PlatformCollege }>>(
+        '/platform/colleges',
+        payload
+      );
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.platform.colleges() });
+    },
+  });
+}
+
+/**
+ * Mutation hook to update college details.
+ * Calls PUT /api/platform/colleges/:id.
+ */
+export function useUpdateCollegeMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, ...payload }: UpdateCollegePayload) => {
+      const response = await apiClient.put<ApiResponse<PlatformCollege>>(
+        `/platform/colleges/${id}`,
+        payload
+      );
+      return response.data;
+    },
+    onSuccess: (_, vars) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.platform.colleges() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.platform.collegeDetail(vars.id) });
+    },
+  });
+}
+
+/**
+ * Mutation hook to toggle college active status.
+ * Calls PATCH /api/platform/colleges/:id/status.
+ */
+export function useToggleCollegeStatusMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, isActive }: ToggleCollegeStatusPayload) => {
+      const response = await apiClient.patch<ApiResponse<{ id: string; isActive: boolean }>>(
+        `/platform/colleges/${id}/status`,
+        { isActive }
+      );
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.platform.colleges() });
+    },
+  });
+}
+
+/**
+ * Mutation hook to provision an administrator for an existing unassigned college.
+ * Calls POST /api/platform/colleges/:id/admins.
+ */
+export function useProvisionCollegeAdminMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ collegeId, name, email }: ProvisionCollegeAdminPayload) => {
+      const response = await apiClient.post<ApiResponse<{ admin: unknown }>>(
+        `/platform/colleges/${collegeId}/admins`,
+        { name, email }
+      );
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.platform.colleges() });
+    },
+  });
+}
+
+/**
+ * Mutation hook to resend invitation email to an administrator.
+ * Calls POST /api/platform/college-admins/:id/resend-invitation.
+ */
+export function useResendCollegeAdminInviteMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ adminId }: ResendCollegeAdminInvitePayload) => {
+      const response = await apiClient.post<ApiResponse<{ admin: unknown }>>(
+        `/platform/college-admins/${adminId}/resend-invitation`
+      );
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.platform.colleges() });
+    },
+  });
+}
+
+/**
+ * Mutation hook to suspend or reactivate a College Administrator account.
+ * Calls PATCH /api/platform/college-admins/:id/status.
+ */
+export function useToggleCollegeAdminStatusMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ adminId, isActive }: ToggleCollegeAdminStatusPayload) => {
+      const response = await apiClient.patch<ApiResponse<{ id: string; isActive: boolean; status: string }>>(
+        `/platform/college-admins/${adminId}/status`,
+        { isActive }
+      );
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.platform.colleges() });
+    },
+  });
+}
+
 

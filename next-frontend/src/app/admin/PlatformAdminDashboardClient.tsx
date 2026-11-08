@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import PlatformAdminLayout from '@/components/platform/PlatformAdminLayout';
 import PlatformAdminsTab from '@/components/platform/PlatformAdminsTab';
+import PlatformCollegesTab from '@/components/platform/PlatformCollegesTab';
 import {
   Shield,
   ShieldCheck,
@@ -305,80 +306,8 @@ export function PlatformAdminDashboardClient() {
       {/* Tab: Super-Administrators Management */}
       {activeTab === 'admins' && <PlatformAdminsTab />}
 
-      {/* Tab 2: Institutions & Tenancy */}
-      {activeTab === 'colleges' && (
-        <div className="space-y-6">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-              <div>
-                <h2 className="text-lg font-bold text-slate-900 dark:text-white">
-                  Multi-Tenant Institution Directory
-                </h2>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                  Global college records partitioned by PostgreSQL Row-Level Security.
-                </p>
-              </div>
-            </div>
-
-            {/* Institutions Table */}
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-semibold uppercase tracking-wider text-[10px]">
-                  <tr>
-                    <th className="px-4 py-3 rounded-l-lg">Institution Name</th>
-                    <th className="px-4 py-3">Tenant Slug</th>
-                    <th className="px-4 py-3">Production Domain</th>
-                    <th className="px-4 py-3">Email Domain</th>
-                    <th className="px-4 py-3">RLS Isolation</th>
-                    <th className="px-4 py-3 rounded-r-lg">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {knownColleges.map((col) => (
-                    <tr key={col.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-colors">
-                      <td className="px-4 py-4 font-semibold text-slate-900 dark:text-white">
-                        {col.name}
-                      </td>
-                      <td className="px-4 py-4 font-mono text-purple-600 dark:text-purple-400">
-                        {col.slug}
-                      </td>
-                      <td className="px-4 py-4 font-mono text-slate-600 dark:text-slate-300">
-                        {col.subdomain}
-                      </td>
-                      <td className="px-4 py-4 font-mono text-slate-600 dark:text-slate-300">
-                        @{col.studentEmailDomain}
-                      </td>
-                      <td className="px-4 py-4">
-                        <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-medium">
-                          <CheckCircle2 className="w-3.5 h-3.5" />
-                          <span>Tenant Keyed</span>
-                        </span>
-                      </td>
-                      <td className="px-4 py-4">
-                        <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 rounded border border-emerald-200 dark:border-emerald-800">
-                          {col.status}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Architectural Note regarding Platform Provisioning APIs */}
-            <div className="mt-8 p-4 rounded-xl bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-900/60 text-xs text-purple-800 dark:text-purple-200 space-y-2">
-              <div className="flex items-center gap-2 font-semibold">
-                <Layers className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-                <span>Backend Platform Endpoints Architecture Notice</span>
-              </div>
-              <p className="leading-relaxed">
-                The Express backend exposes privileged platform authentication at <code className="font-mono bg-purple-100 dark:bg-purple-900 px-1 py-0.5 rounded">/api/platform/auth/*</code> (login, logout, me). 
-                Dynamic college registration endpoints (e.g. <code className="font-mono bg-purple-100 dark:bg-purple-900 px-1 py-0.5 rounded">POST /api/platform/colleges</code>) are not mounted in the current backend release; college provisioning is managed via verified migration scripts and platform seed scripts.
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Tab 2: Institutions & College Management */}
+      {activeTab === 'colleges' && <PlatformCollegesTab />}
 
       {/* Tab 3: Security & Access Control */}
       {activeTab === 'security' && (

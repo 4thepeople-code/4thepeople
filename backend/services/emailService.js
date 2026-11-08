@@ -308,9 +308,86 @@ const sendDeletionVerificationCode = async (
   });
 };
 
+/**
+ * Sends a College Administrator Invitation Email
+ *
+ * @param {Object} options
+ * @param {string} options.toEmail
+ * @param {string} options.name
+ * @param {string} options.collegeName
+ * @param {string} options.collegeSlug
+ * @param {string} options.inviteToken
+ */
+const sendCollegeAdminInviteEmail = async ({ toEmail, name, collegeName, collegeSlug, inviteToken }) => {
+  const isProduction = process.env.NODE_ENV === 'production';
+  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+
+  const inviteLink = isProduction
+    ? `https://${collegeSlug}.4thepeople.in/accept-invite/${inviteToken}`
+    : `${frontendUrl}/college/${collegeSlug}/accept-invite/${inviteToken}`;
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 32px; background-color: #0B0F17; color: #F8FAFC; border: 1px solid #1E293B; border-radius: 20px;">
+      <div style="text-align: center; margin-bottom: 24px;">
+        <h1 style="font-size: 34px; font-weight: 900; color: #FFFFFF; letter-spacing: 2px; margin: 0; font-family: 'Syne', Arial, sans-serif;">
+          <span style="color: #FF5733;">4</span> THE PEOPLE<span style="color: #FF5733;">.</span>
+        </h1>
+        <p style="color: #FF5733; font-size: 11px; font-weight: 800; letter-spacing: 3px; text-transform: uppercase; margin-top: 4px;">
+          College Administrator Access
+        </p>
+      </div>
+
+      <h2 style="color: #FFFFFF; font-size: 20px; font-weight: 800; margin-top: 0;">
+        Welcome to 4 THE PEOPLE
+      </h2>
+
+      <p style="color: #94A3B8; font-size: 14px; line-height: 1.6;">
+        Hello <strong style="color: #F8FAFC;">${name}</strong>,
+      </p>
+
+      <p style="color: #94A3B8; font-size: 14px; line-height: 1.6;">
+        You have been provisioned as the <strong>College Administrator</strong> for
+        <strong style="color: #F8FAFC;">${collegeName}</strong>.
+        Please click the button below to complete your registration, activate your account, and set your administrative password:
+      </p>
+
+      <div style="text-align: center; margin: 32px 0;">
+        <a
+          href="${inviteLink}"
+          style="background-color: #7C3AED; color: #ffffff; padding: 14px 28px; text-decoration: none; border-radius: 50px; font-weight: 800; font-size: 13px; text-transform: uppercase; letter-spacing: 1.5px; display: inline-block;"
+        >
+          Activate Administrator Account
+        </a>
+      </div>
+
+      <p style="color: #94A3B8; font-size: 13px;">
+        Or copy and paste this link into your browser:
+      </p>
+
+      <p style="word-break: break-all;">
+        <a href="${inviteLink}" style="color: #8B5CF6; text-decoration: underline;">
+          ${inviteLink}
+        </a>
+      </p>
+
+      <p style="color: #64748B; font-size: 12px; margin-top: 24px; border-top: 1px solid #1E293B; padding-top: 16px;">
+        Note: This invitation link is single-use and will expire in 48 hours.
+      </p>
+    </div>
+  `;
+
+  return sendEmail({
+    toEmail,
+    toName: name,
+    subject: `Welcome to 4 THE PEOPLE - Invitation to Administer ${collegeName}`,
+    html,
+  });
+};
+
 module.exports = {
   sendEmail,
   sendInviteEmail,
+  sendCollegeAdminInviteEmail,
   sendManagerPasswordResetOtp,
   sendDeletionVerificationCode,
   verifyTestDatabaseHost,

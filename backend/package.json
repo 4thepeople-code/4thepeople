@@ -14,6 +14,7 @@
     "test:phase3c": "node tests/phase3c.test.js",
     "test:phase_s1": "node tests/phase_s1_full_verification.test.js",
     "test:phase_s1_closure": "node tests/phase_s1_closure_targeted.test.js",
+    "test:platform_colleges": "node tests/platform_college_management.test.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

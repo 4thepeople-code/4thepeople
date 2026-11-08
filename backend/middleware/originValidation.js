@@ -2,7 +2,7 @@ const { AppError } = require('./errorHandler');
 
 const PROD_ORIGIN_REGEX = /^https:\/\/([a-z0-9-]+\.)?4thepeople\.in$/i;
 const VERCEL_ORIGIN_REGEX = /^https:\/\/([a-z0-9-]+\.)?vercel\.app$/i;
-const DEV_ORIGIN_REGEX = /^https?:\/\/localhost(:[0-9]+)?$/;
+const DEV_ORIGIN_REGEX = /^https?:\/\/([a-z0-9-]+\.)?localhost(:[0-9]+)?$/;
 
 /**
  * Validates whether an incoming HTTP Origin is an authorized origin for the application.
