@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import type { College } from "@/lib/landing/data";
+import BrandLogo from "@/components/BrandLogo";
 
 const links = [
   { href: "#lineup", label: "Lineup" },
@@ -17,15 +18,11 @@ export default function CampusNav({ college }: { college: College }) {
     <header className="sticky top-0 z-50 w-full border-b border-warm-ink/10 bg-cream/90 backdrop-blur-md">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6 lg:px-8">
         <Link href="/" className="flex items-center gap-2.5">
-          <span
-            className="grid h-9 w-9 place-items-center rounded-xl text-white"
-            style={{ backgroundColor: college.accent }}
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-              <path d="M5 19V5l14 14V5" stroke="#fff" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
+          <BrandLogo size="md" />
+          <span className="hidden h-4 w-px bg-warm-ink/20 sm:inline-block" aria-hidden="true" />
+          <span className="hidden font-display text-xs font-bold uppercase tracking-wide text-warm-ink/60 sm:inline">
+            {college.shortName}
           </span>
-          <span className="font-display text-lg font-bold uppercase tracking-wide text-warm-ink">{college.shortName}</span>
         </Link>
 
         <nav className="hidden items-center gap-8 md:flex">
