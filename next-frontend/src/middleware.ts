@@ -5,6 +5,7 @@ import { resolveHost } from './lib/routing/hostResolver';
 const RESERVED_SLUGS = new Set([
   'www', 'admin', 'api', 'mail', 'app',
   'static', 'assets', 'public', 'auth',
+  'demo', 'directory',
 ]);
 
 export function middleware(request: NextRequest) {

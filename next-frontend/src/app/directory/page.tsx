@@ -15,14 +15,14 @@ export const metadata: Metadata = {
   description:
     'Discover collegiate student clubs, technical hackathons, cultural festivals, and community initiatives across partner institutions.',
   alternates: {
-    canonical: 'https://4thepeople.in',
+    canonical: 'https://4thepeople.in/directory',
   },
   openGraph: {
     title: '4 THE PEOPLE | Student Campus Events & Clubs',
     description:
       'Collegiate student activity portal connecting verified institutions, student leadership, and campus event schedules.',
     type: 'website',
-    url: 'https://4thepeople.in',
+    url: 'https://4thepeople.in/directory',
   },
 };
 
