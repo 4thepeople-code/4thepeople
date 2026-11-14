@@ -401,6 +401,7 @@ export const collegeAdmin = {
     deleteWarning:
       "This permanently removes their account, club memberships and activation data. It can't be undone.",
     confirmDelete: 'Delete account',
+    toastDeleted: 'Account deleted.',
   },
 
   clubs: {
