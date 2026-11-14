@@ -39,14 +39,14 @@ export function CollegeAdminUsersClient({ slug }: CollegeAdminUsersClientProps) 
   const handleRequestDeletionCode = useCallback(async () => {
     if (!userToDelete?.id) return;
     return await requestCodeMutation.mutateAsync(userToDelete.id);
-  }, [userToDelete?.id, requestCodeMutation]);
+  }, [userToDelete, requestCodeMutation]);
 
   const handleConfirmUserDelete = useCallback(
     async (code: string) => {
       if (!userToDelete?.id) return;
       return await deleteUserMutation.mutateAsync({ userId: userToDelete.id, code });
     },
-    [userToDelete?.id, deleteUserMutation]
+    [userToDelete, deleteUserMutation]
   );
 
   const filteredUsers = users.filter((u) => {

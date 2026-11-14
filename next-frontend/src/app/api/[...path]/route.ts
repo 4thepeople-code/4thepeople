@@ -33,18 +33,24 @@ async function proxyRequest(request: NextRequest, { params }: { params: Promise<
 
     // Fallback: If not set by subdomain (e.g. path-based routing on Vercel preview https://.../college/lbrce):
     if (!tenantSlug) {
-      const referer = request.headers.get('referer');
-      if (referer) {
-        try {
-          const refererUrl = new URL(referer);
-          const match = refererUrl.pathname.match(/^\/college\/([a-z0-9-]+)/i);
-          if (match) {
-            tenantSlug = match[1].toLowerCase();
-            hostType = 'COLLEGE';
-          } else if (refererUrl.pathname.startsWith('/admin')) {
-            hostType = 'PLATFORM_ADMIN';
-          }
-        } catch {}
+      const queryCollege = request.nextUrl.searchParams.get('college');
+      if (queryCollege) {
+        tenantSlug = queryCollege.toLowerCase();
+        hostType = 'COLLEGE';
+      } else {
+        const referer = request.headers.get('referer');
+        if (referer) {
+          try {
+            const refererUrl = new URL(referer);
+            const match = refererUrl.pathname.match(/^\/college\/([a-z0-9-]+)/i);
+            if (match) {
+              tenantSlug = match[1].toLowerCase();
+              hostType = 'COLLEGE';
+            } else if (refererUrl.pathname.startsWith('/admin')) {
+              hostType = 'PLATFORM_ADMIN';
+            }
+          } catch {}
+        }
       }
     }
 

@@ -1,7 +1,17 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from './axios';
 import { queryKeys } from './queryKeys';
-import type { Club, Event, User } from '@/types/models';
+import type {
+  Club,
+  Event,
+  User,
+  EventCertificate,
+  CertificateBatch,
+  EventCertificateTemplate,
+  EligibleStudentItem,
+  PlaceholderConfigItem,
+  PredefinedTemplate,
+} from '@/types/models';
 
 // ============================================================================
 // Types
@@ -428,3 +438,292 @@ export async function deleteManagerAvatar() {
   const response = await apiClient.delete('/manager/profile/avatar');
   return response.data;
 }
+
+// ============================================================================
+// Event Certificates API & Hooks
+// ============================================================================
+
+export interface EventCertificatesResponse {
+  certificates: EventCertificate[];
+  pagination: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
+}
+
+export async function fetchEventCertificates(
+  slug: string,
+  eventId: string,
+  page = 1,
+  status = 'ALL',
+  search = ''
+): Promise<EventCertificatesResponse> {
+  const params = new URLSearchParams();
+  params.set('page', String(page));
+  if (status && status !== 'ALL') params.set('status', status);
+  if (search) params.set('search', search);
+
+  const response = await apiClient.get(`/manager/events/${eventId}/certificates?${params.toString()}`);
+  const data = response.data?.data || response.data;
+  return {
+    certificates: data.certificates || [],
+    pagination: data.pagination || { total: 0, page: 1, limit: 20, totalPages: 1 },
+  };
+}
+
+export function useEventCertificatesQuery(
+  slug: string,
+  eventId: string,
+  page = 1,
+  status = 'ALL',
+  search = '',
+  enabled = true
+) {
+  return useQuery({
+    queryKey: queryKeys.tenant(slug).certificates.eventCertificates(eventId, page, status, search),
+    queryFn: () => fetchEventCertificates(slug, eventId, page, status, search),
+    enabled: !!slug && !!eventId && enabled,
+  });
+}
+
+export async function fetchEligibleStudents(slug: string, eventId: string): Promise<EligibleStudentItem[]> {
+  const response = await apiClient.get(`/manager/events/${eventId}/certificates/eligible-students`);
+  const data = response.data?.data || response.data;
+  return Array.isArray(data) ? data : [];
+}
+
+export function useEligibleStudentsQuery(slug: string, eventId: string, enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.tenant(slug).certificates.eligibleStudents(eventId),
+    queryFn: () => fetchEligibleStudents(slug, eventId),
+    enabled: !!slug && !!eventId && enabled,
+  });
+}
+
+/**
+ * Method A: Issue an individual certificate PDF for a registered student.
+ */
+export async function issueIndividualCertificateApi(
+  slug: string,
+  eventId: string,
+  userId: string,
+  file: File
+): Promise<EventCertificate> {
+  const formData = new FormData();
+  formData.append('userId', userId);
+  formData.append('file', file);
+
+  const response = await apiClient.post(`/manager/events/${eventId}/certificates/individual`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return response.data?.data || response.data;
+}
+
+export function useIssueIndividualCertificateMutation(slug: string, eventId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ userId, file }: { userId: string; file: File }) =>
+      issueIndividualCertificateApi(slug, eventId, userId, file),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.tenant(slug).certificates.all });
+    },
+  });
+}
+
+/**
+ * Method B: Upload bulk certificates ZIP archive with manifest.csv.
+ */
+export async function uploadBulkCertificatesApi(
+  slug: string,
+  eventId: string,
+  archiveFile: File
+): Promise<CertificateBatch> {
+  const formData = new FormData();
+  formData.append('archive', archiveFile);
+
+  const response = await apiClient.post(`/manager/events/${eventId}/certificates/bulk`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return response.data?.data || response.data;
+}
+
+export function useUploadBulkCertificatesMutation(slug: string, eventId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (archiveFile: File) => uploadBulkCertificatesApi(slug, eventId, archiveFile),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.tenant(slug).certificates.all });
+    },
+  });
+}
+
+/**
+ * Method C: Fetch predefined certificate templates.
+ */
+export async function getPredefinedTemplatesApi(slug: string, eventId: string): Promise<PredefinedTemplate[]> {
+  const response = await apiClient.get<{ success: boolean; data: PredefinedTemplate[] }>(
+    `/manager/events/${eventId}/certificates/templates/predefined`
+  );
+  return response.data?.data || [];
+}
+
+export function usePredefinedTemplatesQuery(slug: string, eventId: string, enabled = true) {
+  return useQuery({
+    queryKey: [...queryKeys.tenant(slug).certificates.all, 'predefined-templates', eventId],
+    queryFn: () => getPredefinedTemplatesApi(slug, eventId),
+    enabled: !!slug && !!eventId && enabled,
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+/**
+ * Method C: Save Certificate Template.
+ */
+export async function saveCertificateTemplateApi(
+  slug: string,
+  eventId: string,
+  templateName: string,
+  placeholderConfig: PlaceholderConfigItem[],
+  options?: {
+    templateFile?: File | null;
+    predefinedTemplateId?: string | null;
+  }
+): Promise<EventCertificateTemplate> {
+  const formData = new FormData();
+  if (options?.templateFile) {
+    formData.append('template', options.templateFile);
+  }
+  if (options?.predefinedTemplateId) {
+    formData.append('predefinedTemplateId', options.predefinedTemplateId);
+  }
+  formData.append('templateName', templateName);
+  formData.append('placeholderConfig', JSON.stringify(placeholderConfig));
+
+  const response = await apiClient.post(`/manager/events/${eventId}/certificates/template`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return response.data?.data || response.data;
+}
+
+/**
+ * Method C: Preview Certificate Template with text overlays.
+ */
+export async function previewCertificateTemplateApi(
+  slug: string,
+  eventId: string,
+  placeholderConfig: PlaceholderConfigItem[],
+  options?: {
+    sampleData?: Record<string, string>;
+    templateId?: string | null;
+    templateFile?: File | null;
+    predefinedTemplateId?: string | null;
+  }
+): Promise<Blob> {
+  const formData = new FormData();
+  if (options?.templateFile) {
+    formData.append('template', options.templateFile);
+  }
+  if (options?.predefinedTemplateId) {
+    formData.append('predefinedTemplateId', options.predefinedTemplateId);
+  }
+  if (options?.templateId) {
+    formData.append('templateId', options.templateId);
+  }
+  formData.append('placeholderConfig', JSON.stringify(placeholderConfig));
+  if (options?.sampleData) {
+    formData.append('sampleData', JSON.stringify(options.sampleData));
+  }
+
+  const response = await apiClient.post(`/manager/events/${eventId}/certificates/template/preview`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    responseType: 'blob',
+  });
+  return response.data;
+}
+
+/**
+ * Method C: Batch Generate Certificates from template.
+ */
+export async function generateCertificatesFromTemplateApi(
+  slug: string,
+  eventId: string,
+  templateId: string,
+  studentUserIds?: string[] | null
+): Promise<CertificateBatch> {
+  const response = await apiClient.post(`/manager/events/${eventId}/certificates/generate`, {
+    templateId,
+    studentUserIds,
+  });
+  return response.data?.data || response.data;
+}
+
+export function useGenerateCertificatesMutation(slug: string, eventId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ templateId, studentUserIds }: { templateId: string; studentUserIds?: string[] | null }) =>
+      generateCertificatesFromTemplateApi(slug, eventId, templateId, studentUserIds),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.tenant(slug).certificates.all });
+    },
+  });
+}
+
+/**
+ * Revoke an existing certificate with reason.
+ */
+export async function revokeCertificateApi(
+  slug: string,
+  eventId: string,
+  certificateId: string,
+  reason: string
+): Promise<EventCertificate> {
+  const response = await apiClient.post(`/manager/events/${eventId}/certificates/${certificateId}/revoke`, {
+    reason,
+  });
+  return response.data?.data || response.data;
+}
+
+export function useRevokeCertificateMutation(slug: string, eventId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ certificateId, reason }: { certificateId: string; reason: string }) =>
+      revokeCertificateApi(slug, eventId, certificateId, reason),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.tenant(slug).certificates.all });
+    },
+  });
+}
+
+/**
+ * Reissue a certificate with a replacement PDF file.
+ */
+export async function reissueCertificateApi(
+  slug: string,
+  eventId: string,
+  certificateId: string,
+  file: File
+): Promise<EventCertificate> {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const response = await apiClient.post(
+    `/manager/events/${eventId}/certificates/${certificateId}/reissue`,
+    formData,
+    { headers: { 'Content-Type': 'multipart/form-data' } }
+  );
+  return response.data?.data || response.data;
+}
+
+export function useReissueCertificateMutation(slug: string, eventId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ certificateId, file }: { certificateId: string; file: File }) =>
+      reissueCertificateApi(slug, eventId, certificateId, file),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.tenant(slug).certificates.all });
+    },
+  });
+}
+

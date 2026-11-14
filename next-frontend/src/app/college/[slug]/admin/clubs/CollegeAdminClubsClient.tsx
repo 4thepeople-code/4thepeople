@@ -51,14 +51,14 @@ export function CollegeAdminClubsClient({ slug }: CollegeAdminClubsClientProps) 
   const handleRequestDeletionCode = useCallback(async () => {
     if (!clubToDelete?.id) return;
     return await requestCodeMutation.mutateAsync(clubToDelete.id);
-  }, [clubToDelete?.id, requestCodeMutation]);
+  }, [clubToDelete, requestCodeMutation]);
 
   const handleConfirmClubDelete = useCallback(
     async (code: string) => {
       if (!clubToDelete?.id) return;
       return await deleteClubMutation.mutateAsync({ clubId: clubToDelete.id, code });
     },
-    [clubToDelete?.id, deleteClubMutation]
+    [clubToDelete, deleteClubMutation]
   );
 
   const filteredClubs = clubs.filter((c) => {

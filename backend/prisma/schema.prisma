@@ -34,6 +34,9 @@ model College {
   users                  User[]
   studentActivations     StudentActivation[]
   emailOutbox            EmailOutbox[]
+  certificates           EventCertificate[]
+  certificateTemplates   EventCertificateTemplate[]
+  certificateBatches     CertificateBatch[]
 
   @@map("colleges")
 }
@@ -78,6 +81,11 @@ model User {
   eventRegistrations        EventRegistration[]
   memberships               Membership[]
   studentActivations        StudentActivation[]
+  certificates              EventCertificate[]     @relation("UserCertificates")
+  issuedCertificates        EventCertificate[]     @relation("IssuedCertificates")
+  revokedCertificates       EventCertificate[]     @relation("RevokedCertificates")
+  createdCertificateTemplates EventCertificateTemplate[]
+  createdCertificateBatches CertificateBatch[]
   college                   College                @relation(fields: [collegeId], references: [id], onUpdate: NoAction, map: "users_college_id_fkey")
   department                Department?            @relation(fields: [collegeId, departmentId], references: [collegeId, id], onDelete: SetNull, onUpdate: NoAction, map: "fk_users_department")
 
@@ -193,6 +201,9 @@ model Event {
   updatedAt            DateTime               @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
   gallery              EventGalleryImage[]
   registrations        EventRegistration[]
+  certificates         EventCertificate[]
+  certificateTemplates EventCertificateTemplate[]
+  certificateBatches   CertificateBatch[]
   colleges             College                @relation(fields: [collegeId], references: [id], onDelete: Cascade, onUpdate: NoAction)
   club                 Club                   @relation(fields: [collegeId, clubId], references: [collegeId, id], onDelete: Cascade, onUpdate: NoAction, map: "fk_events_club")
 
@@ -359,3 +370,115 @@ enum EventRegistrationMode {
 
   @@map("event_registration_mode_enum")
 }
+
+model CertificateBatch {
+  id           String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  collegeId    String                 @map("college_id") @db.Uuid
+  eventId      String                 @map("event_id") @db.Uuid
+  method       CertificateBatchMethod
+  status       CertificateBatchStatus @default(PENDING)
+  totalCount   Int                    @default(0) @map("total_count")
+  successCount Int                    @default(0) @map("success_count")
+  failedCount  Int                    @default(0) @map("failed_count")
+  skippedCount Int                    @default(0) @map("skipped_count")
+  errorDetails Json                   @default("[]") @map("error_details")
+  createdById  String                 @map("created_by_id") @db.Uuid
+  createdAt    DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime               @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  college      College                @relation(fields: [collegeId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  event        Event                  @relation(fields: [collegeId, eventId], references: [collegeId, id], onDelete: Cascade, onUpdate: NoAction, map: "fk_batches_event")
+  creator      User                   @relation(fields: [collegeId, createdById], references: [collegeId, id], onDelete: Cascade, onUpdate: NoAction, map: "fk_batches_creator")
+  certificates EventCertificate[]
+
+  @@unique([collegeId, id], map: "uq_certificate_batches_college_id")
+  @@index([collegeId, eventId], map: "idx_certificate_batches_event")
+  @@map("certificate_batches")
+}
+
+model EventCertificateTemplate {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  collegeId         String   @map("college_id") @db.Uuid
+  eventId           String   @map("event_id") @db.Uuid
+  templateName      String   @map("template_name")
+  templatePublicId  String   @map("template_public_id")
+  templateUrl       String   @map("template_url")
+  placeholderConfig Json     @default("[]") @map("placeholder_config")
+  isActive          Boolean  @default(true) @map("is_active")
+  createdById       String   @map("created_by_id") @db.Uuid
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  college           College  @relation(fields: [collegeId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  event             Event    @relation(fields: [collegeId, eventId], references: [collegeId, id], onDelete: Cascade, onUpdate: NoAction, map: "fk_cert_templates_event")
+  creator           User     @relation(fields: [collegeId, createdById], references: [collegeId, id], onDelete: Cascade, onUpdate: NoAction, map: "fk_cert_templates_creator")
+
+  @@index([collegeId, eventId], map: "idx_cert_templates_event")
+  @@map("event_certificate_templates")
+}
+
+model EventCertificate {
+  id                  String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  collegeId           String            @map("college_id") @db.Uuid
+  eventId             String            @map("event_id") @db.Uuid
+  userId              String            @map("user_id") @db.Uuid
+  certificateNumber   String            @unique @map("certificate_number")
+  certificatePublicId String?           @map("certificate_public_id")
+  certificateUrl      String?           @map("certificate_url")
+  source              CertificateSource @default(INDIVIDUAL_UPLOAD)
+  status              CertificateStatus @default(ISSUED)
+  issuedAt            DateTime          @default(now()) @map("issued_at") @db.Timestamptz(6)
+  issuedById          String?           @map("issued_by_id") @db.Uuid
+  revokedAt           DateTime?         @map("revoked_at") @db.Timestamptz(6)
+  revokedById         String?           @map("revoked_by_id") @db.Uuid
+  revocationReason    String?           @map("revocation_reason")
+  batchId             String?           @map("batch_id") @db.Uuid
+  metadata            Json?             @default("{}")
+  createdAt           DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  college             College           @relation(fields: [collegeId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  event               Event             @relation(fields: [collegeId, eventId], references: [collegeId, id], onDelete: Cascade, onUpdate: NoAction, map: "fk_certificates_event")
+  user                User              @relation("UserCertificates", fields: [collegeId, userId], references: [collegeId, id], onDelete: Cascade, onUpdate: NoAction, map: "fk_certificates_user")
+  batch               CertificateBatch? @relation(fields: [collegeId, batchId], references: [collegeId, id], onDelete: SetNull, onUpdate: NoAction, map: "fk_certificates_batch")
+  issuedBy            User?             @relation("IssuedCertificates", fields: [collegeId, issuedById], references: [collegeId, id], onDelete: SetNull, onUpdate: NoAction, map: "fk_certificates_issuer")
+  revokedBy           User?             @relation("RevokedCertificates", fields: [collegeId, revokedById], references: [collegeId, id], onDelete: SetNull, onUpdate: NoAction, map: "fk_certificates_revoker")
+
+  @@index([collegeId, eventId], map: "idx_event_certificates_college_event")
+  @@index([collegeId, userId], map: "idx_event_certificates_college_user")
+  @@index([collegeId, status], map: "idx_event_certificates_status")
+  @@map("event_certificates")
+}
+
+enum CertificateSource {
+  INDIVIDUAL_UPLOAD
+  BULK_UPLOAD
+  GENERATED
+
+  @@map("certificate_source_enum")
+}
+
+enum CertificateStatus {
+  ISSUED
+  REVOKED
+
+  @@map("certificate_status_enum")
+}
+
+enum CertificateBatchStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  COMPLETED_WITH_ERRORS
+  FAILED
+
+  @@map("certificate_batch_status_enum")
+}
+
+enum CertificateBatchMethod {
+  BULK_UPLOAD
+  GENERATED
+
+  @@map("certificate_batch_method_enum")
+}
+

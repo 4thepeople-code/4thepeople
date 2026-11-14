@@ -19,6 +19,7 @@ import {
 } from '@/lib/api/manager';
 import ManagerLayout from '@/components/manager/ManagerLayout';
 import { EventHero } from '@/components/manager/EventHero';
+import { EventCertificatesSection } from '@/components/manager/certificates/EventCertificatesSection';
 import { Modal } from '@/components/common/Modal';
 import { DateTimePicker } from '@/components/common/DateTimePicker';
 import {
@@ -892,6 +893,14 @@ export function ManagerEventDetailClient({
             </div>
           </div>
         )}
+
+        {/* SECTION 5: EVENT CERTIFICATES */}
+        <EventCertificatesSection
+          slug={slug}
+          clubId={clubId}
+          eventId={eventId}
+          eventTitle={event?.title}
+        />
 
         {/* Modal: Cancel Event */}
         <Modal

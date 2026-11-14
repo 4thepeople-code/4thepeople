@@ -15,6 +15,7 @@
     "test:phase_s1": "node tests/phase_s1_full_verification.test.js",
     "test:phase_s1_closure": "node tests/phase_s1_closure_targeted.test.js",
     "test:platform_colleges": "node tests/platform_college_management.test.js",
+    "test:certificates": "node tests/certificates.test.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -24,6 +25,7 @@
   "dependencies": {
     "@getbrevo/brevo": "^6.0.3",
     "@prisma/client": "^6.16.2",
+    "adm-zip": "^0.6.1",
     "bcrypt": "^6.0.0",
     "bcryptjs": "^3.0.3",
     "cloudinary": "^2.11.0",
@@ -36,6 +38,7 @@
     "multer": "^2.3.0",
     "node-cron": "^4.6.0",
     "nodemon": "^3.1.10",
+    "pdf-lib": "^1.17.1",
     "prisma": "^6.16.2",
     "zod": "^4.6.2"
   },

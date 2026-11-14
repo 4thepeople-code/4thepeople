@@ -164,3 +164,127 @@ export interface EventRegistration {
   event?: Event;
 }
 
+export type CertificateSource = 'INDIVIDUAL_UPLOAD' | 'BULK_UPLOAD' | 'GENERATED';
+export type CertificateStatus = 'ISSUED' | 'REVOKED';
+export type CertificateBatchStatus = 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'COMPLETED_WITH_ERRORS' | 'FAILED';
+
+export interface EventCertificate {
+  id: string;
+  collegeId: string;
+  eventId: string;
+  userId: string;
+  certificateNumber: string;
+  certificatePublicId?: string | null;
+  certificateUrl?: string | null;
+  source: CertificateSource;
+  status: CertificateStatus;
+  issuedAt: string;
+  issuedById?: string | null;
+  revokedAt?: string | null;
+  revokedById?: string | null;
+  revocationReason?: string | null;
+  metadata?: Record<string, unknown> | null;
+  user?: Partial<User> | null;
+  issuedBy?: Partial<User> | null;
+  revokedBy?: Partial<User> | null;
+  event?: Partial<Event> | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface PlaceholderConfigItem {
+  id?: string;
+  placeholder: string;
+  xPercent?: number;
+  yPercent?: number;
+  widthPercent?: number;
+  fontSize?: number;
+  font?: 'Helvetica' | 'HelveticaBold' | 'Times' | 'TimesBold' | 'Courier' | 'CourierBold';
+  color?: string;
+  align?: 'left' | 'center' | 'right';
+  autoFit?: boolean;
+  isMultiline?: boolean;
+  // Legacy point fallback:
+  x?: number;
+  y?: number;
+  size?: number;
+}
+
+export interface PredefinedTemplate {
+  id: string;
+  name: string;
+  description: string;
+  orientation: 'landscape' | 'portrait';
+  aspectRatio: number;
+  backgroundColor: string;
+  primaryTextColor: string;
+  defaultConfig: PlaceholderConfigItem[];
+}
+
+export interface EventCertificateTemplate {
+  id: string;
+  collegeId: string;
+  eventId: string;
+  templateName: string;
+  templatePublicId: string;
+  templateUrl: string;
+  placeholderConfig: {
+    page?: {
+      width: number;
+      height: number;
+      orientation: 'landscape' | 'portrait';
+    };
+    predefinedTemplateId?: string | null;
+    items?: PlaceholderConfigItem[];
+  } | PlaceholderConfigItem[];
+  isActive: boolean;
+  createdAt?: string;
+}
+
+export interface CertificateBatch {
+  id: string;
+  collegeId: string;
+  eventId: string;
+  method: 'BULK_UPLOAD' | 'GENERATED';
+  status: CertificateBatchStatus;
+  totalCount: number;
+  successCount: number;
+  failedCount: number;
+  skippedCount: number;
+  errorDetails?: Array<{ rollNumber?: string; filename?: string; studentName?: string; reason: string }> | null;
+  createdAt?: string;
+}
+
+export interface EligibleStudentItem {
+  registrationId: string;
+  registeredAt: string;
+  user: {
+    id: string;
+    name: string;
+    email: string;
+    rollNumber?: string | null;
+    department?: { name: string; shortCode: string } | null;
+  };
+  certificate?: {
+    id: string;
+    userId: string;
+    certificateNumber: string;
+    issuedAt: string;
+  } | null;
+  hasActiveCertificate: boolean;
+}
+
+export interface PublicCertificateVerification {
+  valid: boolean;
+  status?: CertificateStatus;
+  certificateNumber: string;
+  recipientName?: string;
+  eventTitle?: string;
+  collegeName?: string;
+  issuedAt?: string;
+  isRevoked?: boolean;
+  revokedAt?: string | null;
+  message?: string;
+}
+
+

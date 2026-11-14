@@ -38,10 +38,12 @@ export function DeleteOtpModal({
   const [isDeleting, setIsDeleting] = useState(false);
 
   const onRequestCodeRef = useRef(onRequestCode);
-  onRequestCodeRef.current = onRequestCode;
-
   const onConfirmRef = useRef(onConfirm || onConfirmDelete);
-  onConfirmRef.current = onConfirm || onConfirmDelete;
+
+  useEffect(() => {
+    onRequestCodeRef.current = onRequestCode;
+    onConfirmRef.current = onConfirm || onConfirmDelete;
+  }, [onRequestCode, onConfirm, onConfirmDelete]);
 
   const hasRequestedRef = useRef(false);
 
