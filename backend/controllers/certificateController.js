@@ -318,9 +318,14 @@ exports.downloadManagerCertificate = asyncHandler(async (req, res) => {
   validateUUID(eventId, 'event ID');
   validateUUID(certificateId, 'certificate ID');
 
-  const cert = await withTenant(req.collegeId, async (tx) => {
+  const collegeId = req.collegeId || req.user?.collegeId;
+  if (!collegeId) {
+    throw new AppError('College tenant context missing', 400);
+  }
+
+  const cert = await withTenant(collegeId, async (tx) => {
     return tx.eventCertificate.findFirst({
-      where: { id: certificateId, eventId, collegeId: req.collegeId },
+      where: { id: certificateId, eventId, collegeId },
     });
   });
 
@@ -343,8 +348,13 @@ exports.getMyCertificates = asyncHandler(async (req, res) => {
     throw new AppError('Authentication required', 401);
   }
 
+  const collegeId = req.collegeId || req.user?.collegeId;
+  if (!collegeId) {
+    throw new AppError('College tenant context missing', 400);
+  }
+
   const certs = await certificateService.getStudentCertificates({
-    collegeId: req.collegeId,
+    collegeId,
     userId: req.user.id,
   });
 
@@ -365,14 +375,23 @@ exports.downloadStudentCertificate = asyncHandler(async (req, res) => {
   const { certificateId } = req.params;
   validateUUID(certificateId, 'certificate ID');
 
-  const cert = await withTenant(req.collegeId, async (tx) => {
-    return tx.eventCertificate.findFirst({
-      where: {
-        id: certificateId,
-        userId: req.user.id,
-        collegeId: req.collegeId,
-      },
-    });
+  const collegeId = req.collegeId || req.user?.collegeId;
+  if (!collegeId) {
+    throw new AppError('College tenant context missing', 400);
+  }
+
+  const cert = await withTenant(collegeId, async (tx) => {
+    // If college admin or super admin, allow downloading any certificate within this college
+    const isElevated =
+      req.user.role === 'COLLEGE_ADMIN' ||
+      req.user.role === 'SUPER_ADMIN' ||
+      req.user.role === 'ADMIN';
+
+    const where = isElevated
+      ? { id: certificateId, collegeId }
+      : { id: certificateId, userId: req.user.id, collegeId };
+
+    return tx.eventCertificate.findFirst({ where });
   });
 
   if (!cert) {

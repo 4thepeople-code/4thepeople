@@ -700,7 +700,7 @@ export function StudentDashboardClient({ slug, initialTab = 'registrations' }: S
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {myCertificates.map((cert) => {
-                  const downloadUrl = `/api/certificates/${cert.id}/download`;
+                  const downloadUrl = `/api/certificates/${cert.id}/download?college=${slug}`;
                   const verifyUrl = `/college/${slug}/verify/${cert.certificateNumber}`;
 
                   return (
@@ -776,7 +776,7 @@ export function StudentDashboardClient({ slug, initialTab = 'registrations' }: S
                         <a
                           href={downloadUrl}
                           target="_blank"
-                          rel="noopener noreferrer"
+                          rel="noopener"
                           className="flex-1 py-2.5 px-4 rounded-xl font-bold text-xs uppercase tracking-wider bg-cyan-500 hover:bg-cyan-400 text-slate-950 flex items-center justify-center gap-1.5 transition shadow-sm shadow-cyan-500/20"
                         >
                           <Download className="w-3.5 h-3.5" />

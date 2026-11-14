@@ -248,7 +248,7 @@ export function EventCertificatesSection({
               <tbody className="divide-y divide-white/5">
                 {certificates.map((cert) => {
                   const isIssued = cert.status === 'ISSUED';
-                  const downloadUrl = `/api/manager/events/${eventId}/certificates/${cert.id}/download`;
+                  const downloadUrl = `/api/manager/events/${eventId}/certificates/${cert.id}/download?college=${slug}`;
 
                   return (
                     <tr
@@ -342,7 +342,7 @@ export function EventCertificatesSection({
                           <a
                             href={downloadUrl}
                             target="_blank"
-                            rel="noopener noreferrer"
+                            rel="noopener"
                             className="p-1.5 rounded-lg border border-white/10 text-slate-300 hover:text-cyan-400 hover:border-cyan-500/30 hover:bg-white/5 transition"
                             title="View / Download PDF"
                           >
