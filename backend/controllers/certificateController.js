@@ -2,6 +2,7 @@ const asyncHandler = require('../utils/asyncHandler');
 const { AppError } = require('../middleware/errorHandler');
 const { withTenant } = require('../config/db');
 const certificateService = require('../services/certificateService');
+const { fetchCertificateAssetBuffer } = require('../utils/certificateStorage');
 
 const UUID_REGEX = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 
@@ -15,26 +16,15 @@ const validateUUID = (value, label) => {
  * Helper to stream certificate PDF to HTTP response.
  */
 async function streamCertificateResponse(certificate, res) {
-  if (!certificate || !certificate.certificateUrl) {
+  if (!certificate || (!certificate.certificateUrl && !certificate.certificatePublicId)) {
     throw new AppError('Certificate document file is not available', 404);
   }
 
-  if (process.env.NODE_ENV === 'test' || certificate.certificateUrl.includes('test-cloud')) {
-    const dummyPdf = Buffer.from('%PDF-1.4\n1 0 obj\n<<>>\nendobj\ntrailer\n<<>>\n%%EOF\n');
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `inline; filename="${certificate.certificateNumber}.pdf"`);
-    return res.send(dummyPdf);
-  }
-
   try {
-    const resp = await fetch(certificate.certificateUrl);
-    if (!resp.ok) {
-      throw new AppError('Failed to retrieve certificate document from storage', 502);
-    }
-    const arrayBuf = await resp.arrayBuffer();
+    const buffer = await fetchCertificateAssetBuffer(certificate.certificatePublicId, certificate.certificateUrl);
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `inline; filename="${certificate.certificateNumber}.pdf"`);
-    return res.send(Buffer.from(arrayBuf));
+    return res.send(buffer);
   } catch (err) {
     throw new AppError(`Failed to stream certificate: ${err.message}`, 502);
   }
@@ -200,15 +190,10 @@ exports.previewCertificateTemplate = asyncHandler(async (req, res) => {
       throw new AppError('Certificate template not found', 404);
     }
 
-    if (process.env.NODE_ENV === 'test' || template.templateUrl.includes('test-cloud')) {
-      const { PDFDocument } = require('pdf-lib');
-      const testDoc = await PDFDocument.create();
-      testDoc.addPage([600, 400]);
-      templateBuffer = Buffer.from(await testDoc.save());
-    } else {
-      const resp = await fetch(template.templateUrl);
-      if (!resp.ok) throw new AppError('Failed to fetch template from storage', 500);
-      templateBuffer = Buffer.from(await resp.arrayBuffer());
+    try {
+      templateBuffer = await fetchCertificateAssetBuffer(template.templatePublicId, template.templateUrl);
+    } catch (err) {
+      throw new AppError('Failed to fetch certificate template asset from storage: ' + err.message, 500);
     }
   } else {
     throw new AppError('Either a template PDF file or an existing templateId is required', 400);

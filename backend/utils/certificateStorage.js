@@ -114,9 +114,70 @@ async function deleteCertificateAsset(publicId) {
   }
 }
 
+/**
+ * Fetches a stored certificate or template PDF buffer from storage.
+ * Handles Cloudinary private/restricted raw asset delivery by using an authenticated private download URL.
+ * Falls back to public URL or test stub when applicable.
+ * 
+ * @param {string} publicId - Cloudinary asset public ID
+ * @param {string} [publicUrl] - Direct asset URL
+ * @returns {Promise<Buffer>}
+ */
+async function fetchCertificateAssetBuffer(publicId, publicUrl) {
+  if (isTestEnv || (publicUrl && publicUrl.includes('test-cloud'))) {
+    const { PDFDocument } = require('pdf-lib');
+    const testDoc = await PDFDocument.create();
+    testDoc.addPage([600, 400]);
+    return Buffer.from(await testDoc.save());
+  }
+
+  // 1. Try authenticated Cloudinary private download URL if publicId exists
+  if (publicId && cloudinary.config().api_key) {
+    try {
+      const privateUrl = cloudinary.utils.private_download_url(publicId, 'pdf', {
+        resource_type: 'raw',
+        type: 'upload',
+      });
+      const resp = await fetch(privateUrl);
+      if (resp.ok) {
+        const ab = await resp.arrayBuffer();
+        const buf = Buffer.from(ab);
+        if (isValidPdf(buf)) {
+          return buf;
+        }
+      } else {
+        console.warn(`[CERT_STORAGE] Authenticated download returned status ${resp.status} for ${publicId}`);
+      }
+    } catch (err) {
+      console.warn('[CERT_STORAGE] Authenticated download failed:', err.message);
+    }
+  }
+
+  // 2. Fallback to direct public URL if provided
+  if (publicUrl) {
+    try {
+      const resp = await fetch(publicUrl);
+      if (resp.ok) {
+        const ab = await resp.arrayBuffer();
+        const buf = Buffer.from(ab);
+        if (isValidPdf(buf)) {
+          return buf;
+        }
+      } else {
+        console.warn(`[CERT_STORAGE] Direct URL fetch returned status ${resp.status} for ${publicUrl}`);
+      }
+    } catch (err) {
+      console.warn('[CERT_STORAGE] Direct URL fetch failed:', err.message);
+    }
+  }
+
+  throw new Error('Failed to retrieve PDF asset from storage');
+}
+
 module.exports = {
   isValidPdf,
   uploadCertificatePdf,
   uploadCertificateTemplatePdf,
   deleteCertificateAsset,
+  fetchCertificateAssetBuffer,
 };

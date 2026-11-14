@@ -9,6 +9,7 @@ const {
   uploadCertificatePdf,
   uploadCertificateTemplatePdf,
   deleteCertificateAsset,
+  fetchCertificateAssetBuffer,
 } = require('../utils/certificateStorage');
 
 // ============================================================================
@@ -651,20 +652,12 @@ async function generateCertificatesFromTemplate({ collegeId, eventId, templateId
     eventTitle = event.title;
   });
 
-  // 2. Fetch template PDF buffer
+  // 2. Fetch template PDF buffer using authenticated download
   let templateBuffer = null;
-  if (template.templateUrl.startsWith('https://res.cloudinary.com/test-cloud/') || process.env.NODE_ENV === 'test') {
-    // Generate minimal blank PDF for test environment
-    const testDoc = await PDFDocument.create();
-    testDoc.addPage([600, 400]);
-    templateBuffer = Buffer.from(await testDoc.save());
-  } else {
-    const resp = await fetch(template.templateUrl);
-    if (!resp.ok) {
-      throw new AppError('Failed to fetch certificate template asset from storage', 500);
-    }
-    const arrayBuf = await resp.arrayBuffer();
-    templateBuffer = Buffer.from(arrayBuf);
+  try {
+    templateBuffer = await fetchCertificateAssetBuffer(template.templatePublicId, template.templateUrl);
+  } catch (err) {
+    throw new AppError('Failed to fetch certificate template asset from storage: ' + err.message, 500);
   }
 
   // 3. Find registered students
