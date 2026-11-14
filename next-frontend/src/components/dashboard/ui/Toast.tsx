@@ -19,6 +19,11 @@ export interface ToastOptions {
   variant?: ToastVariant;
   /** Defaults to 4s; errors stay a little longer. */
   durationMs?: number;
+  /**
+   * Optional inline action (e.g. "Undo" after a reversible toggle). Keep one
+   * short verb — this is a toast, not a dialog.
+   */
+  action?: { label: string; onClick: () => void };
 }
 
 interface ToastItem {
@@ -26,6 +31,7 @@ interface ToastItem {
   message: string;
   variant: ToastVariant;
   durationMs: number;
+  action?: { label: string; onClick: () => void };
 }
 
 interface ToastContextValue {
@@ -66,7 +72,10 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       const variant = options?.variant ?? 'info';
       const durationMs = options?.durationMs ?? (variant === 'error' ? 6500 : 4000);
       const id = nextId.current++;
-      setItems((prev) => [...prev.slice(-3), { id, message, variant, durationMs }]);
+      setItems((prev) => [
+        ...prev.slice(-3),
+        { id, message, variant, durationMs, action: options?.action },
+      ]);
     },
     [],
   );
@@ -117,6 +126,18 @@ function ToastRow({ item, onDismiss }: { item: ToastItem; onDismiss: (id: number
     >
       <Icon aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" />
       <p className="flex-1 text-xs font-medium leading-relaxed">{item.message}</p>
+      {item.action && (
+        <button
+          type="button"
+          onClick={() => {
+            item.action?.onClick();
+            onDismiss(item.id);
+          }}
+          className="min-h-8 shrink-0 rounded-lg px-2 text-xs font-bold underline underline-offset-2 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-[var(--primary)]"
+        >
+          {item.action.label}
+        </button>
+      )}
       <button
         type="button"
         onClick={() => onDismiss(item.id)}

@@ -23,21 +23,25 @@ import {
 
 export interface DashboardShellProps {
   role: DashboardRole;
-  /** College slug for college-scoped roles. */
-  slug: string;
+  /**
+   * College slug for college-scoped roles. Super Admin (platform) screens
+   * don't need one.
+   */
+  slug?: string;
   /** College display name for the sidebar brand line. */
   collegeName?: string;
   children: ReactNode;
 }
 
-function loginHrefFor(role: DashboardRole, slug: string): string {
+function loginHrefFor(role: DashboardRole, slug?: string): string {
+  const collegeSlug = slug ?? '';
   switch (role) {
     case 'collegeAdmin':
-      return collegeAdminLoginHref(slug);
+      return collegeAdminLoginHref(collegeSlug);
     case 'eventManager':
-      return managerLoginHref(slug);
+      return managerLoginHref(collegeSlug);
     case 'student':
-      return studentLoginHref(slug);
+      return studentLoginHref(collegeSlug);
     case 'superAdmin':
       return platformLoginHref();
   }

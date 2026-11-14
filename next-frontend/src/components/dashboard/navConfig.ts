@@ -50,7 +50,7 @@ export interface RoleNav {
   primaryAction: NavItem;
 }
 
-export function getRoleNav(role: DashboardRole, slug: string): RoleNav {
+export function getRoleNav(role: DashboardRole, slug = ''): RoleNav {
   switch (role) {
     case 'collegeAdmin':
       return {
@@ -134,14 +134,18 @@ export function getRoleNav(role: DashboardRole, slug: string): RoleNav {
           {
             title: nav.sections.main,
             items: [
-              // /admin is a single page with internal tabs today; Phase 2 makes
-              // these read ?tab=.
-              { label: 'Colleges', href: platformDashboardHref(), icon: Building2, interim: true },
-              { label: 'Platform admins', href: platformDashboardHref(), icon: Shield, interim: true },
+              // Dedicated routes (Phase 2) so deep links and active states work.
+              { label: 'Overview', href: platformDashboardHref(), icon: LayoutDashboard },
+              { label: 'Colleges', href: `${platformDashboardHref()}/colleges`, icon: Building2 },
+              { label: 'Platform admins', href: `${platformDashboardHref()}/admins`, icon: Shield },
             ],
           },
         ],
-        primaryAction: { label: actions.addCollege, href: platformDashboardHref(), icon: Building2, interim: true },
+        primaryAction: {
+          label: actions.addCollege,
+          href: `${platformDashboardHref()}/colleges`,
+          icon: Building2,
+        },
       };
   }
 }
