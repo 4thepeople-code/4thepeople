@@ -21,6 +21,14 @@ export interface CampusEvent {
   status: EventStatus;
   attendees: number;
   description: string;
+  /** ISO start timestamp — drives "Next up" ordering and poster date badges. */
+  startAt?: string;
+  /** Poster artwork URL. Events without one fall back to a typographic poster. */
+  posterUrl?: string;
+  posterAlt?: string;
+  /** Set by club leads/admins to pin this event into the hero. */
+  pinned?: boolean;
+  cancelled?: boolean;
 }
 
 export interface CollegeStats {
@@ -69,12 +77,12 @@ export const colleges: College[] = [
       { id: "hacknorth", name: "HackNorth", category: "Hackathon", tagline: "Makers marathons & demo nights", members: 97, color: "#facc15" },
     ],
     events: [
-      { id: "e1", title: "RoboRush: Build-a-Bot Finals", clubId: "roborangers", month: "NOV", day: "14", weekday: "Sat", time: "10:00 AM", location: "Innovation Lab 2", status: "upcoming", attendees: 186, description: "Six teams. One arena. Zero mercy." },
-      { id: "e2", title: "Midnight Melody: Fall Concert", clubId: "soundline", month: "NOV", day: "21", weekday: "Sat", time: "7:30 PM", location: "Open-Air Amphitheatre", status: "upcoming", attendees: 342, description: "Live bands + open mic finale under the stars." },
-      { id: "e3", title: "Debate Forge: AI & Ethics", clubId: "debateforge", month: "NOV", day: "18", weekday: "Wed", time: "6:00 PM", location: "Humanities Hall A", status: "upcoming", attendees: 74, description: "Fast, loud, and gloriously unresolved." },
-      { id: "e4", title: "Neon Nights: Fall Dance Fest", clubId: "neonmotion", month: "DEC", day: "05", weekday: "Fri", time: "9:00 PM", location: "Student Gym", status: "upcoming", attendees: 298, description: "Three hours of choreography, lights and bass." },
-      { id: "e5", title: "Film Cellar: Campus Noir Night", clubId: "filmcellar", month: "NOV", day: "28", weekday: "Sat", time: "8:30 PM", location: "The Black Box", status: "upcoming", attendees: 67, description: "Cult classics, audience voting, zero chill." },
-      { id: "e6", title: "HackNorth: 36-Hour Makers Marathon", clubId: "hacknorth", month: "DEC", day: "12", weekday: "Sat", time: "4:00 PM", location: "Innovation Lab", status: "upcoming", attendees: 154, description: "Build, break, ship — demos at sunrise." },
+      { id: "e1", title: "RoboRush: Build-a-Bot Finals", clubId: "roborangers", month: "NOV", day: "14", weekday: "Sat", time: "10:00 AM", location: "Innovation Lab 2", status: "upcoming", attendees: 186, description: "Six teams. One arena. Zero mercy.", startAt: "2026-11-14T10:00:00", posterUrl: "/landing/posters/roborush.svg" },
+      { id: "e2", title: "Midnight Melody: Fall Concert", clubId: "soundline", month: "NOV", day: "21", weekday: "Sat", time: "7:30 PM", location: "Open-Air Amphitheatre", status: "upcoming", attendees: 342, description: "Live bands + open mic finale under the stars.", startAt: "2026-11-21T19:30:00" },
+      { id: "e3", title: "Debate Forge: AI & Ethics", clubId: "debateforge", month: "NOV", day: "18", weekday: "Wed", time: "6:00 PM", location: "Humanities Hall A", status: "upcoming", attendees: 74, description: "Fast, loud, and gloriously unresolved.", startAt: "2026-11-18T18:00:00" },
+      { id: "e4", title: "Neon Nights: Fall Dance Fest", clubId: "neonmotion", month: "DEC", day: "05", weekday: "Fri", time: "9:00 PM", location: "Student Gym", status: "upcoming", attendees: 298, description: "Three hours of choreography, lights and bass.", startAt: "2026-12-05T21:00:00" },
+      { id: "e5", title: "Film Cellar: Campus Noir Night", clubId: "filmcellar", month: "NOV", day: "28", weekday: "Sat", time: "8:30 PM", location: "The Black Box", status: "upcoming", attendees: 67, description: "Cult classics, audience voting, zero chill.", startAt: "2026-11-28T20:30:00" },
+      { id: "e6", title: "HackNorth: 36-Hour Makers Marathon", clubId: "hacknorth", month: "DEC", day: "12", weekday: "Sat", time: "4:00 PM", location: "Innovation Lab", status: "upcoming", attendees: 154, description: "Build, break, ship — demos at sunrise.", startAt: "2026-12-12T16:00:00" },
     ],
   },
   {
@@ -99,10 +107,10 @@ export const colleges: College[] = [
       { id: "hacknorth", name: "HackNorth", category: "Hackathon", tagline: "Makers marathons & demo nights", members: 97, color: "#facc15" },
     ],
     events: [
-      { id: "e1", title: "RoboRush: Build-a-Bot Finals", clubId: "roborangers", month: "NOV", day: "14", weekday: "Sat", time: "10:00 AM", location: "Innovation Lab 2", status: "upcoming", attendees: 186, description: "Six teams. One arena. Zero mercy." },
-      { id: "e2", title: "Midnight Melody: Fall Concert", clubId: "soundline", month: "NOV", day: "21", weekday: "Sat", time: "7:30 PM", location: "Open-Air Amphitheatre", status: "upcoming", attendees: 342, description: "Live bands + open mic finale under the stars." },
-      { id: "e3", title: "Debate Forge: AI & Ethics", clubId: "debateforge", month: "NOV", day: "18", weekday: "Wed", time: "6:00 PM", location: "Humanities Hall A", status: "upcoming", attendees: 74, description: "Fast, loud, and gloriously unresolved." },
-      { id: "e4", title: "Neon Nights: Fall Dance Fest", clubId: "neonmotion", month: "DEC", day: "05", weekday: "Fri", time: "9:00 PM", location: "Student Gym", status: "upcoming", attendees: 298, description: "Three hours of choreography, lights and bass." },
+      { id: "e1", title: "RoboRush: Build-a-Bot Finals", clubId: "roborangers", month: "NOV", day: "14", weekday: "Sat", time: "10:00 AM", location: "Innovation Lab 2", status: "upcoming", attendees: 186, description: "Six teams. One arena. Zero mercy.", startAt: "2026-11-14T10:00:00", posterUrl: "/landing/posters/roborush.svg" },
+      { id: "e2", title: "Midnight Melody: Fall Concert", clubId: "soundline", month: "NOV", day: "21", weekday: "Sat", time: "7:30 PM", location: "Open-Air Amphitheatre", status: "upcoming", attendees: 342, description: "Live bands + open mic finale under the stars.", startAt: "2026-11-21T19:30:00" },
+      { id: "e3", title: "Debate Forge: AI & Ethics", clubId: "debateforge", month: "NOV", day: "18", weekday: "Wed", time: "6:00 PM", location: "Humanities Hall A", status: "upcoming", attendees: 74, description: "Fast, loud, and gloriously unresolved.", startAt: "2026-11-18T18:00:00" },
+      { id: "e4", title: "Neon Nights: Fall Dance Fest", clubId: "neonmotion", month: "DEC", day: "05", weekday: "Fri", time: "9:00 PM", location: "Student Gym", status: "upcoming", attendees: 298, description: "Three hours of choreography, lights and bass.", startAt: "2026-12-05T21:00:00" },
     ],
   },
   {
@@ -127,10 +135,10 @@ export const colleges: College[] = [
       { id: "theatre", name: "Theatre Guild", category: "Performing", tagline: "Festival theatre & improv", members: 66, color: "#fb923c" },
     ],
     events: [
-      { id: "e1", title: "Poetry & Ink: National Slam Qualifier", clubId: "poetryink", month: "NOV", day: "20", weekday: "Tue", time: "7:00 PM", location: "The Black Box", status: "upcoming", attendees: 210, description: "Regional qualifiers + open slam finals." },
-      { id: "e2", title: "Synthwave: Neon Arcade Night", clubId: "synthwave", month: "NOV", day: "27", weekday: "Tue", time: "8:00 PM", location: "Student Union Atrium", status: "upcoming", attendees: 188, description: "Analog synths, arcade cabinets, VHS loops." },
-      { id: "e3", title: "Canvas & Code: Generative Art Jam", clubId: "canvascode", month: "DEC", day: "03", weekday: "Fri", time: "6:00 PM", location: "Art Annex", status: "upcoming", attendees: 52, description: "Algorithms + paint. All mediums welcome." },
-      { id: "e4", title: "Free Speech Forum: Campus Issues", clubId: "freefolk", month: "NOV", day: "25", weekday: "Tue", time: "6:30 PM", location: "Lecture Hall 4", status: "upcoming", attendees: 133, description: "Structured, civil, and surprisingly fun." },
+      { id: "e1", title: "Poetry & Ink: National Slam Qualifier", clubId: "poetryink", month: "NOV", day: "20", weekday: "Tue", time: "7:00 PM", location: "The Black Box", status: "upcoming", attendees: 210, description: "Regional qualifiers + open slam finals.", startAt: "2026-11-20T19:00:00" },
+      { id: "e2", title: "Synthwave: Neon Arcade Night", clubId: "synthwave", month: "NOV", day: "27", weekday: "Tue", time: "8:00 PM", location: "Student Union Atrium", status: "upcoming", attendees: 188, description: "Analog synths, arcade cabinets, VHS loops.", startAt: "2026-11-27T20:00:00" },
+      { id: "e3", title: "Canvas & Code: Generative Art Jam", clubId: "canvascode", month: "DEC", day: "03", weekday: "Fri", time: "6:00 PM", location: "Art Annex", status: "upcoming", attendees: 52, description: "Algorithms + paint. All mediums welcome.", startAt: "2026-12-03T18:00:00" },
+      { id: "e4", title: "Free Speech Forum: Campus Issues", clubId: "freefolk", month: "NOV", day: "25", weekday: "Tue", time: "6:30 PM", location: "Lecture Hall 4", status: "upcoming", attendees: 133, description: "Structured, civil, and surprisingly fun.", startAt: "2026-11-25T18:30:00" },
     ],
   },
   {
@@ -155,10 +163,10 @@ export const colleges: College[] = [
       { id: "offset", name: "Offset Press", category: "Art", tagline: "Zines, risograph & print fests", members: 37, color: "#4ade80" },
     ],
     events: [
-      { id: "e1", title: "Bellavista Game Jam: 48-Hour Wonder", clubId: "pixelunion", month: "NOV", day: "13", weekday: "Mon", time: "6:00 PM", location: "Maker Space", status: "upcoming", attendees: 96, description: "Theme reveal at dusk. Sleep optional. Dreams guaranteed." },
-      { id: "e2", title: "Circuit Club: Soldering & Synth Build", clubId: "circuit", month: "NOV", day: "21", weekday: "Tue", time: "7:00 PM", location: "Workshop 3", status: "upcoming", attendees: 44, description: "Build a pocket synth from scratch." },
-      { id: "e3", title: "Motion Bloom: Fusion Showcase", clubId: "motionbloom", month: "DEC", day: "04", weekday: "Fri", time: "7:00 PM", location: "Performance Hall", status: "upcoming", attendees: 176, description: "Two years of movement, ten minutes of magic." },
-      { id: "e4", title: "Signal Lab: Drone & Robotics Demo", clubId: "signallab", month: "DEC", day: "12", weekday: "Thu", time: "5:30 PM", location: "Lab 2", status: "upcoming", attendees: 88, description: "Fly day + payload workshop." },
+      { id: "e1", title: "Bellavista Game Jam: 48-Hour Wonder", clubId: "pixelunion", month: "NOV", day: "13", weekday: "Mon", time: "6:00 PM", location: "Maker Space", status: "upcoming", attendees: 96, description: "Theme reveal at dusk. Sleep optional. Dreams guaranteed.", startAt: "2026-11-13T18:00:00", pinned: true },
+      { id: "e2", title: "Circuit Club: Soldering & Synth Build", clubId: "circuit", month: "NOV", day: "21", weekday: "Tue", time: "7:00 PM", location: "Workshop 3", status: "upcoming", attendees: 44, description: "Build a pocket synth from scratch.", startAt: "2026-11-21T19:00:00" },
+      { id: "e3", title: "Motion Bloom: Fusion Showcase", clubId: "motionbloom", month: "DEC", day: "04", weekday: "Fri", time: "7:00 PM", location: "Performance Hall", status: "upcoming", attendees: 176, description: "Two years of movement, ten minutes of magic.", startAt: "2026-12-04T19:00:00" },
+      { id: "e4", title: "Signal Lab: Drone & Robotics Demo", clubId: "signallab", month: "DEC", day: "12", weekday: "Thu", time: "5:30 PM", location: "Lab 2", status: "upcoming", attendees: 88, description: "Fly day + payload workshop.", startAt: "2026-12-12T17:30:00" },
     ],
   },
   {
@@ -183,10 +191,10 @@ export const colleges: College[] = [
       { id: "beatsquad", name: "Beat Squad", category: "Music", tagline: "Producer cypher & beat battles", members: 52, color: "#a78bfa" },
     ],
     events: [
-      { id: "e1", title: "West Hoops: Rivalry Game Night", clubId: "westhoops", month: "NOV", day: "14", weekday: "Sat", time: "7:00 PM", location: "Riverside Arena", status: "upcoming", attendees: 421, description: "Sellout energy expected. Jerseys required." },
-      { id: "e2", title: "Skate Crew: Night Session", clubId: "skatecrew", month: "NOV", day: "20", weekday: "Fri", time: "9:00 PM", location: "Foundry Skate Park", status: "upcoming", attendees: 73, description: "Watches, sessions, demo pileups." },
-      { id: "e3", title: "Beat Squad: Producer Cypher", clubId: "beatsquad", month: "DEC", day: "06", weekday: "Sat", time: "8:00 PM", location: "Studio B", status: "upcoming", attendees: 34, description: "Beat swap cypher — three producers enter, one beat leaves." },
-      { id: "e4", title: "Trail Mix: Summit Night Hike", clubId: "trailmix", month: "DEC", day: "19", weekday: "Sat", time: "6:00 AM", location: "Ridge Trailhead", status: "upcoming", attendees: 58, description: "12km summit push. Hot cocoa at the top." },
+      { id: "e1", title: "West Hoops: Rivalry Game Night", clubId: "westhoops", month: "NOV", day: "14", weekday: "Sat", time: "7:00 PM", location: "Riverside Arena", status: "upcoming", attendees: 421, description: "Sellout energy expected. Jerseys required.", startAt: "2026-11-14T19:00:00", posterUrl: "/landing/posters/rivalry-night.svg" },
+      { id: "e2", title: "Skate Crew: Night Session", clubId: "skatecrew", month: "NOV", day: "20", weekday: "Fri", time: "9:00 PM", location: "Foundry Skate Park", status: "upcoming", attendees: 73, description: "Watches, sessions, demo pileups.", startAt: "2026-11-20T21:00:00" },
+      { id: "e3", title: "Beat Squad: Producer Cypher", clubId: "beatsquad", month: "DEC", day: "06", weekday: "Sat", time: "8:00 PM", location: "Studio B", status: "upcoming", attendees: 34, description: "Beat swap cypher — three producers enter, one beat leaves.", startAt: "2026-12-06T20:00:00" },
+      { id: "e4", title: "Trail Mix: Summit Night Hike", clubId: "trailmix", month: "DEC", day: "19", weekday: "Sat", time: "6:00 AM", location: "Ridge Trailhead", status: "upcoming", attendees: 58, description: "12km summit push. Hot cocoa at the top.", startAt: "2026-12-19T06:00:00" },
     ],
   },
 ];

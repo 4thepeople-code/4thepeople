@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="750" viewBox="0 0 600 750" role="img" aria-label="RoboRush poster">
+  <rect width="600" height="750" fill="#fff4e6"/>
+  <rect x="24" y="24" width="552" height="702" fill="none" stroke="#241209" stroke-width="6"/>
+  <rect width="600" height="110" fill="#241209"/>
+  <text x="300" y="70" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="30" font-weight="bold" letter-spacing="10" fill="#fff4e6">ROBORANGERS</text>
+  <text x="300" y="220" text-anchor="middle" font-family="Arial Black, Arial, sans-serif" font-size="110" font-weight="900" fill="#241209">ROBO</text>
+  <text x="300" y="330" text-anchor="middle" font-family="Arial Black, Arial, sans-serif" font-size="110" font-weight="900" fill="#ff4a3d">RUSH</text>
+  <circle cx="300" cy="500" r="120" fill="#ff4a3d"/>
+  <g stroke="#241209" stroke-width="10" fill="none" stroke-linecap="round">
+    <rect x="250" y="440" width="100" height="80" rx="14" fill="#fff4e6"/>
+    <circle cx="280" cy="475" r="9" fill="#241209" stroke="none"/>
+    <circle cx="320" cy="475" r="9" fill="#241209" stroke="none"/>
+    <line x1="300" y1="440" x2="300" y2="415"/>
+    <circle cx="300" cy="405" r="10" fill="#241209" stroke="none"/>
+    <line x1="250" y1="465" x2="222" y2="440"/>
+    <line x1="350" y1="465" x2="378" y2="440"/>
+  </g>
+  <rect y="640" width="600" height="110" fill="#241209"/>
+  <text x="300" y="692" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="34" font-weight="bold" letter-spacing="4" fill="#fff4e6">BUILD-A-BOT FINALS</text>
+  <text x="300" y="724" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="bold" letter-spacing="3" fill="#ff4a3d">SIX TEAMS · ONE ARENA · ZERO MERCY</text>
+</svg>

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { colleges, getCollege } from "@/lib/landing/data";
+import { getHeroEvent } from "@/lib/landing/featured";
 import CampusNav from "@/components/campus/CampusNav";
 import CampusHero from "@/components/campus/CampusHero";
 import Marquee from "@/components/campus/Marquee";
@@ -38,6 +39,7 @@ export async function generateMetadata({ params }: CampusPageProps): Promise<Met
 export default async function CampusPage({ params }: CampusPageProps) {
   const { college: collegeSlug } = await params;
   const college = getCollege(collegeSlug);
+  const heroEvent = college ? getHeroEvent(college) : undefined;
 
   if (!college || (college.status !== "demo" && college.slug !== "lbrce")) {
     notFound();
@@ -81,7 +83,7 @@ export default async function CampusPage({ params }: CampusPageProps) {
         <section id="lineup" className="mx-auto w-full max-w-7xl px-6 py-24 lg:px-8 lg:py-32">
           <EventsCarousel college={college} />
         </section>
-        <SpotlightEvent college={college} />
+        <SpotlightEvent college={college} heroEventId={heroEvent?.id} />
         <ClubsSection collegeId={college.slug} />
       </main>
       <CampusCTA />

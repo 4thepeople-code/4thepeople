@@ -1,7 +1,17 @@
 import type { College } from "@/lib/landing/data";
+import { getSpotlightEvent } from "@/lib/landing/featured";
 
-export default function SpotlightEvent({ college }: { college: College }) {
-  const featured = college.events.find((e) => e.status === "upcoming") ?? college.events[0];
+export default function SpotlightEvent({
+  college,
+  heroEventId,
+}: {
+  college: College;
+  /** Id of the event featured in the hero poster — skipped so the sections never duplicate. */
+  heroEventId?: string;
+}) {
+  const featured = getSpotlightEvent(college, heroEventId);
+
+  if (!featured) return null;
 
   return (
     <section id="spotlight" className="bg-warm-ink text-cream">

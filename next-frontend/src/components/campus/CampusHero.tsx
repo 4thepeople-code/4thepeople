@@ -1,22 +1,30 @@
 import type { CampusEvent, College } from "@/lib/landing/data";
+import { formatEventDate, getHeroEvent, type HeroPosterEvent } from "@/lib/landing/featured";
+import HeroPoster from "@/components/campus/HeroPoster";
 
-const monthOrder = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
-
-function getLatestEvent(college: College): CampusEvent | undefined {
-  const upcoming = college.events.filter((e) => e.status !== "past");
-  return upcoming.sort(
-    (a, b) => monthOrder.indexOf(b.month) - monthOrder.indexOf(a.month) || Number(b.day) - Number(a.day),
-  )[0];
+function toPosterEvent(college: College, event: CampusEvent): HeroPosterEvent | undefined {
+  if (!event.startAt) return undefined;
+  return {
+    id: event.id,
+    title: event.title,
+    posterUrl: event.posterUrl,
+    posterAlt: event.posterAlt,
+    startAt: event.startAt,
+    venue: event.location,
+    attending: event.attendees,
+    href: `/demo/${college.slug}/events/${event.id}`,
+  };
 }
 
 export default function CampusHero({ college }: { college: College }) {
-  const latest = getLatestEvent(college);
+  const featured = getHeroEvent(college);
+  const posterEvent = featured ? toPosterEvent(college, featured) : undefined;
 
   return (
     <section className="relative overflow-hidden bg-cream text-warm-ink">
       <div
         aria-hidden
-        className="absolute -right-14 top-4 hidden h-44 w-44 -rotate-12 place-items-center rounded-full bg-coral text-center font-display text-2xl font-bold uppercase text-white sm:grid lg:block"
+        className="absolute -right-14 top-4 hidden h-44 w-44 place-items-center rounded-full bg-coral text-center font-display text-2xl font-bold uppercase text-white sm:grid lg:block"
       >
         Fall · 2026
       </div>
@@ -26,39 +34,42 @@ export default function CampusHero({ college }: { college: College }) {
       />
 
       <div className="relative mx-auto max-w-7xl px-6 pb-20 pt-16 lg:px-8 lg:pb-28 lg:pt-20">
-        <div className="flex flex-col gap-12 lg:grid lg:grid-cols-2 lg:gap-16 lg:items-end">
+        <div className="flex flex-col gap-12 min-[900px]:grid min-[900px]:grid-cols-[1.4fr_1fr] min-[900px]:items-end min-[900px]:gap-16">
           <div className="max-w-4xl">
             <span className="inline-flex items-center gap-2 rounded-full border-2 border-warm-ink bg-white px-4 py-2 text-xs font-bold uppercase tracking-[0.16em] shadow-[3px_3px_0_0_#241209]">
               <span className="h-2.5 w-2.5 rounded-full bg-coral" />
               Now booking · {college.season}
             </span>
 
-            {latest && (
+            {featured && (
               <>
                 <p className="mt-8 text-xs font-bold uppercase tracking-[0.28em] text-ink-900/50">
-                  ★ Next up · {latest.weekday}, {latest.month} {latest.day}
+                  ★ Next up ·{" "}
+                  {featured.startAt
+                    ? formatEventDate(featured.startAt)
+                    : `${featured.weekday}, ${featured.month} ${featured.day}`}
                 </p>
                 <h1 className="mt-4 font-campus text-[52px] leading-[0.9] uppercase tracking-tight text-warm-ink sm:text-[68px] lg:text-[92px]">
-                  {latest.title.toUpperCase()}
+                  {featured.title.toUpperCase()}
                 </h1>
-                <p className="mt-7 max-w-xl text-lg leading-snug text-ink-900/70">{latest.description}</p>
+                <p className="mt-7 max-w-xl text-lg leading-snug text-ink-900/70">{featured.description}</p>
 
                 <div className="mt-8 flex flex-wrap items-center gap-3">
                   <span className="rounded-full bg-ink-900 px-4 py-2 text-xs font-bold uppercase tracking-wider text-cream">
-                    {latest.time}
+                    {featured.time}
                   </span>
                   <span className="rounded-full border-2 border-warm-ink bg-white px-4 py-2 text-xs font-bold uppercase tracking-wider text-warm-ink">
-                    {latest.location}
+                    {featured.location}
                   </span>
                 </div>
 
                 <div className="mt-9 flex flex-wrap items-center gap-4">
                   <a
-                    href={`/demo/${college.slug}/events/${latest.id}`}
+                    href={`/demo/${college.slug}/events/${featured.id}`}
                     className="inline-flex h-14 items-center justify-center rounded-2xl px-8 text-base font-bold text-white transition-transform hover:-translate-y-0.5"
                     style={{ backgroundColor: college.accent }}
                   >
-                    Get tickets · {latest.attendees} attending
+                    Get tickets · {featured.attendees} attending
                   </a>
                   <a
                     href="#lineup"
@@ -71,17 +82,7 @@ export default function CampusHero({ college }: { college: College }) {
             )}
           </div>
 
-          <div className="w-full max-w-sm -rotate-2 rounded-3xl border-2 border-warm-ink bg-white p-6 shadow-[8px_8px_0_0_#241209]">
-            <p className="text-xs font-bold uppercase tracking-[0.18em] text-ink-900/50">Season snapshot</p>
-            <div className="mt-5 space-y-4">
-              {college.stats?.map((s) => (
-                <div key={s.label} className="flex items-baseline justify-between gap-4 border-b border-dashed border-warm-ink/15 pb-3 last:border-0 last:pb-0">
-                  <span className="font-display text-3xl font-bold text-warm-ink">{s.value}</span>
-                  <span className="text-right text-sm font-medium text-ink-900/60">{s.label}</span>
-                </div>
-              ))}
-            </div>
-          </div>
+          {posterEvent && <HeroPoster event={posterEvent} accent={college.accent} />}
         </div>
       </div>
     </section>

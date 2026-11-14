@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="750" viewBox="0 0 600 750" role="img" aria-label="West Hoops rivalry game poster">
+  <rect width="600" height="750" fill="#fff4e6"/>
+  <rect x="24" y="24" width="552" height="702" fill="none" stroke="#241209" stroke-width="6"/>
+  <rect width="600" height="110" fill="#241209"/>
+  <text x="300" y="70" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="30" font-weight="bold" letter-spacing="10" fill="#fff4e6">WEST HOOPS</text>
+  <text x="300" y="225" text-anchor="middle" font-family="Arial Black, Arial, sans-serif" font-size="72" font-weight="900" fill="#241209">RIVALRY</text>
+  <text x="300" y="315" text-anchor="middle" font-family="Arial Black, Arial, sans-serif" font-size="72" font-weight="900" fill="#ff4a3d">GAME NIGHT</text>
+  <circle cx="300" cy="490" r="130" fill="#ff7a18"/>
+  <path d="M300 400 L300 580 M215 440 L385 440 M210 510 L390 510 M245 415 L245 565 M355 415 L355 565" stroke="#241209" stroke-width="9" fill="none"/>
+  <circle cx="300" cy="490" r="130" fill="none" stroke="#241209" stroke-width="10"/>
+  <rect y="640" width="600" height="110" fill="#241209"/>
+  <text x="300" y="692" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="34" font-weight="bold" letter-spacing="4" fill="#fff4e6">RIVERSIDE ARENA</text>
+  <text x="300" y="724" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="bold" letter-spacing="3" fill="#ff7a18">SELLOUT ENERGY · JERSEYS REQUIRED</text>
+</svg>
