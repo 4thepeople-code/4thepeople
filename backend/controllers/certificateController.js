@@ -132,12 +132,29 @@ exports.processBulkUpload = asyncHandler(async (req, res) => {
 /**
  * POST /manager/events/:eventId/certificates/template
  */
+/**
+ * GET /manager/events/:eventId/certificates/templates/predefined
+ */
+exports.listPredefinedTemplates = asyncHandler(async (req, res) => {
+  const templates = certificateService.getPredefinedTemplates();
+  res.status(200).json({
+    success: true,
+    data: templates,
+  });
+});
+
+/**
+ * POST /manager/events/:eventId/certificates/template (Method C)
+ * Accepts uploaded PDF/PNG/JPEG file OR predefinedTemplateId.
+ */
 exports.saveCertificateTemplate = asyncHandler(async (req, res) => {
   const { eventId } = req.params;
   validateUUID(eventId, 'event ID');
 
-  if (!req.file || !req.file.buffer) {
-    throw new AppError('A valid PDF template file is required in the "template" field', 400);
+  const { predefinedTemplateId, templateName } = req.body;
+
+  if (!req.file && !predefinedTemplateId) {
+    throw new AppError('Either a template file (PDF/PNG/JPEG) or predefinedTemplateId is required', 400);
   }
 
   let placeholderConfig = [];
@@ -151,18 +168,24 @@ exports.saveCertificateTemplate = asyncHandler(async (req, res) => {
     }
   }
 
+  const collegeId = req.collegeId || req.user?.collegeId;
+  if (!collegeId) {
+    throw new AppError('College tenant context missing', 400);
+  }
+
   const template = await certificateService.saveCertificateTemplate({
-    collegeId: req.collegeId,
+    collegeId,
     eventId,
-    templateBuffer: req.file.buffer,
-    templateName: req.body.templateName || 'Certificate Template',
+    templateBuffer: req.file ? req.file.buffer : null,
+    predefinedTemplateId: predefinedTemplateId || null,
+    templateName: templateName || 'Certificate Template',
     placeholderConfig,
     issuerId: req.user.id || req.user.userId,
   });
 
   res.status(201).json({
     success: true,
-    message: 'Certificate template uploaded successfully',
+    message: 'Certificate template saved successfully',
     data: template,
   });
 });
@@ -172,17 +195,25 @@ exports.saveCertificateTemplate = asyncHandler(async (req, res) => {
  */
 exports.previewCertificateTemplate = asyncHandler(async (req, res) => {
   let templateBuffer = null;
+  const { predefinedTemplateId } = req.body;
 
   if (req.file && req.file.buffer) {
     templateBuffer = req.file.buffer;
+  } else if (predefinedTemplateId) {
+    // Handled by service
   } else if (req.body.templateId) {
     validateUUID(req.body.templateId, 'template ID');
     const { eventId } = req.params;
     validateUUID(eventId, 'event ID');
 
-    const template = await withTenant(req.collegeId, async (tx) => {
+    const collegeId = req.collegeId || req.user?.collegeId;
+    if (!collegeId) {
+      throw new AppError('College tenant context missing', 400);
+    }
+
+    const template = await withTenant(collegeId, async (tx) => {
       return tx.eventCertificateTemplate.findFirst({
-        where: { id: req.body.templateId, eventId, collegeId: req.collegeId },
+        where: { id: req.body.templateId, eventId, collegeId },
       });
     });
 
@@ -196,7 +227,7 @@ exports.previewCertificateTemplate = asyncHandler(async (req, res) => {
       throw new AppError('Failed to fetch certificate template asset from storage: ' + err.message, 500);
     }
   } else {
-    throw new AppError('Either a template PDF file or an existing templateId is required', 400);
+    throw new AppError('Either a template file, predefinedTemplateId, or an existing templateId is required', 400);
   }
 
   let placeholderConfig = [];
@@ -221,6 +252,7 @@ exports.previewCertificateTemplate = asyncHandler(async (req, res) => {
 
   const previewPdf = await certificateService.previewCertificateTemplate({
     templateBuffer,
+    predefinedTemplateId: predefinedTemplateId || null,
     placeholderConfig,
     sampleData,
   });
@@ -240,8 +272,13 @@ exports.generateCertificatesFromTemplate = asyncHandler(async (req, res) => {
   const { templateId, studentUserIds } = req.body;
   validateUUID(templateId, 'template ID');
 
+  const collegeId = req.collegeId || req.user?.collegeId;
+  if (!collegeId) {
+    throw new AppError('College tenant context missing', 400);
+  }
+
   const batchResult = await certificateService.generateCertificatesFromTemplate({
-    collegeId: req.collegeId,
+    collegeId,
     eventId,
     templateId,
     studentUserIds: Array.isArray(studentUserIds) ? studentUserIds : null,

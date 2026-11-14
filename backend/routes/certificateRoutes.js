@@ -5,6 +5,7 @@ const {
   singlePdf,
   zipArchive,
   templatePdf,
+  templateAsset,
 } = require('../middleware/certificateUploadMiddleware');
 const certificateController = require('../controllers/certificateController');
 
@@ -61,11 +62,18 @@ managerCertificateRouter.post(
   certificateController.processBulkUpload
 );
 
-// Method C: Upload certificate template
+// Method C: Predefined templates list
+managerCertificateRouter.get(
+  '/events/:eventId/certificates/templates/predefined',
+  requireAdminOrEventManager,
+  certificateController.listPredefinedTemplates
+);
+
+// Method C: Upload certificate template (PDF, PNG, JPEG)
 managerCertificateRouter.post(
   '/events/:eventId/certificates/template',
   requireAdminOrEventManager,
-  templatePdf('template', 10),
+  templateAsset('template', 15),
   certificateController.saveCertificateTemplate
 );
 
@@ -73,7 +81,7 @@ managerCertificateRouter.post(
 managerCertificateRouter.post(
   '/events/:eventId/certificates/template/preview',
   requireAdminOrEventManager,
-  templatePdf('template', 10),
+  templateAsset('template', 15),
   certificateController.previewCertificateTemplate
 );
 

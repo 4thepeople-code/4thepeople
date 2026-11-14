@@ -55,11 +55,69 @@ async function uploadCertificatePdf(buffer, collegeId, eventId, filename) {
 }
 
 /**
- * Uploads a certificate template PDF buffer.
+ * Checks if buffer has PNG magic bytes.
+ */
+function isPng(buffer) {
+  if (!buffer || !Buffer.isBuffer(buffer) || buffer.length < 8) return false;
+  return (
+    buffer[0] === 0x89 &&
+    buffer[1] === 0x50 &&
+    buffer[2] === 0x4e &&
+    buffer[3] === 0x47 &&
+    buffer[4] === 0x0d &&
+    buffer[5] === 0x0a &&
+    buffer[6] === 0x1a &&
+    buffer[7] === 0x0a
+  );
+}
+
+/**
+ * Checks if buffer has JPEG magic bytes.
+ */
+function isJpeg(buffer) {
+  if (!buffer || !Buffer.isBuffer(buffer) || buffer.length < 3) return false;
+  return buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff;
+}
+
+/**
+ * Converts a PNG or JPEG buffer into a single-page PDF buffer matching image dimensions.
+ */
+async function convertImageToPdfBuffer(imageBuffer) {
+  const { PDFDocument } = require('pdf-lib');
+  const pdfDoc = await PDFDocument.create();
+  let embeddedImage;
+  if (isPng(imageBuffer)) {
+    embeddedImage = await pdfDoc.embedPng(imageBuffer);
+  } else if (isJpeg(imageBuffer)) {
+    embeddedImage = await pdfDoc.embedJpg(imageBuffer);
+  } else {
+    throw new Error('Unsupported image format: template must be a valid PNG or JPEG image');
+  }
+
+  const { width, height } = embeddedImage;
+  const page = pdfDoc.addPage([width, height]);
+  page.drawImage(embeddedImage, {
+    x: 0,
+    y: 0,
+    width,
+    height,
+  });
+
+  const pdfBytes = await pdfDoc.save();
+  return Buffer.from(pdfBytes);
+}
+
+/**
+ * Uploads a certificate template buffer (accepts PDF, PNG, or JPEG).
+ * Images are automatically converted to pristine vector PDF pages with matching dimensions.
  */
 async function uploadCertificateTemplatePdf(buffer, collegeId, eventId, templateName) {
-  if (!isValidPdf(buffer)) {
-    throw new Error('Invalid file format: must be a valid PDF document with %PDF- header');
+  let pdfBuffer = buffer;
+
+  if (isPng(buffer) || isJpeg(buffer)) {
+    pdfBuffer = await convertImageToPdfBuffer(buffer);
+  } else if (!isValidPdf(buffer)) {
+    throw new Error('Invalid file format: must be a valid PDF document (%PDF-) or PNG/JPEG image');
   }
 
   if (isTestEnv) {
@@ -86,7 +144,7 @@ async function uploadCertificateTemplatePdf(buffer, collegeId, eventId, template
         });
       }
     );
-    uploadStream.end(buffer);
+    uploadStream.end(pdfBuffer);
   });
 }
 
@@ -176,6 +234,9 @@ async function fetchCertificateAssetBuffer(publicId, publicUrl) {
 
 module.exports = {
   isValidPdf,
+  isPng,
+  isJpeg,
+  convertImageToPdfBuffer,
   uploadCertificatePdf,
   uploadCertificateTemplatePdf,
   deleteCertificateAsset,

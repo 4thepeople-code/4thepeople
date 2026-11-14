@@ -193,13 +193,32 @@ export interface EventCertificate {
 }
 
 export interface PlaceholderConfigItem {
+  id?: string;
   placeholder: string;
-  x: number;
-  y: number;
-  size?: number;
-  font?: 'Helvetica' | 'HelveticaBold' | 'Times';
+  xPercent?: number;
+  yPercent?: number;
+  widthPercent?: number;
+  fontSize?: number;
+  font?: 'Helvetica' | 'HelveticaBold' | 'Times' | 'TimesBold' | 'Courier' | 'CourierBold';
   color?: string;
   align?: 'left' | 'center' | 'right';
+  autoFit?: boolean;
+  isMultiline?: boolean;
+  // Legacy point fallback:
+  x?: number;
+  y?: number;
+  size?: number;
+}
+
+export interface PredefinedTemplate {
+  id: string;
+  name: string;
+  description: string;
+  orientation: 'landscape' | 'portrait';
+  aspectRatio: number;
+  backgroundColor: string;
+  primaryTextColor: string;
+  defaultConfig: PlaceholderConfigItem[];
 }
 
 export interface EventCertificateTemplate {
@@ -209,7 +228,15 @@ export interface EventCertificateTemplate {
   templateName: string;
   templatePublicId: string;
   templateUrl: string;
-  placeholderConfig: PlaceholderConfigItem[];
+  placeholderConfig: {
+    page?: {
+      width: number;
+      height: number;
+      orientation: 'landscape' | 'portrait';
+    };
+    predefinedTemplateId?: string | null;
+    items?: PlaceholderConfigItem[];
+  } | PlaceholderConfigItem[];
   isActive: boolean;
   createdAt?: string;
 }

@@ -10,6 +10,7 @@ import type {
   EventCertificateTemplate,
   EligibleStudentItem,
   PlaceholderConfigItem,
+  PredefinedTemplate,
 } from '@/types/models';
 
 // ============================================================================
@@ -559,6 +560,25 @@ export function useUploadBulkCertificatesMutation(slug: string, eventId: string)
 }
 
 /**
+ * Method C: Fetch predefined certificate templates.
+ */
+export async function getPredefinedTemplatesApi(slug: string, eventId: string): Promise<PredefinedTemplate[]> {
+  const response = await apiClient.get<{ success: boolean; data: PredefinedTemplate[] }>(
+    `/manager/events/${eventId}/certificates/templates/predefined`
+  );
+  return response.data?.data || [];
+}
+
+export function usePredefinedTemplatesQuery(slug: string, eventId: string, enabled = true) {
+  return useQuery({
+    queryKey: [...queryKeys.tenant(slug).certificates.all, 'predefined-templates', eventId],
+    queryFn: () => getPredefinedTemplatesApi(slug, eventId),
+    enabled: !!slug && !!eventId && enabled,
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+/**
  * Method C: Save Certificate Template.
  */
 export async function saveCertificateTemplateApi(
@@ -566,10 +586,18 @@ export async function saveCertificateTemplateApi(
   eventId: string,
   templateName: string,
   placeholderConfig: PlaceholderConfigItem[],
-  templateFile: File
+  options?: {
+    templateFile?: File | null;
+    predefinedTemplateId?: string | null;
+  }
 ): Promise<EventCertificateTemplate> {
   const formData = new FormData();
-  formData.append('template', templateFile);
+  if (options?.templateFile) {
+    formData.append('template', options.templateFile);
+  }
+  if (options?.predefinedTemplateId) {
+    formData.append('predefinedTemplateId', options.predefinedTemplateId);
+  }
   formData.append('templateName', templateName);
   formData.append('placeholderConfig', JSON.stringify(placeholderConfig));
 
@@ -586,20 +614,26 @@ export async function previewCertificateTemplateApi(
   slug: string,
   eventId: string,
   placeholderConfig: PlaceholderConfigItem[],
-  sampleData?: Record<string, string>,
-  templateId?: string,
-  templateFile?: File
+  options?: {
+    sampleData?: Record<string, string>;
+    templateId?: string | null;
+    templateFile?: File | null;
+    predefinedTemplateId?: string | null;
+  }
 ): Promise<Blob> {
   const formData = new FormData();
-  if (templateFile) {
-    formData.append('template', templateFile);
+  if (options?.templateFile) {
+    formData.append('template', options.templateFile);
   }
-  if (templateId) {
-    formData.append('templateId', templateId);
+  if (options?.predefinedTemplateId) {
+    formData.append('predefinedTemplateId', options.predefinedTemplateId);
+  }
+  if (options?.templateId) {
+    formData.append('templateId', options.templateId);
   }
   formData.append('placeholderConfig', JSON.stringify(placeholderConfig));
-  if (sampleData) {
-    formData.append('sampleData', JSON.stringify(sampleData));
+  if (options?.sampleData) {
+    formData.append('sampleData', JSON.stringify(options.sampleData));
   }
 
   const response = await apiClient.post(`/manager/events/${eventId}/certificates/template/preview`, formData, {

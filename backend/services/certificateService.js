@@ -6,11 +6,19 @@ const { platformPrisma } = require('../config/platformDb');
 const { AppError } = require('../middleware/errorHandler');
 const {
   isValidPdf,
+  isPng,
+  isJpeg,
+  convertImageToPdfBuffer,
   uploadCertificatePdf,
   uploadCertificateTemplatePdf,
   deleteCertificateAsset,
   fetchCertificateAssetBuffer,
 } = require('../utils/certificateStorage');
+const {
+  getPredefinedTemplates,
+  getPredefinedTemplatePdfBuffer,
+  getPredefinedTemplateById,
+} = require('../assets/templates/predefinedTemplates');
 
 // ============================================================================
 // Constants & Security Limits
@@ -504,14 +512,50 @@ async function processBulkCertificates({ collegeId, eventId, zipBuffer, issuerId
 
 /**
  * Method C: Save Certificate Template for an Event.
+ * Accepts uploaded PDF, PNG, JPEG, or a predefinedTemplateId.
  */
-async function saveCertificateTemplate({ collegeId, eventId, templateBuffer, templateName, placeholderConfig, issuerId }) {
-  if (!isValidPdf(templateBuffer)) {
-    throw new AppError('Invalid file: only valid PDF documents with %PDF- header are accepted', 400);
+async function saveCertificateTemplate({ collegeId, eventId, templateBuffer, predefinedTemplateId, templateName, placeholderConfig, issuerId }) {
+  let effectiveBuffer = templateBuffer;
+
+  if (predefinedTemplateId) {
+    const predefinedBuf = getPredefinedTemplatePdfBuffer(predefinedTemplateId);
+    if (!predefinedBuf) {
+      throw new AppError(`Predefined template '${predefinedTemplateId}' not found`, 404);
+    }
+    effectiveBuffer = predefinedBuf;
   }
 
+  if (!effectiveBuffer) {
+    throw new AppError('Either a template file or predefinedTemplateId is required', 400);
+  }
+
+  if (isPng(effectiveBuffer) || isJpeg(effectiveBuffer)) {
+    effectiveBuffer = await convertImageToPdfBuffer(effectiveBuffer);
+  }
+
+  if (!isValidPdf(effectiveBuffer)) {
+    throw new AppError('Invalid file: only valid PDF documents (%PDF-) or PNG/JPEG images are accepted', 400);
+  }
+
+  // Inspect page dimensions to save with template configuration
+  const pdfDoc = await PDFDocument.load(effectiveBuffer);
+  const page = pdfDoc.getPages()[0];
+  const { width: pageWidth, height: pageHeight } = page.getSize();
+
+  const configToSave = {
+    page: {
+      width: Math.round(pageWidth * 100) / 100,
+      height: Math.round(pageHeight * 100) / 100,
+      orientation: pageWidth >= pageHeight ? 'landscape' : 'portrait',
+    },
+    predefinedTemplateId: predefinedTemplateId || null,
+    items: Array.isArray(placeholderConfig)
+      ? placeholderConfig
+      : (placeholderConfig && placeholderConfig.items ? placeholderConfig.items : []),
+  };
+
   const uploadResult = await uploadCertificateTemplatePdf(
-    templateBuffer,
+    effectiveBuffer,
     collegeId,
     eventId,
     templateName || 'certificate_template'
@@ -532,7 +576,7 @@ async function saveCertificateTemplate({ collegeId, eventId, templateBuffer, tem
           templateName: templateName || 'Event Certificate Template',
           templatePublicId: uploadResult.publicId,
           templateUrl: uploadResult.url,
-          placeholderConfig: Array.isArray(placeholderConfig) ? placeholderConfig : [],
+          placeholderConfig: configToSave,
           isActive: true,
           createdById: issuerId,
         },
@@ -548,15 +592,20 @@ async function saveCertificateTemplate({ collegeId, eventId, templateBuffer, tem
 
 /**
  * Method C: Render Coordinate-based PDF overlay for given placeholders using pdf-lib.
+ * Supports both normalized percentage coordinates (responsive visual editor) and legacy point coordinates.
  */
 async function renderCertificateOverlay(templateBuffer, data, placeholderConfig = []) {
   const pdfDoc = await PDFDocument.load(templateBuffer);
-  const fontRegular = await pdfDoc.embedFont(StandardFonts.Helvetica);
-  const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-  const fontTimes = await pdfDoc.embedFont(StandardFonts.TimesRomanBold);
+  const fontHelvetica = await pdfDoc.embedFont(StandardFonts.Helvetica);
+  const fontHelveticaBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+  const fontTimes = await pdfDoc.embedFont(StandardFonts.TimesRoman);
+  const fontTimesBold = await pdfDoc.embedFont(StandardFonts.TimesRomanBold);
+  const fontCourier = await pdfDoc.embedFont(StandardFonts.Courier);
+  const fontCourierBold = await pdfDoc.embedFont(StandardFonts.CourierBold);
 
   const pages = pdfDoc.getPages();
   const page = pages[0];
+  const { width: pageWidth, height: pageHeight } = page.getSize();
 
   const parseColor = (hexStr) => {
     if (!hexStr || typeof hexStr !== 'string' || !hexStr.startsWith('#')) return rgb(0, 0, 0);
@@ -567,7 +616,32 @@ async function renderCertificateOverlay(templateBuffer, data, placeholderConfig 
     return rgb(r, g, b);
   };
 
-  for (const item of placeholderConfig) {
+  const getFont = (fontName) => {
+    switch (fontName) {
+      case 'HelveticaBold':
+        return fontHelveticaBold;
+      case 'Times':
+      case 'TimesRoman':
+        return fontTimes;
+      case 'TimesBold':
+      case 'TimesRomanBold':
+        return fontTimesBold;
+      case 'Courier':
+        return fontCourier;
+      case 'CourierBold':
+        return fontCourierBold;
+      case 'Helvetica':
+      default:
+        return fontHelvetica;
+    }
+  };
+
+  // Support config as Array or Object with .items
+  const items = Array.isArray(placeholderConfig)
+    ? placeholderConfig
+    : (placeholderConfig && placeholderConfig.items ? placeholderConfig.items : []);
+
+  for (const item of items) {
     const key = item.placeholder;
     let text = '';
     if (key === '{{studentName}}') text = data.studentName || '';
@@ -580,25 +654,60 @@ async function renderCertificateOverlay(templateBuffer, data, placeholderConfig 
 
     if (!text) continue;
 
-    const size = item.size ? Number(item.size) : 18;
-    const font = item.font === 'Helvetica' ? fontRegular : item.font === 'Times' ? fontTimes : fontBold;
+    const font = getFont(item.font);
     const color = parseColor(item.color || '#000000');
+    let currentSize = Number(item.fontSize || item.size) || 18;
 
-    let x = Number(item.x) || 100;
-    const y = Number(item.y) || 200;
+    let pdfX = 0;
+    let pdfY = 0;
 
-    if (item.align === 'center') {
-      const textWidth = font.widthOfTextAtSize(text, size);
-      x = x - textWidth / 2;
-    } else if (item.align === 'right') {
-      const textWidth = font.widthOfTextAtSize(text, size);
-      x = x - textWidth;
+    // 1. Normalized Percentage Coordinate Mode (Visual Editor)
+    if (item.xPercent !== undefined && item.yPercent !== undefined) {
+      const baseX = (Number(item.xPercent) / 100) * pageWidth;
+      const targetYFromTop = (Number(item.yPercent) / 100) * pageHeight;
+      const baseY = pageHeight - targetYFromTop;
+
+      // Max allowed width with automatic text fitting
+      const maxWidth = item.widthPercent
+        ? (Number(item.widthPercent) / 100) * pageWidth
+        : 0.85 * pageWidth;
+
+      if (item.autoFit !== false && maxWidth > 30) {
+        let textWidth = font.widthOfTextAtSize(text, currentSize);
+        if (textWidth > maxWidth) {
+          currentSize = Math.max(8, currentSize * (maxWidth / textWidth));
+        }
+      }
+
+      const textWidth = font.widthOfTextAtSize(text, currentSize);
+
+      if (item.align === 'center') {
+        pdfX = baseX - textWidth / 2;
+      } else if (item.align === 'right') {
+        pdfX = baseX - textWidth;
+      } else {
+        pdfX = baseX;
+      }
+
+      // Vertical optical centering relative to baseline
+      pdfY = baseY - (currentSize * 0.35);
+    } else {
+      // 2. Legacy Raw Point Coordinate Mode
+      pdfX = Number(item.x) || 100;
+      pdfY = Number(item.y) || 200;
+
+      const textWidth = font.widthOfTextAtSize(text, currentSize);
+      if (item.align === 'center') {
+        pdfX -= textWidth / 2;
+      } else if (item.align === 'right') {
+        pdfX -= textWidth;
+      }
     }
 
     page.drawText(text, {
-      x,
-      y,
-      size,
+      x: pdfX,
+      y: pdfY,
+      size: currentSize,
       font,
       color,
     });
@@ -611,14 +720,32 @@ async function renderCertificateOverlay(templateBuffer, data, placeholderConfig 
 /**
  * Method C: Generate sample preview PDF using coordinates and placeholder styling.
  */
-async function previewCertificateTemplate({ templateBuffer, placeholderConfig, sampleData = {} }) {
-  if (!isValidPdf(templateBuffer)) {
+async function previewCertificateTemplate({ templateBuffer, predefinedTemplateId, placeholderConfig, sampleData = {} }) {
+  let effectiveBuffer = templateBuffer;
+
+  if (predefinedTemplateId) {
+    const predefinedBuf = getPredefinedTemplatePdfBuffer(predefinedTemplateId);
+    if (!predefinedBuf) {
+      throw new AppError(`Predefined template '${predefinedTemplateId}' not found`, 404);
+    }
+    effectiveBuffer = predefinedBuf;
+  }
+
+  if (!effectiveBuffer) {
+    throw new AppError('Either a template buffer or predefinedTemplateId is required', 400);
+  }
+
+  if (isPng(effectiveBuffer) || isJpeg(effectiveBuffer)) {
+    effectiveBuffer = await convertImageToPdfBuffer(effectiveBuffer);
+  }
+
+  if (!isValidPdf(effectiveBuffer)) {
     throw new AppError('Invalid PDF template buffer', 400);
   }
 
   const defaultSample = {
-    studentName: 'John Doe',
-    rollNumber: '23761A05A1',
+    studentName: 'Alex Mercer',
+    rollNumber: '23761A0599',
     eventName: 'Annual Innovation Symposium',
     issueDate: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
     certificateId: 'CERT-DEMO-2026-0001',
@@ -626,7 +753,7 @@ async function previewCertificateTemplate({ templateBuffer, placeholderConfig, s
     ...sampleData,
   };
 
-  return renderCertificateOverlay(templateBuffer, defaultSample, placeholderConfig);
+  return renderCertificateOverlay(effectiveBuffer, defaultSample, placeholderConfig);
 }
 
 /**
@@ -1142,4 +1269,5 @@ module.exports = {
   getEligibleStudents,
   getStudentCertificates,
   verifyCertificatePublic,
+  getPredefinedTemplates,
 };
