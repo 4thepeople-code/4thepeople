@@ -10,7 +10,6 @@ import { actions } from '@/lib/copy';
 /** Opens the global "Invite Event Manager" modal from anywhere in the shell. */
 const InviteManagerContext = createContext<() => void>(() => {});
 
-// eslint-disable-next-line react-refresh/only-export-components
 export function useOpenInviteManager() {
   return useContext(InviteManagerContext);
 }
