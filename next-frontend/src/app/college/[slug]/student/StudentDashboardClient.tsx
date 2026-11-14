@@ -9,6 +9,7 @@ import {
   useMyRegistrationsQuery,
   useUpcomingEvents,
   useCancelRegistrationMutation,
+  useMyCertificatesQuery,
 } from '@/lib/api/events';
 import { useMeQuery } from '@/lib/api/auth';
 import { useMyClubsQuery } from '@/lib/api/manager';
@@ -29,6 +30,11 @@ import {
   ArrowRight,
   Shield,
   Building2,
+  Award,
+  Download,
+  Copy,
+  Check,
+  ExternalLink,
 } from 'lucide-react';
 import type { EventRegistration } from '@/types/models';
 
@@ -56,9 +62,17 @@ export function StudentDashboardClient({ slug, initialTab = 'registrations' }: S
   const { isDark } = useTheme();
   const collegeDisplay = slug.toUpperCase();
 
-  const [activeTab, setActiveTab] = useState<'registrations' | 'events' | 'profile'>(
-    initialTab === 'events' ? 'events' : initialTab === 'profile' ? 'profile' : 'registrations'
+  const [activeTab, setActiveTab] = useState<'registrations' | 'events' | 'certificates' | 'profile'>(
+    initialTab === 'events'
+      ? 'events'
+      : initialTab === 'certificates'
+      ? 'certificates'
+      : initialTab === 'profile'
+      ? 'profile'
+      : 'registrations'
   );
+
+  const [copiedCertId, setCopiedCertId] = useState<string | null>(null);
 
   // Cancellation modal state
   const [cancellingReg, setCancellingReg] = useState<EventRegistration | null>(null);
@@ -69,12 +83,17 @@ export function StudentDashboardClient({ slug, initialTab = 'registrations' }: S
   const [selectedCategory, setSelectedCategory] = useState('ALL');
 
   // Queries
-  const isStudent = user && user.role === 'USER';
   const {
     data: myRegistrations = [],
     isLoading: regsLoading,
     refetch: refetchRegs,
   } = useMyRegistrationsQuery(slug, Boolean(user));
+
+  const {
+    data: myCertificates = [],
+    isLoading: certsLoading,
+    refetch: refetchCerts,
+  } = useMyCertificatesQuery(slug, Boolean(user));
 
   const {
     data: upcomingEvents = [],
@@ -302,6 +321,21 @@ export function StudentDashboardClient({ slug, initialTab = 'registrations' }: S
           >
             <Calendar className="w-4 h-4" />
             <span>Discover Events ({upcomingEvents.length})</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('certificates')}
+            className={`px-5 py-2.5 rounded-2xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap ${
+              activeTab === 'certificates'
+                ? 'bg-[#00F0FF] text-black shadow-lg shadow-cyan-500/20'
+                : isDark
+                ? 'bg-white/5 text-gray-400 hover:text-white'
+                : 'bg-slate-100 text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <Award className="w-4 h-4" />
+            <span>My Certificates ({myCertificates.length})</span>
           </button>
 
           <button
@@ -605,7 +639,172 @@ export function StudentDashboardClient({ slug, initialTab = 'registrations' }: S
           </div>
         )}
 
-        {/* TAB 3: STUDENT PROFILE */}
+        {/* TAB 3: MY CERTIFICATES */}
+        {activeTab === 'certificates' && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className={`font-['Syne',sans-serif] text-xl font-bold uppercase ${isDark ? 'text-white' : 'text-[#0F172A]'}`}>
+                  Official Event Certificates
+                </h2>
+                <p className={`text-xs ${isDark ? 'text-gray-400' : 'text-slate-500'}`}>
+                  Verified participation credentials issued for your completed campus club events.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => refetchCerts()}
+                className={`p-2 rounded-xl border text-xs transition cursor-pointer flex items-center gap-1.5 ${
+                  isDark ? 'bg-white/5 border-white/10 text-gray-400 hover:text-white' : 'bg-slate-100 border-slate-200 text-slate-700'
+                }`}
+                title="Refresh certificates"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${certsLoading ? 'animate-spin' : ''}`} />
+                <span className="hidden sm:inline">Refresh</span>
+              </button>
+            </div>
+
+            {certsLoading ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {[1, 2].map((i) => (
+                  <div
+                    key={i}
+                    className={`h-48 rounded-3xl animate-pulse border ${
+                      isDark ? 'bg-white/5 border-white/5' : 'bg-slate-100 border-slate-200'
+                    }`}
+                  />
+                ))}
+              </div>
+            ) : myCertificates.length === 0 ? (
+              <div
+                className={`text-center py-16 rounded-3xl border space-y-3 ${
+                  isDark ? 'bg-[#12141C] border-white/10 text-gray-400' : 'bg-white border-slate-200 text-slate-500'
+                }`}
+              >
+                <Award className="w-12 h-12 text-cyan-400/50 mx-auto" />
+                <div className="space-y-1">
+                  <p className="text-sm font-bold text-slate-200">No Certificates Earned Yet</p>
+                  <p className="text-xs text-slate-400 max-w-md mx-auto">
+                    Certificates will appear here once event managers issue or generate official credentials for events you attended.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('events')}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 text-xs font-bold uppercase tracking-wider hover:bg-cyan-500/20 transition cursor-pointer"
+                >
+                  <Calendar className="w-3.5 h-3.5" />
+                  <span>Discover Upcoming Events</span>
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {myCertificates.map((cert) => {
+                  const downloadUrl = `/api/certificates/${cert.id}/download`;
+                  const verifyUrl = `/college/${slug}/verify/${cert.certificateNumber}`;
+
+                  return (
+                    <div
+                      key={cert.id}
+                      className={`p-6 rounded-3xl border shadow-lg flex flex-col justify-between space-y-4 transition-all relative overflow-hidden ${
+                        isDark
+                          ? 'bg-[#12141C] border-white/10 hover:border-cyan-500/30'
+                          : 'bg-white border-slate-200 shadow-slate-200/50 hover:border-cyan-500/40'
+                      }`}
+                    >
+                      {/* Top ribbon decoration */}
+                      <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-cyan-500/15 via-transparent to-transparent pointer-events-none" />
+
+                      <div className="space-y-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-[10px] font-bold uppercase tracking-wider text-emerald-400">
+                            <CheckCircle2 className="w-3 h-3" />
+                            <span>Official Certificate</span>
+                          </span>
+
+                          <span className="text-[11px] text-slate-400">
+                            Issued:{' '}
+                            {new Date(cert.issuedAt).toLocaleDateString('en-US', {
+                              month: 'short',
+                              day: 'numeric',
+                              year: 'numeric',
+                            })}
+                          </span>
+                        </div>
+
+                        <div>
+                          <h3
+                            className={`font-['Syne',sans-serif] text-lg font-bold uppercase tracking-tight line-clamp-1 ${
+                              isDark ? 'text-white' : 'text-[#0F172A]'
+                            }`}
+                          >
+                            {cert.event?.title || 'Campus Event Participation'}
+                          </h3>
+                          <p className={`text-xs mt-0.5 ${isDark ? 'text-gray-400' : 'text-slate-500'}`}>
+                            {cert.event?.club?.name || `${collegeDisplay} Event`}
+                          </p>
+                        </div>
+
+                        {/* Certificate Number with Copy */}
+                        <div
+                          className={`p-2.5 rounded-xl border flex items-center justify-between text-xs font-mono ${
+                            isDark ? 'bg-black/30 border-white/10' : 'bg-slate-50 border-slate-200'
+                          }`}
+                        >
+                          <span className="text-cyan-400 font-bold truncate">{cert.certificateNumber}</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              navigator.clipboard.writeText(cert.certificateNumber);
+                              setCopiedCertId(cert.certificateNumber);
+                              setTimeout(() => setCopiedCertId(null), 2000);
+                            }}
+                            className="p-1 rounded-md hover:bg-white/10 text-slate-400 hover:text-white transition shrink-0 ml-2"
+                            title="Copy certificate ID"
+                          >
+                            {copiedCertId === cert.certificateNumber ? (
+                              <Check className="w-3.5 h-3.5 text-emerald-400" />
+                            ) : (
+                              <Copy className="w-3.5 h-3.5" />
+                            )}
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Download & Verification CTA Buttons */}
+                      <div className="pt-3 border-t border-white/10 flex items-center gap-3">
+                        <a
+                          href={downloadUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex-1 py-2.5 px-4 rounded-xl font-bold text-xs uppercase tracking-wider bg-cyan-500 hover:bg-cyan-400 text-slate-950 flex items-center justify-center gap-1.5 transition shadow-sm shadow-cyan-500/20"
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                          <span>Download PDF</span>
+                        </a>
+
+                        <Link
+                          href={verifyUrl}
+                          target="_blank"
+                          className={`p-2.5 rounded-xl border transition ${
+                            isDark
+                              ? 'border-white/10 text-slate-300 hover:text-cyan-400 hover:bg-white/5'
+                              : 'border-slate-200 text-slate-700 hover:text-cyan-600 hover:bg-slate-50'
+                          }`}
+                          title="Verify Certificate Authenticity"
+                        >
+                          <ExternalLink className="w-4 h-4" />
+                        </Link>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* TAB 4: STUDENT PROFILE */}
         {activeTab === 'profile' && (
           <div className="max-w-2xl space-y-6">
             <div>

@@ -28,6 +28,7 @@ const inviteRouter = require('./routes/inviteRoutes');
 const clubRouter = require('./routes/clubRoutes');
 const managerRouter = require('./routes/managerRoutes');
 const registrationRouter = require('./routes/registrationRoutes');
+const { certificateRouter, managerCertificateRouter } = require('./routes/certificateRoutes');
 const publicRouter = require('./routes/publicRoutes');
 const platformAuthRouter = require('./platform/platformAuthRoutes');
 const platformAdminManagementRouter = require('./platform/platformAdminManagementRoutes');
@@ -117,11 +118,16 @@ app.use('/api/invite', inviteRouter);
 app.use('/club', clubRouter);
 app.use('/api/club', clubRouter);
 
+app.use('/manager', managerCertificateRouter);
+app.use('/api/manager', managerCertificateRouter);
 app.use('/manager', managerRouter);
 app.use('/api/manager', managerRouter);
 
 app.use('/events', registrationRouter);
 app.use('/api/events', registrationRouter);
+
+app.use('/certificates', certificateRouter);
+app.use('/api/certificates', certificateRouter);
 
 // Public club browsing routes: GET /clubs and GET /clubs/:clubId
 app.use('/', publicRouter);

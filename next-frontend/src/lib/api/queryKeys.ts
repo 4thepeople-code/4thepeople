@@ -61,6 +61,17 @@ export const queryKeys = {
         ['tenant', slug, 'manager', 'club', clubId, 'event', eventId, 'attendees', page] as const,
     },
 
+    certificates: {
+      all: ['tenant', slug, 'certificates'] as const,
+      myCertificates: () => ['tenant', slug, 'certificates', 'mine'] as const,
+      eventCertificates: (eventId: string, page = 1, status = 'ALL', search = '') =>
+        ['tenant', slug, 'certificates', 'event', eventId, page, status, search] as const,
+      eligibleStudents: (eventId: string) =>
+        ['tenant', slug, 'certificates', 'event', eventId, 'eligible-students'] as const,
+      verify: (certificateNumber: string) =>
+        ['public', 'certificates', 'verify', certificateNumber] as const,
+    },
+
     admin: {
       all: ['tenant', slug, 'admin'] as const,
       profile: () => ['tenant', slug, 'admin', 'profile'] as const,

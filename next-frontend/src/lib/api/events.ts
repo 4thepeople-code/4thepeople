@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from './axios';
 import { queryKeys } from './queryKeys';
-import type { Event, EventRegistration } from '@/types/models';
+import type { Event, EventRegistration, EventCertificate, PublicCertificateVerification } from '@/types/models';
 
 /**
  * Fetches all upcoming events for the active college tenant.
@@ -246,3 +246,46 @@ export function useCancelRegistrationMutation(slug: string) {
     },
   });
 }
+
+// ============================================================================
+// Student Certificates & Public Verification
+// ============================================================================
+
+/**
+ * Fetches all issued certificates for the logged-in student.
+ */
+export async function fetchMyCertificates(): Promise<EventCertificate[]> {
+  const response = await apiClient.get('/certificates/my');
+  const res = response.data;
+  if (Array.isArray(res)) return res as EventCertificate[];
+  if (res && typeof res === 'object') {
+    const obj = res as Record<string, unknown>;
+    if (Array.isArray(obj.data)) return obj.data as EventCertificate[];
+  }
+  return [];
+}
+
+export function useMyCertificatesQuery(slug: string, enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.tenant(slug).certificates.myCertificates(),
+    queryFn: () => fetchMyCertificates(),
+    enabled: !!slug && enabled,
+  });
+}
+
+/**
+ * Public Verification API (no auth required).
+ */
+export async function verifyCertificatePublic(certificateNumber: string): Promise<PublicCertificateVerification> {
+  const response = await apiClient.get(`/certificates/verify/${encodeURIComponent(certificateNumber.trim())}`);
+  return response.data?.data || response.data;
+}
+
+export function useVerifyCertificateQuery(slug: string, certificateNumber: string, enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.tenant(slug).certificates.verify(certificateNumber),
+    queryFn: () => verifyCertificatePublic(certificateNumber),
+    enabled: !!certificateNumber && enabled,
+  });
+}
+
