@@ -8,6 +8,12 @@ import { useCollegeAdminLoginMutation } from '@/lib/api/auth';
 import type { AuthUser } from '@/types/auth';
 import PublicLayout from '@/components/public/PublicLayout';
 import {
+  defaultReturnUrl,
+  managerLoginHref,
+  resolvePostLoginTarget,
+  studentLoginHref,
+} from '@/lib/auth/roleRedirect';
+import {
   ShieldCheck,
   Mail,
   Lock,
@@ -36,9 +42,7 @@ export function CollegeAdminLoginClient({ slug, initialReturnUrl }: CollegeAdmin
   const collegeDisplay = slug ? slug.toUpperCase() : 'CAMPUS';
   const returnUrl =
     initialReturnUrl ||
-    (typeof window !== 'undefined' && window.location.pathname.startsWith(`/college/${slug}`)
-      ? `/college/${slug}/admin`
-      : '/admin');
+    defaultReturnUrl('collegeAdmin', slug, typeof window !== 'undefined' ? window.location.pathname : undefined);
 
   const adminLoginMutation = useCollegeAdminLoginMutation(slug);
 
@@ -73,7 +77,14 @@ export function CollegeAdminLoginClient({ slug, initialReturnUrl }: CollegeAdmin
 
       if (user) {
         login(user, token);
-        window.location.href = returnUrl;
+        // Hard navigation (pre-existing behaviour) so cookie state refreshes.
+        window.location.href = resolvePostLoginTarget({
+          portal: 'collegeAdmin',
+          user,
+          slug,
+          currentPath: typeof window !== 'undefined' ? window.location.pathname : undefined,
+          returnUrl,
+        });
       } else {
         setErrorMsg('Login succeeded but user payload was missing.');
       }
@@ -212,19 +223,13 @@ export function CollegeAdminLoginClient({ slug, initialReturnUrl }: CollegeAdmin
             <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-800 text-center space-y-2">
               <p className="text-xs text-gray-500">
                 Are you a club manager?{' '}
-                <Link
-                  href={typeof window !== 'undefined' && window.location.pathname.startsWith(`/college/${slug}`) ? `/college/${slug}/login/manager` : '/login/manager'}
-                  className="text-[#B08D57] hover:underline font-medium"
-                >
+                <Link href={managerLoginHref(slug)} className="text-[#B08D57] hover:underline font-medium">
                   Manager Login
                 </Link>
               </p>
               <p className="text-xs text-gray-500">
                 Are you a student?{' '}
-                <Link
-                  href={typeof window !== 'undefined' && window.location.pathname.startsWith(`/college/${slug}`) ? `/college/${slug}/login` : '/login'}
-                  className="text-[#B08D57] hover:underline font-medium"
-                >
+                <Link href={studentLoginHref(slug)} className="text-[#B08D57] hover:underline font-medium">
                   Student Portal
                 </Link>
               </p>

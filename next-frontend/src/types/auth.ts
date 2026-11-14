@@ -30,6 +30,11 @@ export interface AuthContextState {
   token: string | null;
   loading: boolean;
   isAuthenticated: boolean;
+  /**
+   * Where this user's own dashboard lives (via lib/auth/roleRedirect).
+   * Used by RoleGuard to send wrong-role users home; null when unknown.
+   */
+  dashboardHref: (slug?: string) => string | null;
   login: (userData: AuthUser | string, tokenOrData?: string | Partial<User> | null) => void;
   logout: () => Promise<void>;
   refreshSession: () => Promise<void>;

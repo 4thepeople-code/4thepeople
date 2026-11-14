@@ -1,0 +1,110 @@
+/*
+ * Dashboard design tokens — Phase 1 of the new-UI migration.
+ *
+ * Extends the landing page's token system (see @theme + .landing-scope in
+ * globals.css) with a `.dashboard-scope` wrapper for the role dashboards.
+ * Every value below is taken from the existing landing palette — no new
+ * colors are introduced. Surfaces are cream/paper; actions use the brand
+ * (indigo) primary with coral (--secondary) as the accent. Dark mode mirrors
+ * the landing's dark values and is driven by the `.dark` class that
+ * ThemeContext puts on <html>.
+ */
+.dashboard-scope {
+  /* Landing typography (Sora display, Anton accents, Inter body) */
+  --font-display: var(--font-sora);
+  --font-campus: var(--font-anton);
+
+  /* Surfaces & ink (cream page, paper cards, warm-ink text) */
+  --bg: var(--color-cream, #fff4e6);
+  --surface: var(--color-paper, #fffaf0);
+  --ink: var(--color-warm-ink, #241209);
+  --ink-soft: rgba(36, 18, 9, 0.65);
+  --line: rgba(36, 18, 9, 0.12);
+
+  /* Brand (indigo) primary + coral accent — same values as the landing */
+  --primary: var(--color-brand-500, #4f46e8);
+  --primary-strong: var(--color-brand-600, #4338ca);
+  --primary-soft: var(--color-brand-soft, #ececfd);
+  --secondary: var(--color-coral, #ff4a3d);
+  --secondary-soft: #ffe9e6;
+  --on-primary: #ffffff;
+
+  background-color: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+}
+
+.dark .dashboard-scope {
+  --bg: #0d0f14;
+  --surface: #14171f;
+  --ink: #f2f3f7;
+  --ink-soft: #a7acbb;
+  --line: rgba(242, 243, 247, 0.12);
+  --primary: #8183ff;
+  --primary-strong: #6366f1;
+  --primary-soft: rgba(99, 102, 241, 0.2);
+  --secondary: #ff6a5c;
+  --secondary-soft: rgba(255, 74, 61, 0.18);
+  --on-primary: #0d0f14;
+}
+
+/* Font utilities resolve to the landing fonts inside the dashboard scope */
+.dashboard-scope .font-display {
+  font-family: var(--font-sora), sans-serif;
+}
+
+.dashboard-scope .font-campus {
+  font-family: var(--font-anton), sans-serif;
+}
+
+/* Shared focus ring for interactive dashboard elements */
+.dashboard-scope :focus-visible {
+  outline: none;
+}
+
+/* Skeleton shimmer — respects reduced motion via the media query below */
+@keyframes dashboard-shimmer {
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+.dashboard-scope .animate-dashboard-skeleton {
+  animation: dashboard-shimmer 1.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dashboard-scope .animate-dashboard-skeleton,
+  .dashboard-scope .animate-dashboard-toast-in {
+    animation: none;
+  }
+
+  .dashboard-scope *,
+  .dashboard-scope *::before,
+  .dashboard-scope *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
+@keyframes dashboard-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.dashboard-scope .animate-dashboard-toast-in {
+  animation: dashboard-toast-in 180ms ease-out;
+}

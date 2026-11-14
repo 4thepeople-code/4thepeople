@@ -12,6 +12,11 @@ import {
 import type { AuthUser } from '@/types/auth';
 import PublicLayout from '@/components/public/PublicLayout';
 import {
+  defaultReturnUrl,
+  redirectIfAlreadyAuthenticated,
+  resolvePostLoginTarget,
+} from '@/lib/auth/roleRedirect';
+import {
   ShieldCheck,
   Mail,
   Lock,
@@ -49,17 +54,19 @@ export function ManagerLoginClient({ slug, initialReturnUrl }: ManagerLoginClien
   const collegeDisplay = slug ? slug.toUpperCase() : 'CAMPUS';
   const returnUrl =
     initialReturnUrl ||
-    (typeof window !== 'undefined' && window.location.pathname.startsWith(`/college/${slug}`)
-      ? `/college/${slug}/manager`
-      : '/manager');
+    defaultReturnUrl('manager', slug, typeof window !== 'undefined' ? window.location.pathname : undefined);
 
   // If already authenticated as College Admin, redirect to College Admin portal
   React.useEffect(() => {
-    if (user && user.role === 'COLLEGE_ADMIN') {
-      const adminUrl = typeof window !== 'undefined' && window.location.pathname.startsWith(`/college/${slug}`)
-        ? `/college/${slug}/admin`
-        : '/admin';
-      window.location.href = adminUrl;
+    const target = redirectIfAlreadyAuthenticated({
+      portal: 'manager',
+      user,
+      slug,
+      currentPath: typeof window !== 'undefined' ? window.location.pathname : undefined,
+    });
+    if (target) {
+      // Hard navigation (pre-existing behaviour) so cookie state refreshes.
+      window.location.href = target;
     }
   }, [user, slug]);
 
@@ -98,15 +105,14 @@ export function ManagerLoginClient({ slug, initialReturnUrl }: ManagerLoginClien
 
       if (user) {
         login(user, token);
-        if (user.role === 'COLLEGE_ADMIN') {
-          const adminUrl =
-            typeof window !== 'undefined' && window.location.pathname.startsWith(`/college/${slug}`)
-              ? `/college/${slug}/admin`
-              : '/admin';
-          window.location.href = adminUrl;
-        } else {
-          window.location.href = returnUrl;
-        }
+        // Hard navigation (pre-existing behaviour) so cookie state refreshes.
+        window.location.href = resolvePostLoginTarget({
+          portal: 'manager',
+          user,
+          slug,
+          currentPath: typeof window !== 'undefined' ? window.location.pathname : undefined,
+          returnUrl,
+        });
       } else {
         setErrorMsg('Login succeeded but user payload was missing.');
       }

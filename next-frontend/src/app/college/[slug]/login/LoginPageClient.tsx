@@ -7,6 +7,10 @@ import type { AuthUser } from '@/types/auth';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
 import { useStudentLoginMutation } from '@/lib/api/auth';
+import {
+  redirectIfAlreadyAuthenticated,
+  resolvePostLoginTarget,
+} from '@/lib/auth/roleRedirect';
 import PublicLayout from '@/components/public/PublicLayout';
 import {
   GraduationCap,
@@ -41,8 +45,13 @@ export function LoginPageClient({
 
   // If college admin is already logged in, redirect them to admin workspace
   React.useEffect(() => {
-    if (currentUser?.role === 'COLLEGE_ADMIN') {
-      router.replace(`/college/${slug}/admin`);
+    const target = redirectIfAlreadyAuthenticated({
+      portal: 'student',
+      user: currentUser,
+      slug,
+    });
+    if (target) {
+      router.replace(target);
     }
   }, [currentUser, router, slug]);
 
@@ -86,16 +95,10 @@ export function LoginPageClient({
       const token = resPayload.token || resPayload.data?.token;
 
       if (user) {
-        // If college admin logs in, route to admin portal directly
-        if (user.role === 'COLLEGE_ADMIN') {
-          login(user, token);
-          router.push(`/college/${slug}/admin`);
-          return;
-        }
-
-        // Authoritative cookie-first login establishes session
+        // Authoritative cookie-first login establishes session; admins are
+        // bounced to their own dashboard, everyone else to the returnUrl.
         login(user, token);
-        router.push(returnUrl);
+        router.push(resolvePostLoginTarget({ portal: 'student', user, slug, returnUrl }));
       } else {
         setErrorMsg('Login succeeded but user payload was missing.');
       }
@@ -291,7 +294,7 @@ export function LoginPageClient({
               <div className="flex items-center justify-between text-xs pt-1">
                 <span className={isDark ? 'text-gray-400' : 'text-slate-500'}>Club Manager or Staff?</span>
                 <Link
-                  href={`/college/${slug}/manager/login`}
+                  href={`/college/${slug}/login/manager`}
                   className="font-semibold text-gray-300 hover:text-white inline-flex items-center gap-1"
                 >
                   <Shield className="w-3.5 h-3.5 text-purple-400" />

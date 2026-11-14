@@ -11,6 +11,7 @@ import {
 } from '@/lib/auth/tokenStorage';
 import { clearAllQueryCache } from '@/lib/query/queryClient';
 import { apiClient } from '@/lib/api/axios';
+import { dashboardHrefForUser, slugFromCollegePath } from '@/lib/auth/roleRedirect';
 
 const AuthContext = createContext<AuthContextState | null>(null);
 
@@ -183,6 +184,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
         token,
         loading,
         isAuthenticated: !!user,
+        dashboardHref: (slug?: string) => {
+          const resolvedSlug =
+            slug ??
+            (typeof window === 'undefined' ? null : slugFromCollegePath(window.location.pathname));
+          return dashboardHrefForUser(user, resolvedSlug ?? undefined);
+        },
         login,
         logout,
         refreshSession,
