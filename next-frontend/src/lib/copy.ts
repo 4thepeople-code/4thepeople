@@ -499,6 +499,24 @@ export const collegeAdmin = {
       'This permanently deletes the club, its events, logo and memberships. It cannot be undone.',
     confirmDelete: 'Delete club',
     toastDeleted: 'Club deleted.',
+    // Edit modal
+    editTitle: 'Edit club details',
+    editDescription: 'Update the name, description, branding and Department affiliations.',
+    logoLabel: 'Club logo',
+    uploadLogo: 'Upload logo',
+    changeFile: 'Change file',
+    removeLogo: 'Remove logo',
+    logoHint: 'PNG, JPG or WEBP, up to 5 MB.',
+    formName: 'Club name',
+    formDescription: 'Description',
+    submitSave: 'Save changes',
+    errNameRequired: 'Enter a club name.',
+    errImage: 'Pick an image file (PNG, JPG or WEBP) for the logo.',
+    errLogoRemove:
+      "The logo wasn't removed. The server didn't respond — try again in a moment.",
+    errSave:
+      "Club details weren't saved. The server rejected part of the update — check the details and try again.",
+    toastSaved: 'Club details saved.',
   },
 
   departments: {
