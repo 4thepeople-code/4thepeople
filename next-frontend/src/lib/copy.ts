@@ -29,7 +29,7 @@ export type RoleName = keyof typeof roleNames;
 export const actions = {
   addClub: 'Add club',
   createEvent: 'Create event',
-  inviteManager: 'Invite manager',
+  inviteManager: 'Invite Event Manager',
   register: 'Register',
   browseEvents: 'Browse events',
   addCollege: 'Add college',
@@ -304,5 +304,392 @@ export const superAdmin = {
     errEnrollStart: "Authenticator setup couldn't start. The server didn't respond — try again in a moment.",
     emptyTitle: 'No platform admins yet',
     emptyDescription: 'Add the first platform admin to manage colleges and their College Admins.',
+  },
+} as const;
+
+/**
+ * College Admin screens: /college/[slug]/admin/* (overview, accounts, clubs,
+ * departments, roster, profile). Term rules: the role is "College Admin";
+ * club managers are "Event Manager"; students are "Students".
+ */
+export const collegeAdmin = {
+  dashboard: {
+    title: 'Overview',
+    description:
+      'A live count of the accounts, clubs and Event Managers at your college, plus shortcuts to the most common tasks.',
+    statAccounts: 'Accounts',
+    statAccountsHint: 'Students, Event Managers and the College Admin provisioned for this college.',
+    statClubs: 'Clubs',
+    statClubsHint: 'Recognised student organisations, central and departmental.',
+    statManagers: 'Event Managers',
+    statManagersHint: 'Assigned or invited to at least one club (pending accounts included).',
+    recentClubs: 'Recent clubs',
+    viewAllClubs: 'View all clubs',
+    recentClubsHint: 'The five most recently created clubs.',
+    noClubsTitle: 'No clubs yet',
+    noClubsDescription:
+      'Clubs are where students organise events. Create the first one so departments and students have somewhere to gather.',
+    viewClub: 'View club',
+    quickActions: 'Quick actions',
+    createClub: 'Create a club',
+    createClubHint: 'Set up a new student organisation.',
+    inviteManager: 'Invite an Event Manager',
+    inviteManagerHint: 'Email an invite link for manager setup.',
+    uploadRoster: 'Upload the student roster',
+    uploadRosterHint: 'Batch-import student accounts for self-activation.',
+    reviewAccounts: 'Review accounts',
+    reviewAccountsHint: 'Search, inspect or remove college accounts.',
+    chipCentral: 'Central',
+    chipDepartmental: 'Departmental',
+    noDescription: 'No description yet',
+  },
+
+  users: {
+    title: 'Accounts',
+    description:
+      'Every account at this college — Students, Event Managers and College Admins — with their status.',
+    searchPlaceholder: 'Search by name, email, roll number or role',
+    refresh: 'Refresh list',
+    loadingLabel: 'Loading accounts',
+    tableUser: 'Account',
+    tableRole: 'Role',
+    tableStatus: 'Status',
+    tableCreated: 'Created',
+    tableActions: 'Actions',
+    statusActive: 'Active',
+    statusPending: 'Pending invite / claim',
+    viewDetails: 'View details',
+    delete: 'Delete account',
+    emptyTitle: 'No accounts yet',
+    emptyDescription:
+      'Accounts appear here after you upload the student roster or invite an Event Manager.',
+    emptyAction: 'Upload roster',
+    emptySearchTitle: 'No accounts match',
+    emptySearchFix: 'Clear the search to see every account, or refresh the list.',
+  },
+
+  userDetail: {
+    back: 'Back to accounts',
+    managerBadge: (count: number) => `Event Manager · ${count}`,
+    accountId: 'Account ID',
+    delete: 'Delete account',
+    profileTitle: 'Account profile',
+    fullName: 'Full name',
+    email: 'Email',
+    role: 'Role',
+    status: 'Status',
+    statusActive: 'Active account',
+    statusPending: 'Invitation pending',
+    registered: 'Registered on',
+    resendInvite: 'Resend invite',
+    toastInviteResent:
+      "Invite email sent again. Ask them to check their inbox — and spam — if nothing arrives.",
+    errResendInvite:
+      "The invite wasn't resent. The server didn't respond — try again in a moment.",
+    associatedClubs: (count: number) => `Clubs (${count})`,
+    clubsHint: 'Clubs this person manages or belongs to.',
+    joined: 'Joined',
+    viewClub: 'View club',
+    noClubs: 'Not in any club yet. Memberships appear when they join a club or are invited to manage one.',
+    noClubDescription: 'No description provided for this club.',
+    loadingLabel: 'Loading account',
+    loadFailedTitle: 'Account not found',
+    loadFailedDescription:
+      'This account may have been deleted. Go back to the account list and pick another one.',
+    // OTP delete (names the account and the consequence)
+    deleteTitle: (name: string) => `Delete ${name}'s account?`,
+    deleteWarning:
+      "This permanently removes their account, club memberships and activation data. It can't be undone.",
+    confirmDelete: 'Delete account',
+  },
+
+  clubs: {
+    title: 'Clubs',
+    description: 'Every club at this college, its Department affiliations and its Event Managers.',
+    searchPlaceholder: 'Search by club name or description',
+    createClub: 'Create club',
+    refresh: 'Refresh list',
+    loadingLabel: 'Loading clubs',
+    tableClub: 'Club',
+    tableMembers: 'Members',
+    tableCreated: 'Created',
+    tableActions: 'Actions',
+    members: (count: number) => (count === 1 ? '1 member' : `${count} members`),
+    chipCentral: 'Central',
+    manage: 'Manage club',
+    edit: 'Edit details',
+    delete: 'Delete club',
+    emptyTitle: 'No clubs yet',
+    emptyDescription:
+      'Clubs are where students organise events. Create the first one so Departments and students have somewhere to gather.',
+    emptySearchTitle: 'No clubs match',
+    emptySearchFix: 'Clear the search to see every club, or create a new one.',
+    // OTP delete (names the club and the consequence)
+    deleteTitle: (name: string) => `Delete ${name}?`,
+    deleteWarning:
+      "This permanently deletes the club, its events, logo and memberships, following your college's deletion policy. It can't be undone.",
+    confirmDelete: 'Delete club',
+    toastDeleted: 'Club deleted.',
+  },
+
+  createClub: {
+    title: 'Create club',
+    description: 'Set up a new recognised campus organisation.',
+    back: 'Back to clubs',
+    formName: 'Club name',
+    formNamePlaceholder: 'e.g. IEEE Student Branch',
+    formDescription: 'Description',
+    formDescriptionPlaceholder:
+      "Briefly describe the club's purpose, mission and activities…",
+    centralToggle: 'Central club (campus-wide, no Department)',
+    centralHint:
+      "Central clubs represent the whole college and aren't attached to any single Department.",
+    departmentsLabel: 'Department affiliation',
+    multiSelectPlaceholder: 'Select one or more Departments…',
+    multiSelectDisabled: 'Not for central clubs',
+    submit: 'Create club',
+    submitting: 'Creating club…',
+    errNameRequired: "Enter a club name — it's how Students recognise the club.",
+    errCreate:
+      "The club couldn't be created. The server rejected the request — check the details and try again.",
+    toastCreated: 'Club created.',
+  },
+
+  clubDetail: {
+    back: 'Back to clubs',
+    edit: 'Edit club',
+    delete: 'Delete club',
+    infoTitle: 'Club information',
+    created: 'Created',
+    affiliation: 'Affiliation',
+    centralAffiliation: 'Central club (campus-wide, no Department)',
+    noAffiliation: 'No Department affiliation',
+    description: 'Description',
+    noDescription:
+      'No description yet. Add one with "Edit club" so Students know what this club does.',
+    managersTitle: (count: number) => `Event Managers (${count})`,
+    managersHint: 'Event Managers can create events and manage attendees for this club.',
+    addExisting: 'Add existing user',
+    inviteNew: 'Invite new Event Manager',
+    pendingInvite: 'Pending invite',
+    noEmail: 'No email shown',
+    roleLabel: 'Role',
+    resendInvite: 'Resend invite',
+    toastInviteResent:
+      "Invite email sent again. Ask them to check their inbox — and spam — if nothing arrives.",
+    errResendInvite:
+      "The invite wasn't resent. The server didn't respond — try again in a moment.",
+    remove: 'Remove',
+    removeTitle: (name: string) => `Remove ${name} as Event Manager?`,
+    removeBody: (clubName: string) =>
+      `They'll no longer be able to manage events or attendees for ${clubName}. You can re-invite them any time.`,
+    confirmRemove: 'Remove Event Manager',
+    toastManagerRemoved: (name: string) => `${name} is no longer an Event Manager of this club.`,
+    errRemoveManager:
+      "The Event Manager wasn't removed. The server didn't respond — try again in a moment.",
+    noManagers:
+      'No Event Managers yet. Add one above so events can be created for this club.',
+    loadingLabel: 'Loading club',
+    loadFailedTitle: 'Club not found',
+    loadFailedDescription:
+      'This club may have been deleted. Go back to the club list and pick another one.',
+    deleteTitle: (name: string) => `Delete ${name}?`,
+    deleteWarning:
+      'This permanently deletes the club, its events, logo and memberships. It cannot be undone.',
+    confirmDelete: 'Delete club',
+    toastDeleted: 'Club deleted.',
+  },
+
+  departments: {
+    title: 'Departments',
+    description:
+      'Academic Departments, their short codes, and the clubs affiliated with each one.',
+    create: 'Create department',
+    refresh: 'Refresh list',
+    searchPlaceholder: 'Search by name, short code or description',
+    loadingLabel: 'Loading departments',
+    tableDepartment: 'Department',
+    tableShortCode: 'Short code',
+    tableClubs: 'Clubs',
+    tableActions: 'Actions',
+    noDescription: 'No description',
+    clubs: (count: number) => (count === 1 ? '1 club' : `${count} clubs`),
+    edit: 'Edit',
+    assign: 'Assign clubs',
+    delete: 'Delete',
+    emptyTitle: 'No Departments yet',
+    emptyDescription:
+      'Departments group clubs (e.g. all CSE clubs) and map roster Students to their branch. Create the first one.',
+    emptySearchTitle: 'No Departments match',
+    emptySearchFix: 'Clear the search to see every Department, or create a new one.',
+    deleteTitle: (name: string) => `Delete ${name}?`,
+    deleteWarning:
+      "Every club affiliated with this Department loses its Department mapping — the clubs themselves aren't deleted. You can re-link clubs afterwards. This can't be undone.",
+    confirmDelete: 'Delete department',
+    toastDeleted: (name: string) => `${name} deleted.`,
+    errDelete:
+      "The Department wasn't deleted. The server didn't respond — try again in a moment.",
+  },
+
+  departmentForm: {
+    createTitle: 'Create department',
+    createDescription:
+      'Add an academic Department — its short code maps roster Students to their branch.',
+    editTitle: 'Edit department',
+    editDescription: 'Update the name, short code or description.',
+    formName: 'Department name',
+    formNamePlaceholder: 'e.g. Computer Science & Engineering',
+    formShortCode: 'Short code',
+    formShortCodePlaceholder: 'e.g. CSE',
+    formShortCodeHint:
+      'Short uppercase code used on badges and for roster Department mapping.',
+    formDescription: 'Description',
+    formDescriptionPlaceholder: 'Optional overview of the Department…',
+    submitCreate: 'Create department',
+    submitSave: 'Save changes',
+    errNameRequired: 'Enter the Department name.',
+    errShortCodeRequired: 'Enter a short code — roster mapping uses it.',
+    errCreate:
+      "The Department couldn't be created. The server rejected the request — check the details and try again.",
+    errUpdate:
+      "Department details weren't saved. The server didn't respond — try again in a moment.",
+    toastCreated: (name: string) => `${name} created.`,
+    toastSaved: (name: string) => `${name} saved.`,
+  },
+
+  assignClubs: {
+    title: (dept: string) => `Assign clubs to ${dept}`,
+    description: 'Pick the Departmental clubs affiliated with this Department.',
+    searchPlaceholder: 'Search clubs by name or description',
+    loadingLabel: 'Loading clubs',
+    selectedCount: (count: number) => (count === 1 ? '1 club selected' : `${count} clubs selected`),
+    selectAll: 'Select all',
+    clear: 'Clear',
+    centralExcluded:
+      "Central clubs belong to no Department and can't be assigned here.",
+    noMatches: 'No Departmental clubs match your search.',
+    save: 'Save assignments',
+    errSave:
+      "Club assignments weren't saved. The server didn't respond — try again in a moment.",
+    toastSaved: (dept: string) => `Club assignments saved for ${dept}.`,
+  },
+
+  inviteManager: {
+    title: 'Invite an Event Manager',
+    titleToClub: 'Invite an Event Manager to this club',
+    description:
+      'They receive an email invite to set up their Event Manager account.',
+    formName: 'Full name',
+    formNamePlaceholder: 'e.g. Priya Sharma',
+    formEmail: 'Email',
+    formEmailPlaceholder: 'e.g. priya@college.edu',
+    submit: 'Send invite',
+    errFieldsRequired:
+      "Enter a name and an email — the invite is sent to the email, so double-check it.",
+    errSend:
+      "The invite wasn't sent. The server didn't respond — try again in a moment.",
+    toastSent:
+      'Invite sent. They have 48 hours to accept — follow up if nothing arrives.',
+  },
+
+  addExistingManager: {
+    title: 'Add an existing account as Event Manager',
+    description: 'Assign a registered, active account to manage this club.',
+    searchPlaceholder: 'Search active accounts by name or email',
+    loadingLabel: 'Loading accounts',
+    empty: 'No active accounts are available to assign. Invite a new Event Manager instead.',
+    assign: 'Add as Event Manager',
+    errSelect: 'Pick an account to add as Event Manager.',
+    errAssign:
+      "The account wasn't added. The server didn't respond — try again in a moment.",
+    toastAssigned: (name: string) => `${name} can now manage this club.`,
+  },
+
+  deleteOtp: {
+    // Shared strings for the two-step (email code) deletion flow.
+    requestingLabel: 'Sending a verification code to your admin email…',
+    codeSent: 'A verification code was sent to your admin email address.',
+    codeResent: 'A new verification code was sent to your email.',
+    codeLabel: 'Verification code',
+    codePlaceholder: 'e.g. 123456',
+    resendCode: 'Resend code',
+    blockedTitle: 'Deletion blocked',
+    errRequestCode:
+      "The verification code couldn't be sent. Check your connection and try again.",
+    errInvalidCode:
+      "That code didn't work. Codes expire after a few minutes — request a new one and try again.",
+    close: 'Close',
+  },
+
+  roster: {
+    title: 'Student roster',
+    description:
+      'Import student records in bulk so they can self-activate with their roll number.',
+    loadSample: 'Load sample CSV',
+    howTitle: 'How the roster and self-activation work',
+    howBody:
+      'Imported students are created as inactive accounts — active accounts are never overwritten. Students visit their campus activation page, enter their roll number, and receive a one-time code at their institutional email.',
+    uploadTitle: 'Upload a CSV file',
+    uploadChoose: 'Click to choose a CSV file',
+    uploadHint: 'UTF-8 .csv, up to 5,000 rows per batch.',
+    pasteTitle: 'Paste CSV text',
+    pastePlaceholder: 'Paste comma-separated rows here…',
+    parsedCount: (count: number) =>
+      count === 1 ? '1 valid student row' : `${count} valid student rows`,
+    clear: 'Clear',
+    headersLabel: 'Expected headers',
+    validationTitle: 'Fix these before importing',
+    duplicates: (rolls: string) =>
+      `Duplicate roll numbers in this batch: ${rolls} — later rows update earlier ones.`,
+    previewTitle: (count: number) => `Preview (${count} ${count === 1 ? 'student' : 'students'})`,
+    import: 'Import roster',
+    importing: 'Importing…',
+    tableRoll: 'Roll number',
+    tableName: 'Name',
+    tableDept: 'Department',
+    tableYear: 'Year',
+    tableEmail: 'Email',
+    noDept: '—',
+    toastImported: (inserted: number, updated: number, skipped: number) =>
+      `Roster imported: ${inserted} new, ${updated} updated, ${skipped} active accounts kept safe.`,
+    errUpload:
+      "The roster wasn't imported. The server rejected the file — check the format and try again.",
+    errValidation:
+      'The CSV needs a header row and at least one student row, with "roll_number" and "name" columns.',
+  },
+
+  profile: {
+    title: 'My profile',
+    loadingLabel: 'Loading your profile',
+    changePhoto: 'Change photo',
+    removePhoto: 'Remove photo',
+    confirmRemoveTitle: 'Remove your profile picture?',
+    confirmRemoveBody:
+      'Your profile shows your initials until you upload a new picture.',
+    toastAvatarUploaded: 'Profile picture updated.',
+    toastAvatarRemoved: 'Profile picture removed.',
+    generalInfo: 'General information',
+    formName: 'Display name',
+    formEmail: 'Institutional email',
+    formEmailHint: "Bound to your college's identity — it can't be changed.",
+    saveProfile: 'Save profile',
+    errNameEmpty: 'Enter your name.',
+    toastProfileSaved: 'Profile saved.',
+    security: 'Password',
+    currentPassword: 'Current password',
+    newPassword: 'New password',
+    confirmPassword: 'Confirm new password',
+    newPasswordHint: 'At least 6 characters.',
+    updatePassword: 'Update password',
+    errCurrentRequired: 'Enter your current password.',
+    errNewLength: 'The new password must be at least 6 characters.',
+    errMismatch: "The passwords don't match — retype the new password in both fields.",
+    toastPasswordSaved: 'Password updated.',
+  },
+
+  multiSelect: {
+    selectAll: 'Select all',
+    clearAll: 'Clear all',
+    noMatches: 'No matches for your search.',
   },
 } as const;

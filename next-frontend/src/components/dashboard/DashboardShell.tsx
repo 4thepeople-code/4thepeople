@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { LogOut, Menu, Moon, Sun, X } from 'lucide-react';
+import { LogOut, Menu, Moon, Sun, X, type LucideIcon } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
 import {
@@ -21,6 +21,12 @@ import {
   studentLoginHref,
 } from '@/lib/auth/roleRedirect';
 
+export interface DashboardShellSecondaryAction {
+  label: string;
+  icon?: LucideIcon;
+  onClick: () => void;
+}
+
 export interface DashboardShellProps {
   role: DashboardRole;
   /**
@@ -30,6 +36,12 @@ export interface DashboardShellProps {
   slug?: string;
   /** College display name for the sidebar brand line. */
   collegeName?: string;
+  /**
+   * Optional secondary topbar action (e.g. College Admin's global
+   * "Invite Event Manager" entry). Shows beside the primary action on sm+ and
+   * in the mobile drawer.
+   */
+  secondaryAction?: DashboardShellSecondaryAction;
   children: ReactNode;
 }
 
@@ -56,6 +68,7 @@ export default function DashboardShell({
   role,
   slug,
   collegeName,
+  secondaryAction,
   children,
 }: DashboardShellProps) {
   const nav = getRoleNav(role, slug);
@@ -189,6 +202,23 @@ export default function DashboardShell({
     </DashboardButton>
   );
 
+  const renderSecondaryAction = (className = '') =>
+    secondaryAction ? (
+      <DashboardButton
+        variant="secondary"
+        size="sm"
+        onClick={secondaryAction.onClick}
+        className={className}
+        leftIcon={
+          secondaryAction.icon ? (
+            <secondaryAction.icon aria-hidden="true" className="h-4 w-4" />
+          ) : undefined
+        }
+      >
+        {secondaryAction.label}
+      </DashboardButton>
+    ) : null;
+
   return (
     <div
       className={`dashboard-scope ${anton.variable} ${sora.variable} ${inter.variable} min-h-screen bg-[var(--bg)] text-[var(--ink)]`}
@@ -228,7 +258,10 @@ export default function DashboardShell({
                 {collegeName ?? brand.name}
               </p>
 
-              <div className="hidden sm:block">{primaryAction()}</div>
+              <div className="hidden items-center gap-2 sm:flex">
+                {renderSecondaryAction()}
+                {primaryAction()}
+              </div>
 
               <button
                 type="button"
@@ -279,7 +312,10 @@ export default function DashboardShell({
               </button>
             </div>
             {navList(() => setDrawerOpen(false))}
-            <div className="mt-auto">{userBlock}</div>
+            {secondaryAction && (
+              <div className="border-t border-[var(--line)] px-3 py-3">{renderSecondaryAction('w-full')}</div>
+            )}
+            <div className={secondaryAction ? '' : 'mt-auto'}>{userBlock}</div>
           </div>
         </div>
       )}
