@@ -199,7 +199,7 @@ export interface PlaceholderConfigItem {
   size?: number;
   font?: 'Helvetica' | 'HelveticaBold' | 'Times';
   color?: string;
-  align?: 'left' | 'center';
+  align?: 'left' | 'center' | 'right';
 }
 
 export interface EventCertificateTemplate {

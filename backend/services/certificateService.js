@@ -590,6 +590,9 @@ async function renderCertificateOverlay(templateBuffer, data, placeholderConfig 
     if (item.align === 'center') {
       const textWidth = font.widthOfTextAtSize(text, size);
       x = x - textWidth / 2;
+    } else if (item.align === 'right') {
+      const textWidth = font.widthOfTextAtSize(text, size);
+      x = x - textWidth;
     }
 
     page.drawText(text, {

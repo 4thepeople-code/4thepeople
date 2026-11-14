@@ -30,11 +30,11 @@ interface TemplateGenerationModalProps {
 }
 
 const DEFAULT_CONFIG: PlaceholderConfigItem[] = [
-  { placeholder: '{{studentName}}', x: 300, y: 250, size: 22, font: 'HelveticaBold', color: '#0F172A', align: 'center' },
-  { placeholder: '{{rollNumber}}', x: 300, y: 215, size: 14, font: 'Helvetica', color: '#475569', align: 'center' },
-  { placeholder: '{{eventName}}', x: 300, y: 175, size: 16, font: 'HelveticaBold', color: '#0F172A', align: 'center' },
-  { placeholder: '{{issueDate}}', x: 150, y: 80, size: 11, font: 'Helvetica', color: '#64748B', align: 'left' },
-  { placeholder: '{{certificateId}}', x: 450, y: 80, size: 11, font: 'Helvetica', color: '#64748B', align: 'center' },
+  { placeholder: '{{studentName}}', x: 421, y: 365, size: 24, font: 'HelveticaBold', color: '#0F172A', align: 'center' },
+  { placeholder: '{{rollNumber}}', x: 421, y: 340, size: 14, font: 'Helvetica', color: '#475569', align: 'center' },
+  { placeholder: '{{eventName}}', x: 421, y: 275, size: 20, font: 'HelveticaBold', color: '#0F172A', align: 'center' },
+  { placeholder: '{{issueDate}}', x: 100, y: 60, size: 11, font: 'Helvetica', color: '#64748B', align: 'left' },
+  { placeholder: '{{certificateId}}', x: 742, y: 60, size: 11, font: 'Helvetica', color: '#64748B', align: 'right' },
 ];
 
 const AVAILABLE_PLACEHOLDERS = [
@@ -108,9 +108,18 @@ export function TemplateGenerationModal({
 
   const handleAddPlaceholder = (placeholder: string) => {
     if (config.some((c) => c.placeholder === placeholder)) return;
+    const isCollege = placeholder === '{{collegeName}}';
     setConfig((prev) => [
       ...prev,
-      { placeholder, x: 300, y: 150, size: 14, font: 'Helvetica', color: '#0F172A', align: 'center' },
+      {
+        placeholder,
+        x: 421,
+        y: isCollege ? 520 : 200,
+        size: isCollege ? 16 : 14,
+        font: isCollege ? 'HelveticaBold' : 'Helvetica',
+        color: '#0F172A',
+        align: 'center',
+      },
     ]);
   };
 
@@ -266,12 +275,28 @@ export function TemplateGenerationModal({
 
             {/* Placeholders Coordinate Config Table */}
             <div className="space-y-2">
+              <div className="p-3 bg-cyan-500/10 border border-cyan-500/20 rounded-2xl text-[11px] text-cyan-200 space-y-1">
+                <p className="font-bold flex items-center gap-1.5 text-cyan-300">
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>How Coordinate Overlays Work (A4 Landscape: 842 × 595 pt)</span>
+                </p>
+                <p className="text-slate-300 text-[10px] leading-relaxed">
+                  • <strong>Y Axis</strong> starts from the <strong>bottom</strong> (Y = 0 is bottom edge, Y = 595 is top edge).
+                  <br />
+                  • <strong>X = 421</strong> centers text horizontally across standard A4 certificates.
+                  <br />
+                  • <strong>Template Design Tip:</strong> In your template design (Canva/Word), leave the name and title lines blank. Text is overlaid directly onto coordinates (not text-replaced).
+                  <br />
+                  • Click <strong>&quot;Preview Sample&quot;</strong> below anytime to test your placement before generating.
+                </p>
+              </div>
+
               <div className="flex items-center justify-between">
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-400">
                   Placeholder Coordinates & Styling
                 </label>
                 <span className="text-[10px] text-slate-400">
-                  Coordinates measured in PDF points from bottom-left origin
+                  Origin: Bottom-Left (0, 0)
                 </span>
               </div>
 
@@ -345,11 +370,12 @@ export function TemplateGenerationModal({
                       <span className="text-[10px] text-slate-400">Align:</span>
                       <select
                         value={item.align || 'center'}
-                        onChange={(e) => handleUpdateConfigItem(idx, { align: e.target.value as 'left' | 'center' })}
+                        onChange={(e) => handleUpdateConfigItem(idx, { align: e.target.value as 'left' | 'center' | 'right' })}
                         className="px-1.5 py-1 text-[11px] rounded-lg border border-white/10 bg-black/30 text-white outline-none"
                       >
                         <option value="center">Center</option>
                         <option value="left">Left</option>
+                        <option value="right">Right</option>
                       </select>
                     </div>
 
