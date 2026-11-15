@@ -1020,6 +1020,5 @@ export const student = {
       body: (count: number) =>
         `You are an authorized manager for ${count} ${count === 1 ? 'club' : 'clubs'}. Switch anytime to create events and manage member registrations.`,
       action: 'Switch to manager workspace',
-      badge: (count: number) => `Club manager (${count})`,
     },
 } as const;

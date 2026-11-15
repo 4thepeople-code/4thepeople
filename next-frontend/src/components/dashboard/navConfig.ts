@@ -27,11 +27,6 @@ export interface NavItem {
   /** Route target; not required when an `onClick` handler is supplied. */
   href?: string;
   icon: LucideIcon;
-  /**
-   * Interim targets: some screens are single pages with internal tabs today.
-   * Later phases either move those tabs to routes or make them read ?tab=.
-   */
-  interim?: boolean;
   onClick?: () => void;
 }
 
@@ -47,7 +42,8 @@ export interface RoleNav {
   sections: NavSection[];
   /**
    * The role's most frequent action, always in the most prominent spot.
-   * Targets are existing routes until the matching screen is redesigned.
+   * Event creation stays scoped to a club, so the manager action opens the
+   * club list rather than a create form directly.
    */
   primaryAction: NavItem;
 }
@@ -98,9 +94,9 @@ export function getRoleNav(role: DashboardRole, slug = ''): RoleNav {
             ],
           },
         ],
-        // Event creation lives inside a club page today; Phase 3 gives it a
-        // direct home. Until then this opens the club list.
-        primaryAction: { label: actions.createEvent, href: `${managerDashboardHref(slug)}/clubs`, icon: CalendarPlus, interim: true },
+        // Event creation is scoped to a club (/manager/clubs/[clubId]/events/create);
+        // the primary action opens the club list where the manager picks a club.
+        primaryAction: { label: actions.createEvent, href: `${managerDashboardHref(slug)}/clubs`, icon: CalendarPlus },
       };
 
     case 'student':
