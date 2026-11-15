@@ -18,23 +18,16 @@ export interface DiscoverEventsClientProps {
 
 const CATEGORIES = ['ALL', 'TECH', 'CULTURAL', 'SPORTS', 'WORKSHOP'] as const;
 
-function formatFullDate(dateStr?: string) {
-  if (!dateStr) return 'Date TBA';
+function formatFullDate(dateStr?: string, fallback = 'Date to be announced') {
+  if (!dateStr) return fallback;
   const d = new Date(dateStr);
-  if (isNaN(d.getTime())) return 'Date TBA';
+  if (isNaN(d.getTime())) return fallback;
   return d.toLocaleDateString('en-US', {
     weekday: 'short',
     month: 'short',
     day: 'numeric',
     year: 'numeric',
   });
-}
-
-function formatTime(dateStr?: string) {
-  if (!dateStr) return null;
-  const d = new Date(dateStr);
-  if (isNaN(d.getTime())) return null;
-  return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
 }
 
 /**
@@ -164,7 +157,6 @@ export default function DiscoverEventsClient({ slug }: DiscoverEventsClientProps
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {filteredEvents.map((ev) => {
             const isRegistered = registeredEventIds.has(ev.id);
-            const time = formatTime(ev.startAt);
             return (
               <Link
                 key={ev.id}
@@ -193,14 +185,11 @@ export default function DiscoverEventsClient({ slug }: DiscoverEventsClientProps
                   <div className="space-y-1 text-xs text-[var(--ink-soft)]">
                     <div className="flex items-center gap-1.5">
                       <Calendar aria-hidden="true" className="h-3.5 w-3.5 shrink-0 text-[var(--primary)]" />
-                      <span className="truncate">
-                        {formatFullDate(ev.startAt)}
-                        {time ? ` • ${time}` : ''}
-                      </span>
+                      <span className="truncate">{formatFullDate(ev.startAt, t.noDate)}</span>
                     </div>
                     <div className="flex items-center gap-1.5">
                       <MapPin aria-hidden="true" className="h-3.5 w-3.5 shrink-0 text-[var(--secondary)]" />
-                      <span className="truncate">{ev.location || 'Campus venue'}</span>
+                      <span className="truncate">{ev.location || t.noVenue}</span>
                     </div>
                   </div>
                 </div>
