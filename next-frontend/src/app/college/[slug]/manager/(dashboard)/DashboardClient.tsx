@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Building2, Calendar, Users, ArrowRight } from 'lucide-react';
 import { useMyClubsQuery, fetchClubDashboard, fetchManagedClubEvents } from '@/lib/api/manager';
@@ -23,6 +23,11 @@ interface ManagedClubEvent extends Event {
   clubId?: string;
 }
 
+/** Stable empty arrays: fresh `= []` defaults change identity every render
+ *  and would re-trigger the aggregation effect below on each render. */
+const EMPTY_CLUBS: Club[] = [];
+const EMPTY_EVENTS: ManagedClubEvent[] = [];
+
 /**
  * Event Manager overview: managed clubs, aggregated member counts and the
  * events published across them. Same data sources as the old dashboard
@@ -38,11 +43,15 @@ export default function ManagerDashboardClient({ slug }: ManagerDashboardClientP
   const [totalMembers, setTotalMembers] = useState(0);
 
   const {
-    data: clubs = [],
+    data: clubsData,
     isLoading: clubsLoading,
     isError: clubsIsError,
     refetch: refetchClubs,
   } = useMyClubsQuery(slug);
+
+  // Referentially stable: undefined while loading and [] when empty must not
+  // produce a new array identity per render, or the effect below loops.
+  const clubs = useMemo(() => clubsData ?? EMPTY_CLUBS, [clubsData]);
 
   const loading = clubsLoading || (clubs.length > 0 && detailedClubs.length === 0);
   const hasError = clubsIsError;
@@ -50,9 +59,11 @@ export default function ManagerDashboardClient({ slug }: ManagerDashboardClientP
   useEffect(() => {
     let isSubscribed = true;
     if (clubs.length === 0) {
-      setDetailedClubs([]);
-      setAllEvents([]);
-      setTotalMembers(0);
+      // Functional no-op updates: bailing out when already empty prevents
+      // set-state → re-render → effect → set-state loops.
+      setDetailedClubs((prev) => (prev.length > 0 ? EMPTY_CLUBS : prev));
+      setAllEvents((prev) => (prev.length > 0 ? EMPTY_EVENTS : prev));
+      setTotalMembers((prev) => (prev !== 0 ? 0 : prev));
       return;
     }
 
