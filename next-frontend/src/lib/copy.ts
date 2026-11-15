@@ -717,4 +717,65 @@ export const collegeAdmin = {
     clearAll: 'Clear all',
     noMatches: 'No matches for your search.',
   },
+};
+
+/**
+ * Event Manager screens: /college/[slug]/manager/*. Terms: the role is
+ * "Event Manager"; clubs they run are theirs; students are "Students".
+ */
+export const eventManager = {
+  dashboard: {
+    title: 'Overview',
+    description: 'Your managed clubs, their members and the events you have published.',
+    heading: "What's happening with my clubs?",
+    subheading:
+      'Oversee your assigned clubs, publish upcoming campus events, monitor member activity, and manage registrations.',
+    welcomeBack: (name: string) => `Welcome back, ${name}`,
+    managedClubs: 'My managed clubs',
+    managedClubsHint: 'Select any club to update information, upload logos, manage events, and view details.',
+    viewAllClubs: 'View all clubs',
+    noClubsTitle: 'No managed clubs assigned',
+    noClubsDescription:
+      'You are not currently assigned to manage any clubs. Please contact your college administrator to get access.',
+    eventsTitle: 'Published events',
+    eventsHint: 'All events created across your managed clubs.',
+    noEventsTitle: 'No published events yet',
+    noEventsDescription: 'Create an event for this club to start sharing schedules, locations, and photo galleries.',
+    createEvent: 'Create event',
+    createEventHint: 'Set the date, venue and details for a new campus event.',
+    refresh: 'Refresh list',
+    loadingLabel: 'Loading your managed clubs',
+    loadFailedTitle: 'Could not load your managed clubs',
+    loadFailedDescription: 'The server did not respond. Try again in a moment.',
+    statManagedClubs: 'Managed Clubs',
+    statManagedClubsHint: 'Assigned manager access',
+    statMembers: 'Total Club Members',
+    statMembersHint: 'Enrolled students across clubs',
+    statEvents: 'Total Club Events',
+    statEventsHint: 'Active & upcoming events',
+    noDescription: 'No description yet',
+    statusUpcoming: 'Upcoming',
+    statusOngoing: 'Live',
+    statusCompleted: 'Completed',
+    statusCancelled: 'Cancelled',
+  },
+
+  myClubs: {
+    title: 'My Managed Clubs',
+    description: 'Select a club to edit details, upload logos & cover photos, manage campus events, and organize photo galleries.',
+    searchPlaceholder: 'Filter clubs by name or description...',
+    loadingLabel: 'Loading your managed clubs',
+    emptyTitle: 'No managed clubs assigned',
+    emptyDescription:
+      'You have not been assigned to manage any clubs yet — please contact your college administrator.',
+    emptySearchTitle: 'No managed clubs match',
+    emptySearchFix: 'Clear the search to see every managed club.',
+    viewClub: 'Open club',
+  },
+
+  noClubs: {
+    title: 'No managed clubs assigned',
+    description:
+      'You are not currently assigned to manage any clubs. Please ask your College Administrator to link you to a club before you can create or manage events.',
+  },
 } as const;

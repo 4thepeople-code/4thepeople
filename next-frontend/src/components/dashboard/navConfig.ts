@@ -24,13 +24,15 @@ export type { DashboardRole };
 
 export interface NavItem {
   label: string;
-  href: string;
+  /** Route target; not required when an `onClick` handler is supplied. */
+  href?: string;
   icon: LucideIcon;
   /**
    * Interim targets: some screens are single pages with internal tabs today.
    * Later phases either move those tabs to routes or make them read ?tab=.
    */
   interim?: boolean;
+  onClick?: () => void;
 }
 
 export interface NavSection {
@@ -153,6 +155,7 @@ export function getRoleNav(role: DashboardRole, slug = ''): RoleNav {
 /** Longest-prefix active check so nested routes highlight their section. */
 export function isNavActive(item: NavItem, pathname: string): boolean {
   if (item.href === pathname) return true;
+  if (!item.href) return false;
   return pathname.startsWith(`${item.href}/`);
 }
 
@@ -160,6 +163,8 @@ export function isNavActive(item: NavItem, pathname: string): boolean {
 export function activeNavItems(items: NavItem[], pathname: string): NavItem[] {
   const matches = items.filter((item) => isNavActive(item, pathname));
   if (matches.length <= 1) return matches;
-  const deepest = matches.reduce((a, b) => (b.href.length > a.href.length ? b : a));
+  const deepest = matches.reduce((a, b) =>
+    (b.href?.length ?? 0) > (a.href?.length ?? 0) ? b : a,
+  );
   return [deepest];
 }

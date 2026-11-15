@@ -10,6 +10,7 @@ import {
   activeNavItems,
   getRoleNav,
   type DashboardRole,
+  type NavItem,
 } from './navConfig';
 import DashboardButton from './ui/DashboardButton';
 import { anton, inter, sora } from './fonts';
@@ -42,6 +43,12 @@ export interface DashboardShellProps {
    * in the mobile drawer.
    */
   secondaryAction?: DashboardShellSecondaryAction;
+  /**
+   * Optional override for the topbar primary action. Used by the Event Manager
+   * workspace to swap in a club-aware "Create event" (one club → straight to the
+   * form, several → picker, none → guidance) instead of the nav-derived default.
+   */
+  primaryActionOverride?: NavItem;
   children: ReactNode;
 }
 
@@ -69,6 +76,7 @@ export default function DashboardShell({
   slug,
   collegeName,
   secondaryAction,
+  primaryActionOverride,
   children,
 }: DashboardShellProps) {
   const nav = getRoleNav(role, slug);
@@ -124,21 +132,33 @@ export default function DashboardShell({
             {section.items.map((item) => {
               const isActive = activeNavItems(section.items, pathname).some((n) => n.href === item.href);
               const Icon = item.icon;
+              const className = `flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-semibold transition-colors duration-150 motion-reduce:transition-none focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-[var(--primary)] ${
+                isActive
+                  ? 'bg-[var(--primary-soft)] text-[var(--primary)]'
+                  : 'text-[var(--ink-soft)] hover:bg-[var(--primary-soft)]/60 hover:text-[var(--ink)]'
+              }`;
+              const inner = (
+                <>
+                  <Icon aria-hidden="true" className="h-4.5 w-4.5 shrink-0" />
+                  {item.label}
+                </>
+              );
               return (
                 <li key={item.label}>
-                  <Link
-                    href={item.href}
-                    onClick={onNavigate}
-                    aria-current={isActive ? 'page' : undefined}
-                    className={`flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-semibold transition-colors duration-150 motion-reduce:transition-none focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-[var(--primary)] ${
-                      isActive
-                        ? 'bg-[var(--primary-soft)] text-[var(--primary)]'
-                        : 'text-[var(--ink-soft)] hover:bg-[var(--primary-soft)]/60 hover:text-[var(--ink)]'
-                    }`}
-                  >
-                    <Icon aria-hidden="true" className="h-4.5 w-4.5 shrink-0" />
-                    {item.label}
-                  </Link>
+                  {item.href ? (
+                    <Link href={item.href} onClick={onNavigate} aria-current={isActive ? 'page' : undefined} className={className}>
+                      {inner}
+                    </Link>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={item.onClick}
+                      aria-current={isActive ? 'page' : undefined}
+                      className={className}
+                    >
+                      {inner}
+                    </button>
+                  )}
                 </li>
               );
             })}
@@ -191,16 +211,33 @@ export default function DashboardShell({
     </div>
   );
 
-  const primaryAction = (className = '') => (
-    <DashboardButton
-      href={nav.primaryAction.href}
-      size="sm"
-      className={className}
-      leftIcon={<nav.primaryAction.icon aria-hidden="true" className="h-4 w-4" />}
-    >
-      {nav.primaryAction.label}
-    </DashboardButton>
-  );
+  const resolvedPrimary = primaryActionOverride ?? nav.primaryAction;
+
+  const primaryAction = (className = '') => {
+    if (resolvedPrimary.onClick) {
+      return (
+        <DashboardButton
+          variant="primary"
+          size="sm"
+          className={className}
+          onClick={resolvedPrimary.onClick}
+          leftIcon={<resolvedPrimary.icon aria-hidden="true" className="h-4 w-4" />}
+        >
+          {resolvedPrimary.label}
+        </DashboardButton>
+      );
+    }
+    return (
+      <DashboardButton
+        href={resolvedPrimary.href ?? '/'}
+        size="sm"
+        className={className}
+        leftIcon={<resolvedPrimary.icon aria-hidden="true" className="h-4 w-4" />}
+      >
+        {resolvedPrimary.label}
+      </DashboardButton>
+    );
+  };
 
   const renderSecondaryAction = (className = '') =>
     secondaryAction ? (
