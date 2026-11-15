@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
-import { LogOut, ShieldAlert } from 'lucide-react';
+import { Building2, LogOut, ShieldAlert } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import {
   collegeAdminLoginHref,
@@ -11,6 +11,7 @@ import {
   studentLoginHref,
   type DashboardRole,
 } from '@/lib/auth/roleRedirect';
+import { getCollegeBindingFor, dashboardSectionForRole } from '@/lib/auth/collegeBinding';
 import { SkeletonLines } from './ui/Skeleton';
 import DashboardButton from './ui/DashboardButton';
 import { guard, roleNames } from '@/lib/copy';
@@ -47,6 +48,9 @@ function loginHrefFor(role: DashboardRole, slug?: string): string {
  *     bounced out of manager routes — the pre-existing behaviour, kept).
  *   - Super Admin (platform): explicit "sign out & switch account" screen —
  *     platform routes must not redirect college accounts anywhere.
+ * - Signed in but bound to a different college than the URL slug: a clean
+ *   "wrong college" screen with a link to their own dashboard (the backend
+ *   still 403s every cross-tenant data call; this is presentation only).
  *
  * Note: Event Manager authorization is data-driven (role 'USER' + active
  * memberships) and stays in the manager pages; this guard handles session and
@@ -143,6 +147,59 @@ export default function RoleGuard({ role, slug, children }: RoleGuardProps) {
       );
     }
     return null;
+  }
+
+  // Client-side tenant check (UX only — the backend 403s cross-tenant data):
+  // if this account is known to belong to a different college than the URL,
+  // show a clean switch screen instead of screens full of 403 error states.
+  const binding = getCollegeBindingFor(user);
+  if (slug && binding && binding.slug !== slug) {
+    const section = dashboardSectionForRole(role);
+    const ownDashboardHref = section ? `/college/${binding.slug}/${section}` : null;
+    const handleSignOut = async () => {
+      setSigningOut(true);
+      try {
+        await logout();
+      } finally {
+        window.location.href = loginHrefFor(role, slug);
+      }
+    };
+    return (
+      <div className="dashboard-scope flex min-h-screen items-center justify-center bg-[var(--bg)] p-6 text-[var(--ink)]">
+        <div className="w-full max-w-md space-y-5 rounded-3xl border border-[var(--line)] bg-[var(--surface)] p-8 text-center shadow-sm">
+          <span
+            aria-hidden="true"
+            className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-[var(--primary-soft)] text-[var(--primary)]"
+          >
+            <Building2 className="h-7 w-7" />
+          </span>
+          <div>
+            <h1 className="font-display text-xl font-bold">{guard.wrongCollegeTitle}</h1>
+            <p className="mt-2 text-sm leading-relaxed text-[var(--ink-soft)]">
+              {guard.wrongCollegeDescription(slug, binding.slug)}
+            </p>
+            <p className="mt-1 font-mono text-xs text-[var(--ink-soft)]">{user.email}</p>
+          </div>
+          <div className="flex flex-col justify-center gap-3 sm:flex-row">
+            {ownDashboardHref && (
+              <DashboardButton variant="primary" size="sm" href={ownDashboardHref}>
+                {guard.goToMyDashboard}
+              </DashboardButton>
+            )}
+            <DashboardButton
+              variant="secondary"
+              size="sm"
+              onClick={handleSignOut}
+              loading={signingOut}
+              loadingLabel={guard.signOutAndSwitch}
+              leftIcon={signingOut ? undefined : <LogOut aria-hidden="true" className="h-4 w-4" />}
+            >
+              {guard.signOutAndSwitch}
+            </DashboardButton>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return <>{children}</>;

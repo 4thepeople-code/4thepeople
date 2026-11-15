@@ -112,6 +112,10 @@ export const guard = {
     `You are signed in as ${role}. College accounts can't open platform operations. Sign out and switch to a Super Admin account to continue.`,
   signOutAndSwitch: 'Sign out & switch account',
   returnToPublicSite: 'Return to public site',
+  wrongCollegeTitle: 'Different college workspace',
+  wrongCollegeDescription: (currentSlug: string, ownSlug: string) =>
+    `This page belongs to the ${currentSlug.toUpperCase()} campus workspace, but you are signed in with a ${ownSlug.toUpperCase()} account.`,
+  goToMyDashboard: 'Go to my dashboard',
 } as const;
 
 /**

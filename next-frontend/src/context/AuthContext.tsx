@@ -12,6 +12,7 @@ import {
 import { clearAllQueryCache } from '@/lib/query/queryClient';
 import { apiClient } from '@/lib/api/axios';
 import { dashboardHrefForUser, slugFromCollegePath } from '@/lib/auth/roleRedirect';
+import { rememberCollegeBinding, clearCollegeBinding } from '@/lib/auth/collegeBinding';
 
 const AuthContext = createContext<AuthContextState | null>(null);
 
@@ -143,6 +144,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setStoredAuth(rawToken, tokenOrData as Record<string, unknown> | null);
       setToken(rawToken);
       setUser(mergedUser);
+      rememberCollegeBinding(mergedUser);
     } else {
       // Preferred cookie-first signature: user metadata supplied from login response
       const incomingUser = userOrToken;
@@ -154,6 +156,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       }
 
       setUser(incomingUser);
+      rememberCollegeBinding(incomingUser);
     }
   };
 
@@ -171,6 +174,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       await apiClient.post(logoutEndpoint).catch(() => {});
     } finally {
       clearStoredAuth();
+      clearCollegeBinding();
       clearAllQueryCache();
       setToken(null);
       setUser(null);
