@@ -107,9 +107,39 @@ export function defaultReturnUrl(
 }
 
 /**
- * Target after a successful login. `returnUrl` wins for non-admin portals
- * (it is already validated by the caller), except when the authenticated user
- * turns out to be a College Admin — admins always land on their dashboard.
+ * Validate a `?returnUrl=` value before it is used for post-login navigation.
+ *
+ * Only relative paths starting with a single `/` that stay inside the same
+ * college's subtree (`/college/[slug]/…`) are accepted. Anything else returns
+ * null and the caller must fall back to the role's default dashboard.
+ *
+ * Rejects:
+ * - empty / missing values
+ * - absolute and protocol-relative URLs ('https://evil.com', '//evil.com')
+ * - backslash paths ('/\evil.com' — browsers treat '\' as a path separator,
+ *   so the browser may resolve it off-origin)
+ * - control characters incl. newline/tab (header-injection style smuggling)
+ * - paths belonging to a different college, or outside any college
+ *   ('/college/other/student', '/admin', '/clubs')
+ */
+export function safeReturnUrl(rawReturnUrl: string | undefined, slug: string): string | null {
+  if (!rawReturnUrl || !slug) return null;
+  // Must be relative and start with exactly one '/' (not '//' or '/\').
+  if (!rawReturnUrl.startsWith('/') || rawReturnUrl.startsWith('//')) return null;
+  if (rawReturnUrl.includes('\\')) return null;
+  // No control characters (newlines/tabs could smuggle separators).
+  if (/[\u0000-\u001f\u007f]/.test(rawReturnUrl)) return null;
+  // The path must stay inside this college's subtree.
+  const pathSlug = slugFromCollegePath(rawReturnUrl);
+  if (!pathSlug || pathSlug !== slug.toLowerCase()) return null;
+  return rawReturnUrl;
+}
+
+/**
+ * Target after a successful login. A *validated* `returnUrl` wins for
+ * non-admin portals (see {@link safeReturnUrl}); when it is absent or unsafe
+ * the portal's default dashboard is used instead. A College Admin is always
+ * bounced to their dashboard, whichever portal they used.
  */
 export function resolvePostLoginTarget(options: {
   portal: LoginPortal;
@@ -124,7 +154,8 @@ export function resolvePostLoginTarget(options: {
     return isUnderCollegePath(slug, currentPath) ? adminDashboardHref(slug) : '/admin';
   }
 
-  if (returnUrl) return returnUrl;
+  const safeUrl = safeReturnUrl(returnUrl, slug);
+  if (safeUrl) return safeUrl;
 
   switch (portal) {
     case 'student':
