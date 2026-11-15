@@ -323,6 +323,7 @@ export const collegeAdmin = {
     statClubsHint: 'Recognised student organisations, central and departmental.',
     statManagers: 'Event Managers',
     statManagersHint: 'Assigned or invited to at least one club (pending accounts included).',
+    statManagersPending: 'Pending invites',
     recentClubs: 'Recent clubs',
     viewAllClubs: 'View all clubs',
     recentClubsHint: 'The five most recently created clubs.',

@@ -72,6 +72,17 @@ export default function DashboardClient({ slug }: DashboardClientProps) {
     .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
     .slice(0, 5);
 
+  // Display-only split of the manager tally (logic above is untouched): the
+  // same set is counted, but pending (not-yet-active) accounts are surfaced as
+  // their own label so the number isn't misleading. Backend aggregation comes
+  // later; this is honest client-side math.
+  const pendingManagerCount = users.filter(
+    (u) =>
+      !u.isActive &&
+      u.role !== 'COLLEGE_ADMIN' &&
+      !(u.memberships || []).some((m) => m.role === 'MANAGER'),
+  ).length;
+
   const handleRefresh = () => {
     void refetchUsers();
     void refetchClubs();
@@ -149,7 +160,11 @@ export default function DashboardClient({ slug }: DashboardClientProps) {
         <StatCard
           label={t.statManagers}
           value={uniqueManagerIds.size}
-          hint={t.statManagersHint}
+          hint={
+            pendingManagerCount > 0
+              ? `${t.statManagersHint} · ${t.statManagersPending}: ${pendingManagerCount}`
+              : t.statManagersHint
+          }
           icon={ShieldCheck}
           loading={usersLoading}
           tone="success"
