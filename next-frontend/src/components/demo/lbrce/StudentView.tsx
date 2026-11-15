@@ -75,7 +75,7 @@ export default function StudentView({ college }: StudentViewProps) {
     }
 
     const newTicket: DemoTicket = {
-      ticketId: `TKT-LBRCE-${Math.floor(1000 + Math.random() * 9000)}`,
+      ticketId: `TKT-LBRCE-${event.id.toUpperCase()}`,
       eventId: event.id,
       eventTitle: event.title,
       clubName: club?.name || "Campus Club",
