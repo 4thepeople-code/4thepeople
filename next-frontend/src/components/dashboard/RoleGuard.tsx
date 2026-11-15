@@ -40,7 +40,8 @@ function loginHrefFor(role: DashboardRole, slug?: string): string {
  *
  * - Loading: skeleton, never a spinner.
  * - Signed out: back to the role's login, carrying the current path as
- *   ?returnUrl so the user lands back here.
+ *   ?returnUrl so the user lands back here — on every surface, including
+ *   platform routes (/admin/login), matching the old ProtectedRoute.
  * - Signed in as the wrong role:
  *   - College dashboards: sent to their own dashboard (e.g. College Admin is
  *     bounced out of manager routes — the pre-existing behaviour, kept).
@@ -58,8 +59,10 @@ export default function RoleGuard({ role, slug, children }: RoleGuardProps) {
   const [signingOut, setSigningOut] = useState(false);
 
   useEffect(() => {
-    if (loading || redirecting.current || role === 'superAdmin') return;
+    if (loading || redirecting.current) return;
     if (!user) {
+      // Signed-out visitors are redirected on every surface, including
+      // platform routes (/admin/login) — the old ProtectedRoute behaviour.
       redirecting.current = true;
       const returnUrl = encodeURIComponent(
         typeof window === 'undefined' ? '' : window.location.pathname + window.location.search,
@@ -68,6 +71,9 @@ export default function RoleGuard({ role, slug, children }: RoleGuardProps) {
       router.replace(returnUrl ? `${login}?returnUrl=${returnUrl}` : login);
       return;
     }
+    // Signed-in: platform surfaces never redirect college accounts anywhere —
+    // they get the explicit "sign out & switch" screen instead.
+    if (role === 'superAdmin') return;
     const ownDashboard = dashboardHref(slug);
     const allowed = isAllowed(user.role, user.isPlatformAdmin, role);
     if (!allowed && ownDashboard) {
