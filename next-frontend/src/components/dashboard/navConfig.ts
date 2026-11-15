@@ -111,21 +111,19 @@ export function getRoleNav(role: DashboardRole, slug = ''): RoleNav {
           {
             title: nav.sections.main,
             items: [
-              // The student dashboard is one page with internal tabs today;
-              // Phase 4 makes these read ?tab=.
-              { label: 'Discover events', href: studentDashboardHref(slug), icon: Palette, interim: true },
-              { label: 'My registrations', href: studentDashboardHref(slug), icon: CalendarPlus, interim: true },
-              { label: 'Certificates', href: studentDashboardHref(slug), icon: GraduationCap, interim: true },
+              { label: 'My registrations', href: studentDashboardHref(slug), icon: CalendarPlus },
+              { label: 'Discover events', href: `${studentDashboardHref(slug)}/events`, icon: Palette },
+              { label: 'Certificates', href: `${studentDashboardHref(slug)}/certificates`, icon: GraduationCap },
             ],
           },
           {
             title: nav.sections.account,
             items: [
-              { label: 'Profile', href: studentDashboardHref(slug), icon: Settings, interim: true },
+              { label: 'Profile', href: `${studentDashboardHref(slug)}/profile`, icon: Settings },
             ],
           },
         ],
-        primaryAction: { label: actions.browseEvents, href: studentDashboardHref(slug), icon: Palette, interim: true },
+        primaryAction: { label: actions.browseEvents, href: `${studentDashboardHref(slug)}/events`, icon: Palette },
       };
 
     case 'superAdmin':

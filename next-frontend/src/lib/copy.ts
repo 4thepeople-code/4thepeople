@@ -933,3 +933,93 @@ export const eventManager = {
     noAssignedClubs: 'This manager is not assigned to any club yet.',
   },
 } as const;
+
+export const student = {
+    registrations: {
+      title: 'My registrations',
+      description:
+        'Events you have secured spots for. Present your registration or confirmation at the venue.',
+      loadingLabel: 'Loading your registrations',
+      refresh: 'Refresh list',
+      rsvpConfirmed: 'RSVP confirmed',
+      registeredOn: (date: string) => `Registered: ${date}`,
+      details: 'Details',
+      cancel: 'Cancel',
+      noEventTitle: 'Campus event',
+      noDescription: 'Campus student activity.',
+      noLocation: 'Location TBA',
+      noTime: 'Time TBA',
+      emptyTitle: 'No event registrations yet',
+      emptyDescription:
+        "You haven't registered for any campus events yet. Explore the campus calendar to find upcoming workshops, hackathons, and activities.",
+      emptyAction: 'Explore campus events',
+      cancelTitle: 'Cancel event RSVP?',
+      cancelBody: (eventTitle: string) =>
+        `Are you sure you want to cancel your registration for "${eventTitle}"? Your spot will be released immediately to other students.`,
+      confirmCancel: 'Confirm cancellation',
+      toastCancelled: 'Registration cancelled.',
+      errCancel: "The cancellation didn't go through. The server did not respond — try again in a moment.",
+    },
+
+    discover: {
+      title: 'Discover events',
+      description: 'Hackathons, workshops and competitions happening on campus.',
+      searchLabel: 'Search events',
+      searchPlaceholder: 'Search by title, club or venue…',
+      categoryLabel: 'Category',
+      categoryAll: 'All categories',
+      refresh: 'Refresh list',
+      loadingLabel: 'Loading upcoming events',
+      noEventsTitle: 'No upcoming events yet',
+      noEventsDescription: 'Campus events appear here as clubs publish them. Check back soon.',
+      noMatchesTitle: 'No events match',
+      noMatchesFix: 'Try a different search term or clear the filters to see everything.',
+      registeredBadge: 'Registered',
+      viewRsvp: 'View RSVP ticket',
+      viewDetails: 'View details & RSVP',
+      errLoad: 'Upcoming events could not be loaded. Try again in a moment.',
+    },
+
+    certificates: {
+      title: 'My certificates',
+      description: 'Verified participation credentials issued for your completed campus events.',
+      loadingLabel: 'Loading your certificates',
+      refresh: 'Refresh list',
+      official: 'Official certificate',
+      issued: (date: string) => `Issued ${date}`,
+      noEventTitle: 'Campus event participation',
+      copyId: 'Copy certificate ID',
+      copied: 'Copied',
+      download: 'Download PDF',
+      verify: 'Verify certificate authenticity',
+      emptyTitle: 'No certificates earned yet',
+      emptyDescription:
+        'Certificates will appear here once event managers issue or generate official credentials for events you attended.',
+      emptyAction: 'Discover upcoming events',
+      errLoad: 'Certificates could not be loaded. Try again in a moment.',
+    },
+
+    profile: {
+      title: 'Student profile',
+      description: 'Verified student roster credentials scoped to your college.',
+      loadingLabel: 'Loading your profile',
+      activeStudent: 'Active campus student account',
+      noName: 'Enrolled student',
+      rollNumber: 'Roll number',
+      noRoll: 'Not provided',
+      email: 'Institutional email',
+      institution: 'Institution / tenant',
+      status: 'Account status',
+      statusActive: 'Verified & active',
+      statRegistrations: 'Total events registered',
+      statRegistrationsHint: 'All registered campus activities',
+    },
+
+    managerBanner: {
+      title: 'Club manager workspace available',
+      body: (count: number) =>
+        `You are an authorized manager for ${count} ${count === 1 ? 'club' : 'clubs'}. Switch anytime to create events and manage member registrations.`,
+      action: 'Switch to manager workspace',
+      badge: (count: number) => `Club manager (${count})`,
+    },
+} as const;
