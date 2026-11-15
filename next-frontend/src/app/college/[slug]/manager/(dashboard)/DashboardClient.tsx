@@ -185,7 +185,6 @@ export default function ManagerDashboardClient({ slug }: ManagerDashboardClientP
               >
                 <div className="flex items-center gap-3">
                   {club.logo?.url ? (
-                    // eslint-disable-next-line @next/next/no-img-element
                     <img src={club.logo.url} alt="" className="h-11 w-11 rounded-xl border border-[var(--line)] object-cover" />
                   ) : (
                     <span aria-hidden="true" className="grid h-11 w-11 place-items-center rounded-xl border border-[var(--line)] bg-[var(--bg)] font-display text-sm font-bold text-[var(--primary)]">
@@ -237,7 +236,6 @@ export default function ManagerDashboardClient({ slug }: ManagerDashboardClientP
               >
                 <div className="relative h-36 bg-[var(--bg)]">
                   {evt.coverImage?.url ? (
-                    // eslint-disable-next-line @next/next/no-img-element
                     <img src={evt.coverImage.url} alt="" className="h-full w-full object-cover" />
                   ) : (
                     <div className="flex h-full items-center justify-center p-4">
