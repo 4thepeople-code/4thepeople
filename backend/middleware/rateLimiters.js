@@ -39,4 +39,11 @@ const destructiveLimiter = createLimiter({
   limit: 25,
 });
 
-module.exports = { authLimiter, loginLimiter, inviteLimiter, uploadLimiter, destructiveLimiter };
+// Rate limiter for external OTP request and verify endpoints.
+// 10 requests per minute per IP to resist OTP flooding and brute-force attacks.
+const externalOtpLimiter = createLimiter({
+  windowMs: 60 * 1000,
+  limit: 10,
+});
+
+module.exports = { authLimiter, loginLimiter, inviteLimiter, uploadLimiter, destructiveLimiter, externalOtpLimiter };

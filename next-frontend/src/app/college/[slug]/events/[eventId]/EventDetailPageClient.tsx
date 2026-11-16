@@ -1,9 +1,19 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useUpcomingEvents, useMyRegistrationStatus, useRegisterForEventMutation, useCancelRegistrationMutation } from '@/lib/api/events';
+import {
+  useUpcomingEvents,
+  usePublicEventById,
+  useMyRegistrationStatus,
+  useRegisterForEventMutation,
+  useCancelRegistrationMutation,
+  useExternalRegistrationStatus,
+  useCancelExternalMutation,
+} from '@/lib/api/events';
+import { getStoredExternalToken, clearStoredExternalToken } from '@/lib/auth/tokenStorage';
+import { ExternalGuestRegistrationDialog } from '@/components/public/ExternalGuestRegistrationDialog';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
 import PublicLayout from '@/components/public/PublicLayout';
@@ -21,6 +31,7 @@ import {
   AlertCircle,
   RefreshCw,
   CheckCircle2,
+  Globe,
   Image as ImageIcon,
 } from 'lucide-react';
 import type { Event } from '@/types/models';
@@ -76,26 +87,40 @@ export function EventDetailPageClient({ slug, eventId, clubId: propClubId }: Eve
 
   // Queries
   const { data: upcomingEvents = [], isLoading, isError, error, refetch } = useUpcomingEvents(slug);
-  const { data: regStatus } = useMyRegistrationStatus(slug, eventId, Boolean(user));
+  const { data: directEvent } = usePublicEventById(eventId, !upcomingEvents.some((e) => e.id === eventId));
 
   const registerMutation = useRegisterForEventMutation(slug);
   const cancelMutation = useCancelRegistrationMutation(slug);
+  const cancelExternalMutation = useCancelExternalMutation(slug);
 
   const [showModal, setShowModal] = useState(false);
   const [showFormModal, setShowFormModal] = useState(false);
+  const [showExternalDialog, setShowExternalDialog] = useState(false);
+  const [showCrossCollegeModal, setShowCrossCollegeModal] = useState(false);
   const [formAnswers, setFormAnswers] = useState<Record<string, unknown>>({});
   const [formValidationError, setFormValidationError] = useState<string | null>(null);
   const [shareNotice, setShareNotice] = useState(false);
   const [activeGalleryEvent, setActiveGalleryEvent] = useState<Event | null>(null);
   const [regError, setRegError] = useState<string | null>(null);
 
-  const event = upcomingEvents.find((e) => e.id === eventId) || upcomingEvents[0];
+  // External token tracking in session
+  const [externalToken, setExternalToken] = useState<string | null>(null);
+  useEffect(() => {
+    setExternalToken(getStoredExternalToken());
+  }, []);
+
+  const event = upcomingEvents.find((e) => e.id === eventId) || directEvent || upcomingEvents[0];
   const club = event?.club;
   const clubId = propClubId || club?.id || event?.clubId;
 
   const collegeDisplay = slug.toUpperCase();
 
-  const isRegistered = Boolean(regStatus?.isRegistered);
+  const { data: regStatus } = useMyRegistrationStatus(slug, eventId, Boolean(user));
+  const { data: externalRegStatus } = useExternalRegistrationStatus(eventId, !user && Boolean(externalToken));
+
+  const hostCollegeId = event?.collegeId || event?.college?.id || (event?.club as unknown as { collegeId?: string })?.collegeId;
+  const isCrossCollege = Boolean(user && user.collegeId && hostCollegeId && user.collegeId !== hostCollegeId);
+  const isRegistered = Boolean(regStatus?.isRegistered || externalRegStatus?.isRegistered);
 
   const dateInfo = formatDateParts(event?.startAt || event?.startDate || event?.date);
   const eventTime = formatEventTime(
@@ -112,14 +137,53 @@ export function EventDetailPageClient({ slug, eventId, clubId: propClubId }: Eve
       window.open(validRegistrationUrl, '_blank', 'noopener,noreferrer');
       return;
     }
+
+    // 1. Unauthenticated visitor
     if (!user) {
+      if (event?.visibility === 'PUBLIC' || !event?.visibility) {
+        setShowExternalDialog(true);
+        return;
+      }
       const returnPath = `/college/${slug}/events/${eventId}`;
       router.push(`/college/${slug}/login?returnUrl=${encodeURIComponent(returnPath)}`);
       return;
     }
+
     if (!event?.id) return;
 
-    // Check if custom questions need to be answered
+    // 2. Cross-college student
+    if (isCrossCollege) {
+      if (event.visibility !== 'PUBLIC') {
+        setRegError('Cross-college registration is only available for public events.');
+        return;
+      }
+      setShowCrossCollegeModal(true);
+      return;
+    }
+
+    // 3. Same-college student flow
+    const fields = event.customFormDefinition?.fields;
+    if (fields && Array.isArray(fields) && fields.length > 0) {
+      setShowFormModal(true);
+      return;
+    }
+
+    try {
+      setRegError(null);
+      await registerMutation.mutateAsync({ eventId: event.id });
+      setShowModal(true);
+    } catch (err: unknown) {
+      const msg =
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+        (err instanceof Error ? err.message : 'Failed to register for event.');
+      setRegError(msg);
+    }
+  };
+
+  const handleConfirmCrossCollege = async () => {
+    setShowCrossCollegeModal(false);
+    if (!event?.id) return;
+
     const fields = event.customFormDefinition?.fields;
     if (fields && Array.isArray(fields) && fields.length > 0) {
       setShowFormModal(true);
@@ -168,10 +232,16 @@ export function EventDetailPageClient({ slug, eventId, clubId: propClubId }: Eve
   };
 
   const handleCancelRegistration = async () => {
-    if (!user || !event?.id) return;
+    if (!event?.id) return;
     try {
       setRegError(null);
-      await cancelMutation.mutateAsync(event.id);
+      if (user) {
+        await cancelMutation.mutateAsync(event.id);
+      } else if (externalRegStatus?.isRegistered) {
+        await cancelExternalMutation.mutateAsync({ eventId: event.id });
+        clearStoredExternalToken();
+        setExternalToken(null);
+      }
     } catch (err: unknown) {
       const msg =
         (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
@@ -366,6 +436,34 @@ export function EventDetailPageClient({ slug, eventId, clubId: propClubId }: Eve
 
                   {/* Action CTA Buttons */}
                   <div className="pt-2 flex flex-col gap-2.5">
+                    {/* Visitor Context Banners */}
+                    {isCrossCollege && event.visibility === 'PUBLIC' && (
+                      <div className="p-3 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-xs text-indigo-300 flex items-center gap-2.5">
+                        <Globe className="w-4 h-4 shrink-0 text-indigo-400" />
+                        <span>Inter-College Event: Open to students from other campuses.</span>
+                      </div>
+                    )}
+                    {isCrossCollege && event.visibility !== 'PUBLIC' && (
+                      <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-300 flex items-center gap-2.5">
+                        <AlertCircle className="w-4 h-4 shrink-0 text-amber-400" />
+                        <span>Restricted Event: Open only to students of {event.college?.name || slug.toUpperCase()}.</span>
+                      </div>
+                    )}
+                    {!user && (event.visibility === 'PUBLIC' || !event.visibility) && (
+                      <div className="p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-300 flex items-center justify-between gap-2">
+                        <span className="flex items-center gap-2">
+                          <Sparkles className="w-4 h-4 shrink-0 text-emerald-400" />
+                          <span>Guest & External Registration open for this event</span>
+                        </span>
+                        <Link
+                          href={`/college/${slug}/login?returnUrl=${encodeURIComponent(`/college/${slug}/events/${eventId}`)}`}
+                          className="text-[#00F0FF] hover:underline font-bold text-[11px] shrink-0"
+                        >
+                          Student Login
+                        </Link>
+                      </div>
+                    )}
+
                     {regError && (
                       <div className="p-3 rounded-xl bg-red-500/15 border border-red-500/30 text-xs font-semibold text-red-400 flex items-center gap-2">
                         <AlertCircle className="w-4 h-4 shrink-0" />
@@ -393,11 +491,11 @@ export function EventDetailPageClient({ slug, eventId, clubId: propClubId }: Eve
                           <button
                             type="button"
                             onClick={handleCancelRegistration}
-                            disabled={cancelMutation.isPending}
+                            disabled={cancelMutation.isPending || cancelExternalMutation.isPending}
                             className="py-3 px-4 rounded-full font-bold text-xs uppercase tracking-wider border border-red-500/30 text-red-400 hover:bg-red-500/10 transition cursor-pointer"
                             title="Cancel RSVP"
                           >
-                            {cancelMutation.isPending ? 'Cancelling...' : 'Cancel RSVP'}
+                            {cancelMutation.isPending || cancelExternalMutation.isPending ? 'Cancelling...' : 'Cancel RSVP'}
                           </button>
                         </div>
                       ) : (
@@ -406,14 +504,16 @@ export function EventDetailPageClient({ slug, eventId, clubId: propClubId }: Eve
                           onClick={handleRegister}
                           disabled={
                             registerMutation.isPending ||
+                            (isCrossCollege && event.visibility !== 'PUBLIC') ||
                             (event.capacity !== null &&
                               event.capacity !== undefined &&
                               (event.registeredCount || 0) >= event.capacity)
                           }
                           className={`flex-1 min-w-[200px] py-3.5 px-6 rounded-full font-extrabold text-xs uppercase tracking-wider shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer ${
-                            event.capacity !== null &&
-                            event.capacity !== undefined &&
-                            (event.registeredCount || 0) >= event.capacity
+                            (isCrossCollege && event.visibility !== 'PUBLIC') ||
+                            (event.capacity !== null &&
+                              event.capacity !== undefined &&
+                              (event.registeredCount || 0) >= event.capacity)
                               ? 'bg-gray-600 text-gray-300 cursor-not-allowed'
                               : 'bg-[#00F0FF] hover:bg-[#38f2ff] text-black shadow-cyan-500/30'
                           }`}
@@ -429,6 +529,11 @@ export function EventDetailPageClient({ slug, eventId, clubId: propClubId }: Eve
                             <>
                               <AlertCircle className="w-4 h-4" />
                               <span>Event Full (Capacity Reached)</span>
+                            </>
+                          ) : isCrossCollege && event.visibility !== 'PUBLIC' ? (
+                            <>
+                              <AlertCircle className="w-4 h-4" />
+                              <span>Restricted to Host College</span>
                             </>
                           ) : (
                             <>
@@ -769,6 +874,95 @@ export function EventDetailPageClient({ slug, eventId, clubId: propClubId }: Eve
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* External Guest Registration Dialog */}
+      {showExternalDialog && event && (
+        <ExternalGuestRegistrationDialog
+          isOpen={showExternalDialog}
+          event={event}
+          onClose={() => setShowExternalDialog(false)}
+          onSuccess={() => {
+            setExternalToken(getStoredExternalToken());
+            setShowExternalDialog(false);
+            setShowModal(true);
+          }}
+        />
+      )}
+
+      {/* Cross-College Student Confirmation Modal */}
+      {showCrossCollegeModal && event && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div
+            className={`border rounded-3xl max-w-lg w-full p-6 sm:p-8 space-y-5 shadow-2xl ${
+              isDark ? 'bg-[#12141C] border-white/15 text-white' : 'bg-white border-slate-200 text-[#0F172A]'
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              <div className="p-3 rounded-2xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                <Building2 className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="font-['Syne',sans-serif] text-xl font-black uppercase">
+                  Cross-College Registration
+                </h3>
+                <p className="text-xs text-slate-400">Inter-institutional event participation</p>
+              </div>
+            </div>
+
+            <div className={`p-4 rounded-2xl border text-xs leading-relaxed space-y-2.5 ${
+              isDark ? 'bg-slate-950/60 border-white/10' : 'bg-slate-50 border-slate-200'
+            }`}>
+              <p>
+                You are registering as a verified student for an event organized by another institution.
+              </p>
+              <div className="p-3 rounded-xl bg-indigo-500/10 border border-indigo-500/20 space-y-1">
+                <div className="flex justify-between">
+                  <span className="text-slate-400">Host Campus:</span>
+                  <span className="font-bold">{event?.college?.name || slug.toUpperCase()}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-400">Your Account:</span>
+                  <span className="font-semibold">{user?.email}</span>
+                </div>
+              </div>
+              <p className="text-[11px] text-slate-400">
+                • Your student identity details will be securely shared with the host college organizers.<br />
+                • Your home institution affiliation and account remain unchanged.
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowCrossCollegeModal(false)}
+                className={`px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider border transition cursor-pointer ${
+                  isDark ? 'bg-white/5 border-white/10 text-gray-300 hover:text-white' : 'bg-slate-100 border-slate-200 text-slate-700'
+                }`}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmCrossCollege}
+                disabled={registerMutation.isPending}
+                className="px-5 py-2.5 rounded-xl bg-[#00F0FF] hover:bg-[#38f2ff] text-black font-extrabold text-xs uppercase tracking-wider transition cursor-pointer flex items-center gap-2"
+              >
+                {registerMutation.isPending ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Registering...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Confirm & Register</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}

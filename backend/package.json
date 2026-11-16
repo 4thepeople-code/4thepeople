@@ -5,6 +5,7 @@
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js",
+    "worker:outbox": "node workers/outboxRunner.js",
     "postinstall": "prisma generate",
     "lint": "eslint .",
     "test:phase1": "node tests/phase1_tenant_layer.test.js",

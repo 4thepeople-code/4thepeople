@@ -13,6 +13,69 @@ function getActivationPepper() {
 }
 
 /**
+ * Returns the external OTP pepper secret.
+ * This is a dedicated secret, independent from ACTIVATION_CODE_PEPPER.
+ * Never falls back to a hardcoded value. Throws if the variable is absent.
+ * In production, throws if the value is under 32 bytes.
+ */
+function getExternalOtpPepper() {
+  const pepper = process.env.EXTERNAL_OTP_PEPPER;
+  if (!pepper) {
+    throw new Error(
+      'EXTERNAL_OTP_PEPPER environment variable is not set. ' +
+      'Set it in .env for development or as a production environment variable.'
+    );
+  }
+  if (process.env.NODE_ENV === 'production' && Buffer.from(pepper, 'utf8').length < 32) {
+    throw new Error(
+      'FATAL SECURITY ERROR: EXTERNAL_OTP_PEPPER must be at least 32 bytes in production'
+    );
+  }
+  return pepper;
+}
+
+/**
+ * Hashes an external participant OTP using HMAC-SHA-256 with the external OTP pepper.
+ * Input: salt (32-char hex, unique per OTP) concatenated with the 6-digit code.
+ * Never logs the pepper, salt, or raw code.
+ *
+ * @param {string} salt - 32-character hex string unique per OTP record
+ * @param {string} code - 6-digit numeric string
+ * @returns {string} 64-character hex hash
+ */
+function hashExternalOtp(salt, code) {
+  if (!salt || typeof salt !== 'string') {
+    throw new Error('Salt is required for external OTP hashing');
+  }
+  if (!code || typeof code !== 'string') {
+    throw new Error('Code is required for external OTP hashing');
+  }
+  const pepper = getExternalOtpPepper();
+  return crypto.createHmac('sha256', pepper).update(salt + code).digest('hex');
+}
+
+/**
+ * Verifies a submitted external OTP code against a stored hash in constant time.
+ *
+ * @param {string} salt - Salt from the stored OTP record
+ * @param {string} submittedCode - Code submitted by the user
+ * @param {string} storedHash - Hash stored in external_auth_otps
+ * @returns {boolean}
+ */
+function verifyExternalOtpCode(salt, submittedCode, storedHash) {
+  if (!salt || !submittedCode || !storedHash) return false;
+  try {
+    const candidate = hashExternalOtp(salt, submittedCode);
+    const bufA = Buffer.from(candidate, 'hex');
+    const bufB = Buffer.from(storedHash, 'hex');
+    if (bufA.length !== bufB.length) return false;
+    return crypto.timingSafeEqual(bufA, bufB);
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Returns the outbox AES-256-GCM encryption key.
  * In production, refuses to start if missing or under 32 bytes.
  */
@@ -118,5 +181,8 @@ module.exports = {
   decryptPayload,
   getActivationPepper,
   getOutboxKey,
+  getExternalOtpPepper,
+  hashExternalOtp,
+  verifyExternalOtpCode,
 };
 

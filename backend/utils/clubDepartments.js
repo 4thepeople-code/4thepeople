@@ -64,8 +64,12 @@ function serializeClub(club) {
     ? { url: club.coverImageUrl, publicId: club.coverImagePublicId || null }
     : null;
 
+  // Protect private and administrative fields from leaking to API responses:
+  // createdByUserId (foreign key to users table) and legacyMongoId (internal migration identifier)
+  const { createdByUserId, legacyMongoId, ...safeData } = club;
+
   const serialized = {
-    ...club,
+    ...safeData,
     isCentral,
     clubType,
     logo,

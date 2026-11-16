@@ -213,10 +213,188 @@ const checkAdminOrClubManager = (req, res, next, paramName) => {
   requireClubManager(paramName)(req, res, next);
 };
 
+/**
+ * crossCollegeRegisterMiddleware
+ *
+ * A relaxed authentication middleware used exclusively on cross-college student
+ * registration endpoints. Unlike authenticateToken, it accepts JWTs where
+ * decoded.collegeId !== req.collegeId (cross-college scenario).
+ *
+ * It still:
+ *   1. Verifies JWT signature and type.
+ *   2. Re-loads the student's user record from their home college using
+ *      withTenant(decoded.collegeId), ensuring RLS is enforced.
+ *   3. Validates the user is active and role is unchanged.
+ *
+ * Sets req.user (with college.name from home college), req.homeCollegeId,
+ * and req.isCrossCollege.
+ *
+ * NEVER use this middleware on admin, manager, or other privileged endpoints.
+ */
+const crossCollegeRegisterMiddleware = async (req, res, next) => {
+  let token = null;
+
+  const authHeader = req.headers['authorization'];
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    token = authHeader.split(' ')[1];
+  } else if (req.cookies && (req.cookies.yuva_token || req.cookies.token)) {
+    token = req.cookies.yuva_token || req.cookies.token;
+  }
+
+  if (!token) {
+    return next(new AppError('Authentication required', 401));
+  }
+
+  const jwtSecret = process.env.JWT_SECRET || process.env.JWT_SECRET_TOKEN;
+  if (!jwtSecret && process.env.NODE_ENV === 'production') {
+    return next(new Error('JWT_SECRET configuration missing in production'));
+  }
+  const effectiveSecret = jwtSecret || 'dev_insecure_jwt_secret_fallback_do_not_use_in_prod';
+
+  try {
+    const decoded = jwt.verify(token, effectiveSecret);
+
+    // Reject platform tokens and external tokens — only college student tokens allowed
+    if (decoded.type === 'platform' || decoded.platformAdminId) {
+      return next(new AppError('Access denied: Platform token cannot authenticate this route', 403));
+    }
+    if (decoded.type === 'external') {
+      return next(new AppError('Access denied: External verification token cannot authenticate this route', 403));
+    }
+    if (decoded.type !== 'college') {
+      return next(new AppError('Access denied: Invalid token type for this route', 403));
+    }
+
+    const homeCollegeId = decoded.collegeId;
+    const userId = decoded.userId || decoded.id;
+
+    if (!homeCollegeId || !userId) {
+      return next(new AppError('Invalid token claims: Missing tenant or user identity', 401));
+    }
+
+    // Re-load student from their HOME college under RLS.
+    // This is intentionally a separate transaction from any subsequent write.
+    const freshUser = await withTenant(homeCollegeId, async (tx) => {
+      return tx.user.findFirst({
+        where: { id: userId, collegeId: homeCollegeId },
+        select: {
+          id: true,
+          collegeId: true,
+          name: true,
+          email: true,
+          role: true,
+          isActive: true,
+          rollNumber: true,
+          college: { select: { name: true } },
+        },
+      });
+    });
+
+    if (!freshUser) {
+      return next(new AppError('User account not found', 401));
+    }
+    if (!freshUser.isActive) {
+      return next(new AppError('Account is inactive. Please contact your college administrator.', 403));
+    }
+    if (freshUser.role !== decoded.role) {
+      return next(new AppError('User role has changed. Please log in again.', 401));
+    }
+
+    req.user = {
+      ...decoded,
+      id: freshUser.id,
+      userId: freshUser.id,
+      collegeId: freshUser.collegeId,
+      name: freshUser.name,
+      email: freshUser.email,
+      role: freshUser.role,
+      isActive: freshUser.isActive,
+      rollNumber: freshUser.rollNumber || null,
+      college: freshUser.college || null,
+    };
+    req.homeCollegeId = homeCollegeId;
+    req.isCrossCollege = req.collegeId ? (homeCollegeId !== req.collegeId) : false;
+
+    next();
+  } catch (error) {
+    if (error instanceof AppError) {
+      return next(error);
+    }
+    if (error.name === 'TokenExpiredError') {
+      return next(new AppError('Authentication token has expired', 401));
+    }
+    return next(new AppError('Invalid authentication token', 401));
+  }
+};
+
+/**
+ * authenticateExternalToken
+ *
+ * Verifies an external participant JWT (type: 'external') issued after OTP verification.
+ * Rejects college and platform tokens.
+ * Enforces that the token's hostCollegeId matches the current req.collegeId to prevent
+ * cross-college token replay.
+ *
+ * Sets req.externalUser = { email, hostCollegeId } on success.
+ * Does NOT set req.user.
+ */
+const authenticateExternalToken = (req, res, next) => {
+  let token = null;
+
+  const authHeader = req.headers['authorization'];
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    token = authHeader.split(' ')[1];
+  }
+
+  if (!token) {
+    return next(new AppError('Authentication required', 401));
+  }
+
+  const jwtSecret = process.env.JWT_SECRET || process.env.JWT_SECRET_TOKEN;
+  if (!jwtSecret && process.env.NODE_ENV === 'production') {
+    return next(new Error('JWT_SECRET configuration missing in production'));
+  }
+  const effectiveSecret = jwtSecret || 'dev_insecure_jwt_secret_fallback_do_not_use_in_prod';
+
+  try {
+    const decoded = jwt.verify(token, effectiveSecret);
+
+    // Reject non-external tokens
+    if (decoded.type !== 'external') {
+      return next(new AppError('Access denied: This endpoint requires an external verification token', 403));
+    }
+
+    // Require OTP verification to have completed
+    if (!decoded.isEmailVerified) {
+      return next(new AppError('Access denied: Email verification is required', 403));
+    }
+
+    // Enforce college context binding: token must have been issued for this exact college
+    if (req.collegeId && decoded.hostCollegeId && decoded.hostCollegeId !== req.collegeId) {
+      return next(new AppError('Access denied: Token issued for a different college', 403));
+    }
+
+    req.externalUser = {
+      email: decoded.email,
+      hostCollegeId: decoded.hostCollegeId || req.collegeId,
+    };
+
+    next();
+  } catch (error) {
+    if (error instanceof AppError) return next(error);
+    if (error.name === 'TokenExpiredError') {
+      return next(new AppError('Verification token has expired. Please request a new code.', 401));
+    }
+    return next(new AppError('Invalid verification token', 401));
+  }
+};
+
 module.exports = {
   authenticateToken,
   requireAdmin,
   requireCollegeAdmin: requireAdmin,
   requireClubManager,
   requireAdminOrClubManager,
+  crossCollegeRegisterMiddleware,
+  authenticateExternalToken,
 };

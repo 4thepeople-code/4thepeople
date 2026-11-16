@@ -66,20 +66,16 @@ const PublicNavbar = () => {
               Home
             </Link>
 
-            <a
-              href="/#upcoming-events"
-              onClick={(e) => {
-                if (location.pathname === '/') {
-                  e.preventDefault();
-                  document.getElementById('upcoming-events')?.scrollIntoView({ behavior: 'smooth' });
-                }
-              }}
+            <Link
+              to="/events"
               className={`transition-colors ${
-                isDark ? 'text-gray-300 hover:text-[#00F0FF]' : 'text-slate-600 hover:text-cyan-600'
+                location.pathname.startsWith('/events')
+                  ? isDark ? 'text-[#00F0FF]' : 'text-cyan-600 font-extrabold'
+                  : isDark ? 'text-gray-300 hover:text-[#00F0FF]' : 'text-slate-600 hover:text-cyan-600'
               }`}
             >
               Events
-            </a>
+            </Link>
 
             <Link
               to="/clubs"
@@ -200,23 +196,19 @@ const PublicNavbar = () => {
               >
                 Home
               </Link>
-              <a
-                href="/#upcoming-events"
-                onClick={(e) => {
-                  setMobileMenuOpen(false);
-                  if (location.pathname === '/') {
-                    e.preventDefault();
-                    document.getElementById('upcoming-events')?.scrollIntoView({ behavior: 'smooth' });
-                  }
-                }}
+              <Link
+                to="/events"
+                onClick={() => setMobileMenuOpen(false)}
                 className={`block py-2 px-3 rounded-lg font-semibold transition-colors ${
-                  isDark
-                    ? 'text-gray-200 hover:bg-white/5 hover:text-[#00F0FF]'
-                    : 'text-slate-700 hover:bg-slate-100 hover:text-cyan-600'
+                  location.pathname.startsWith('/events')
+                    ? isDark ? 'text-[#00F0FF] bg-white/5' : 'text-cyan-600 bg-slate-100 font-bold'
+                    : isDark
+                      ? 'text-gray-200 hover:bg-white/5 hover:text-[#00F0FF]'
+                      : 'text-slate-700 hover:bg-slate-100 hover:text-cyan-600'
                 }`}
               >
                 Events
-              </a>
+              </Link>
               <Link
                 to="/clubs"
                 onClick={() => setMobileMenuOpen(false)}

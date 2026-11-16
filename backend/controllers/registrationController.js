@@ -13,6 +13,13 @@ const validateUUID = (value, label) => {
 /**
  * POST /events/:eventId/register
  * Registers the authenticated user for an upcoming/ongoing event.
+ * Supports both same-college and cross-college student registration.
+ *
+ * Uses crossCollegeRegisterMiddleware (not authenticateToken), which:
+ *   - Accepts JWTs where decoded.collegeId !== req.collegeId (cross-college).
+ *   - Has already re-loaded the student from their home college.
+ *   - Has set req.user (with snapshot identity fields), req.homeCollegeId, req.isCrossCollege.
+ *
  * Atomically checks capacity and increments registered_count via PostgreSQL trigger.
  */
 exports.registerForEvent = asyncHandler(async (req, res) => {
@@ -31,7 +38,7 @@ exports.registerForEvent = asyncHandler(async (req, res) => {
     const [eventStatusRow, event] = await Promise.all([
       tx.eventsWithStatus.findFirst({
         where: { id: eventId, collegeId: req.collegeId },
-        select: { status: true },
+        select: { status: true, visibility: true },
       }),
       tx.event.findFirst({
         where: { id: eventId, collegeId: req.collegeId },
@@ -53,6 +60,11 @@ exports.registerForEvent = asyncHandler(async (req, res) => {
     }
     if (eventStatusRow.status === 'COMPLETED') {
       throw new AppError('Cannot register for a past event', 400);
+    }
+
+    // Cross-college students may only register for PUBLIC events
+    if (req.isCrossCollege && eventStatusRow.visibility !== 'PUBLIC') {
+      throw new AppError('Cross-college registration is only available for public events', 403);
     }
 
     // Check registration mode
@@ -106,7 +118,17 @@ exports.registerForEvent = asyncHandler(async (req, res) => {
       throw new AppError('You are already registered for this event', 409);
     }
 
-    // 4. Atomically insert registration. PostgreSQL trigger handle_registration_insert
+    // 4. Build snapshot identity fields — always from server-side user data,
+    //    never from client-supplied values.
+    //    For cross-college: req.user was loaded from home college by crossCollegeRegisterMiddleware.
+    //    For same-college: req.user was loaded from host college by the same middleware.
+    const homeCollegeId = req.homeCollegeId || req.collegeId;
+    const participantName = req.user.name;
+    const participantEmail = req.user.email;
+    const participantRollNumber = req.user.rollNumber || null;
+    const participantCollegeName = req.user.college?.name || null;
+
+    // 5. Atomically insert registration. PostgreSQL trigger handle_registration_insert
     // row-locks the events table row FOR UPDATE, enforces capacity, and increments registered_count.
     try {
       return await tx.eventRegistration.create({
@@ -114,6 +136,14 @@ exports.registerForEvent = asyncHandler(async (req, res) => {
           collegeId: req.collegeId,
           eventId,
           userId: req.user.id,
+          participantType: 'STUDENT',
+          homeCollegeId,
+          participantName,
+          participantEmail,
+          participantRollNumber,
+          participantCollegeName,
+          isUserDeleted: false,
+          registeredByRole: 'SELF',
           formAnswers: validatedAnswers,
         },
       });
@@ -162,12 +192,19 @@ exports.cancelRegistration = asyncHandler(async (req, res) => {
   validateUUID(eventId, 'event ID');
 
   await withTenant(req.collegeId, async (tx) => {
-    // Check event exists under tenant
-    const event = await tx.event.findFirst({
+    // Check event exists under tenant and is not already completed/cancelled
+    const event = await tx.eventsWithStatus.findFirst({
       where: { id: eventId, collegeId: req.collegeId },
+      select: { status: true },
     });
     if (!event) {
       throw new AppError('Event not found', 404);
+    }
+    if (event.status === 'COMPLETED') {
+      throw new AppError('Cannot cancel registration for a past event', 400);
+    }
+    if (event.status === 'CANCELLED') {
+      throw new AppError('Cannot cancel registration for a cancelled event', 400);
     }
 
     const existing = await tx.eventRegistration.findFirst({
@@ -206,9 +243,14 @@ exports.getMyRegistrationStatus = asyncHandler(async (req, res) => {
   const status = await withTenant(req.collegeId, async (tx) => {
     const event = await tx.eventsWithStatus.findFirst({
       where: { id: eventId, collegeId: req.collegeId },
+      select: { id: true, visibility: true },
     });
     if (!event) {
       throw new AppError('Event not found', 404);
+    }
+
+    if (req.isCrossCollege && event.visibility !== 'PUBLIC') {
+      throw new AppError('Cross-college registration is only available for public events', 403);
     }
 
     const registration = await tx.eventRegistration.findFirst({
@@ -296,6 +338,8 @@ exports.listMyRegistrations = asyncHandler(async (req, res) => {
 /**
  * GET /manager/clubs/:clubId/events/:eventId/registrations
  * Returns paginated attendee list for club managers or college admins.
+ * Includes all participant types (students, cross-college students, external participants).
+ * Supports ?participantType=STUDENT|EXTERNAL filter.
  */
 exports.getEventAttendees = asyncHandler(async (req, res) => {
   if (!req.collegeId) {
@@ -309,6 +353,13 @@ exports.getEventAttendees = asyncHandler(async (req, res) => {
   const page = Math.max(1, parseInt(req.query.page, 10) || 1);
   const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 20));
   const skip = (page - 1) * limit;
+
+  // Optional participant type filter
+  const participantTypeFilter = req.query.participantType;
+  const validParticipantTypes = ['STUDENT', 'EXTERNAL'];
+  if (participantTypeFilter && !validParticipantTypes.includes(participantTypeFilter)) {
+    throw new AppError('participantType must be STUDENT or EXTERNAL', 400);
+  }
 
   const result = await withTenant(req.collegeId, async (tx) => {
     const club = await tx.club.findFirst({
@@ -327,16 +378,31 @@ exports.getEventAttendees = asyncHandler(async (req, res) => {
       throw new AppError('Event not found', 404);
     }
 
+    const whereFilter = {
+      eventId,
+      collegeId: req.collegeId,
+      ...(participantTypeFilter ? { participantType: participantTypeFilter } : {}),
+    };
+
     const [total, registrations] = await Promise.all([
-      tx.eventRegistration.count({
-        where: { eventId, collegeId: req.collegeId },
-      }),
+      tx.eventRegistration.count({ where: whereFilter }),
       tx.eventRegistration.findMany({
-        where: { eventId, collegeId: req.collegeId },
+        where: whereFilter,
         orderBy: { registeredAt: 'asc' },
         skip,
         take: limit,
-        include: {
+        select: {
+          id: true,
+          eventId: true,
+          registeredAt: true,
+          participantType: true,
+          participantName: true,
+          participantEmail: true,
+          participantRollNumber: true,
+          participantCollegeName: true,
+          homeCollegeId: true,
+          isUserDeleted: true,
+          formAnswers: true,
           user: {
             select: {
               id: true,
@@ -360,7 +426,15 @@ exports.getEventAttendees = asyncHandler(async (req, res) => {
         id: r.id,
         eventId: r.eventId,
         registeredAt: r.registeredAt,
-        user: r.user,
+        participantType: r.participantType,
+        participantName: r.participantName,
+        participantEmail: r.participantEmail,
+        participantRollNumber: r.participantRollNumber || null,
+        participantCollegeName: r.participantCollegeName || null,
+        homeCollegeId: r.homeCollegeId || null,
+        isUserDeleted: r.isUserDeleted,
+        formAnswers: r.formAnswers || null,
+        user: r.user || null,
       })),
     };
   });
@@ -412,11 +486,19 @@ exports.exportEventRegistrations = asyncHandler(async (req, res) => {
       }
     }
 
-    // 3. Fetch all registrations with user and department info
+    // 3. Fetch all registrations with snapshot identity and user/department info
     const registrations = await tx.eventRegistration.findMany({
       where: { eventId, collegeId: req.collegeId },
       orderBy: { registeredAt: 'asc' },
-      include: {
+      select: {
+        id: true,
+        registeredAt: true,
+        participantType: true,
+        participantName: true,
+        participantEmail: true,
+        participantRollNumber: true,
+        participantCollegeName: true,
+        formAnswers: true,
         user: {
           select: {
             id: true,
@@ -431,19 +513,34 @@ exports.exportEventRegistrations = asyncHandler(async (req, res) => {
       },
     });
 
-    // 4. Build CSV
+    // 4. Build CSV — includes all participant types
     const rows = [
-      ['Registration ID', 'Roll Number', 'Student Name', 'Student Email', 'Department', 'Registered At', 'Form Answers']
+      [
+        'Registration ID',
+        'Participant Type',
+        'Name',
+        'Email',
+        'Roll Number',
+        'Home College / Institution',
+        'Department',
+        'Registered At',
+        'Form Answers',
+      ],
     ];
 
     for (const r of registrations) {
       const answersStr = r.formAnswers ? JSON.stringify(r.formAnswers) : '';
+      const dept = r.user && r.user.department
+        ? (r.user.department.shortCode || r.user.department.name)
+        : '';
       rows.push([
         r.id,
-        r.user ? (r.user.rollNumber || '') : '',
-        r.user ? r.user.name : '',
-        r.user ? r.user.email : '',
-        r.user && r.user.department ? (r.user.department.shortCode || r.user.department.name) : '',
+        r.participantType || 'STUDENT',
+        r.participantName || '',
+        r.participantEmail || '',
+        r.participantRollNumber || '',
+        r.participantCollegeName || '',
+        dept,
         new Date(r.registeredAt).toISOString(),
         answersStr,
       ]);

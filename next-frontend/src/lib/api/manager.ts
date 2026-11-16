@@ -36,12 +36,19 @@ export interface EventAttendeeItem {
   id: string;
   eventId: string;
   registeredAt: string;
+  participantType?: 'STUDENT' | 'EXTERNAL';
+  participantName?: string | null;
+  participantEmail?: string | null;
+  participantRollNumber?: string | null;
+  participantCollegeName?: string | null;
+  homeCollegeId?: string | null;
+  isUserDeleted?: boolean;
   user?: {
     id: string;
     name: string;
     email: string;
     avatarUrl?: string | null;
-  };
+  } | null;
   formAnswers?: Record<string, unknown> | null;
 }
 
@@ -356,10 +363,15 @@ export async function fetchEventAttendees(
   clubId: string,
   eventId: string,
   page = 1,
-  limit = 20
+  limit = 20,
+  participantType = 'ALL'
 ): Promise<EventAttendeesResponse> {
+  const typeParam =
+    participantType && participantType !== 'ALL'
+      ? `&participantType=${encodeURIComponent(participantType)}`
+      : '';
   const response = await apiClient.get(
-    `/manager/clubs/${clubId}/events/${eventId}/registrations?page=${page}&limit=${limit}`
+    `/manager/clubs/${clubId}/events/${eventId}/registrations?page=${page}&limit=${limit}${typeParam}`
   );
   const res = response.data;
   return (res?.data || res) as EventAttendeesResponse;
@@ -371,11 +383,12 @@ export function useEventAttendeesQuery(
   eventId: string,
   page = 1,
   limit = 20,
+  participantType = 'ALL',
   enabled = true
 ) {
   return useQuery({
-    queryKey: queryKeys.tenant(slug).manager.attendees(clubId, eventId, page),
-    queryFn: () => fetchEventAttendees(clubId, eventId, page, limit),
+    queryKey: queryKeys.tenant(slug).manager.attendees(clubId, eventId, page, participantType),
+    queryFn: () => fetchEventAttendees(clubId, eventId, page, limit, participantType),
     enabled: !!slug && !!clubId && !!eventId && enabled,
   });
 }

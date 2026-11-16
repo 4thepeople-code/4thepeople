@@ -57,8 +57,8 @@ export const queryKeys = {
       clubDashboard: (clubId: string) => ['tenant', slug, 'manager', 'club', clubId, 'dashboard'] as const,
       clubEvents: (clubId: string) => ['tenant', slug, 'manager', 'club', clubId, 'events'] as const,
       profile: () => ['tenant', slug, 'manager', 'profile'] as const,
-      attendees: (clubId: string, eventId: string, page = 1) =>
-        ['tenant', slug, 'manager', 'club', clubId, 'event', eventId, 'attendees', page] as const,
+      attendees: (clubId: string, eventId: string, page = 1, participantType = 'ALL') =>
+        ['tenant', slug, 'manager', 'club', clubId, 'event', eventId, 'attendees', page, participantType] as const,
     },
 
     certificates: {
@@ -83,6 +83,12 @@ export const queryKeys = {
       departments: () => ['tenant', slug, 'admin', 'departments'] as const,
     },
   }),
+
+  // External guest queries (unauthenticated or guest-verified)
+  external: {
+    all: ['external'] as const,
+    registrationStatus: (eventId: string) => ['external', 'registrations', 'status', eventId] as const,
+  },
 
   // Platform administration queries (strictly isolated from college tenants)
   platform: {

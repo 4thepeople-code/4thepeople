@@ -7,6 +7,8 @@ const { encryptPayload } = require('../utils/cryptoUtils');
 function calculateTemplateExpiry(templateType, options = {}) {
   const now = new Date();
   switch (templateType) {
+    case 'EXTERNAL_OTP':
+      return new Date(now.getTime() + 10 * 60 * 1000); // 10 minutes
     case 'STUDENT_ACTIVATION':
       return new Date(now.getTime() + 10 * 60 * 1000); // 10 minutes
     case 'PASSWORD_RESET':

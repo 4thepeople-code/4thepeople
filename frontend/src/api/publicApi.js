@@ -13,6 +13,16 @@ export const publicApi = {
   },
 
   // Public Events
+  discoverEvents: async (params = {}) => {
+    const res = await api.get('/events', { params });
+    return res.data;
+  },
+
+  getEventById: async (eventId) => {
+    const res = await api.get(`/events/${eventId}`);
+    return res.data;
+  },
+
   getUpcomingEvents: async () => {
     const res = await api.get('/events/upcoming');
     return res.data;

@@ -15,9 +15,13 @@ const { resolveCollege } = require('./middleware/resolveCollege');
 const { corsOptionsDelegate, validateOriginOrReferer } = require('./middleware/originValidation');
 const { validateProxySharedSecret } = require('./middleware/proxySecurity');
 const { startEventStatusJob } = require('./services/eventStatusJob');
+const { startOutboxWorkerLoop } = require('./workers/outboxRunner');
 
 if (process.env.NODE_ENV !== 'test') {
   startEventStatusJob();
+  if (process.env.ENABLE_IN_PROCESS_OUTBOX_WORKER === 'true') {
+    startOutboxWorkerLoop();
+  }
 }
 
 // Routers
@@ -30,6 +34,7 @@ const managerRouter = require('./routes/managerRoutes');
 const registrationRouter = require('./routes/registrationRoutes');
 const { certificateRouter, managerCertificateRouter } = require('./routes/certificateRoutes');
 const publicRouter = require('./routes/publicRoutes');
+const externalRouter = require('./routes/externalRoutes');
 const platformAuthRouter = require('./platform/platformAuthRoutes');
 const platformAdminManagementRouter = require('./platform/platformAdminManagementRoutes');
 const platformCollegeManagementRouter = require('./platform/platformCollegeManagementRoutes');
@@ -126,11 +131,15 @@ app.use('/api/manager', managerRouter);
 app.use('/events', registrationRouter);
 app.use('/api/events', registrationRouter);
 
+app.use('/external', externalRouter);
+app.use('/api/external', externalRouter);
+
 app.use('/certificates', certificateRouter);
 app.use('/api/certificates', certificateRouter);
 
-// Public club browsing routes: GET /clubs and GET /clubs/:clubId
+// Public club and event browsing routes: GET /clubs, GET /events, etc.
 app.use('/', publicRouter);
+app.use('/api', publicRouter);
 
 // 404 Handler for unhandled endpoints
 app.use((req, res, next) => {

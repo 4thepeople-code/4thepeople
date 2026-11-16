@@ -17,6 +17,7 @@ import {
   uploadEventGallery,
   deleteEventGalleryImage,
 } from '@/lib/api/manager';
+import { apiClient } from '@/lib/api/axios';
 import ManagerLayout from '@/components/manager/ManagerLayout';
 import { EventHero } from '@/components/manager/EventHero';
 import { EventCertificatesSection } from '@/components/manager/certificates/EventCertificatesSection';
@@ -40,6 +41,8 @@ import {
   Users,
   ChevronLeft,
   ChevronRight,
+  Download,
+  Filter,
 } from 'lucide-react';
 
 export interface ManagerEventDetailClientProps {
@@ -67,8 +70,10 @@ export function ManagerEventDetailClient({
 
   const getPath = (subPath: string) => `/college/${slug}${subPath}`;
 
-  // State: Pagination for Attendees
+  // State: Pagination & Filter for Attendees
   const [attendeePage, setAttendeePage] = useState(1);
+  const [participantTypeFilter, setParticipantTypeFilter] = useState<'ALL' | 'STUDENT' | 'EXTERNAL'>('ALL');
+  const [isExporting, setIsExporting] = useState(false);
 
   // Queries
   const {
@@ -83,7 +88,28 @@ export function ManagerEventDetailClient({
     isLoading: attendeesLoading,
     isError: attendeesError,
     refetch: refetchAttendees,
-  } = useEventAttendeesQuery(slug, clubId, eventId, attendeePage, 10);
+  } = useEventAttendeesQuery(slug, clubId, eventId, attendeePage, 10, participantTypeFilter);
+
+  const handleExportCsv = async () => {
+    try {
+      setIsExporting(true);
+      const res = await apiClient.get(`/events/${eventId}/export`, {
+        responseType: 'blob',
+      });
+      const blobUrl = window.URL.createObjectURL(new Blob([res.data], { type: 'text/csv' }));
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.setAttribute('download', `attendees-${eventId}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (err) {
+      console.error('Failed to export attendees CSV:', err);
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   // Mutations
   const updateEventMutation = useUpdateClubEventMutation(slug);
@@ -748,7 +774,7 @@ export function ManagerEventDetailClient({
               }`}
             >
               <div
-                className={`flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-4 ${
+                className={`flex flex-col md:flex-row md:items-center justify-between gap-4 border-b pb-4 ${
                   isDark ? 'border-white/10' : 'border-[#E8E6DF]'
                 }`}
               >
@@ -765,14 +791,28 @@ export function ManagerEventDetailClient({
                       Event Attendees
                     </h2>
                     <p className="text-xs text-slate-400 font-medium">
-                      Registered campus students and attendees
+                      Registered campus students, cross-college attendees, and external guests
                     </p>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={handleExportCsv}
+                    disabled={isExporting}
+                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition cursor-pointer ${
+                      isDark
+                        ? 'border-white/10 hover:bg-white/5 text-slate-300'
+                        : 'border-slate-200 hover:bg-slate-100 text-slate-700'
+                    }`}
+                  >
+                    <Download className={`w-3.5 h-3.5 ${isExporting ? 'animate-bounce' : ''}`} />
+                    <span>{isExporting ? 'Exporting...' : 'Export CSV'}</span>
+                  </button>
+
                   <span
-                    className={`px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider border ${
+                    className={`px-3 py-1.5 rounded-full text-xs font-black uppercase tracking-wider border ${
                       isDark
                         ? 'bg-slate-800 text-slate-300 border-slate-700'
                         : 'bg-[#FAF9F5] text-[#0F172A] border-[#E2E0D5]'
@@ -782,6 +822,46 @@ export function ManagerEventDetailClient({
                     {event.capacity ? ` / ${event.capacity} Capacity` : ''}
                   </span>
                 </div>
+              </div>
+
+              {/* Participant Type Filters */}
+              <div className="flex flex-wrap items-center gap-2 pt-1">
+                <span className="text-xs font-bold text-slate-400 flex items-center gap-1 mr-1">
+                  <Filter className="w-3.5 h-3.5" /> Filter:
+                </span>
+                <button
+                  type="button"
+                  onClick={() => { setParticipantTypeFilter('ALL'); setAttendeePage(1); }}
+                  className={`px-3 py-1 rounded-xl text-xs font-bold transition cursor-pointer ${
+                    participantTypeFilter === 'ALL'
+                      ? 'bg-[#FF5733] text-white shadow-sm'
+                      : isDark ? 'bg-white/5 text-slate-400 hover:text-white' : 'bg-slate-100 text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  All
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setParticipantTypeFilter('STUDENT'); setAttendeePage(1); }}
+                  className={`px-3 py-1 rounded-xl text-xs font-bold transition cursor-pointer ${
+                    participantTypeFilter === 'STUDENT'
+                      ? 'bg-[#FF5733] text-white shadow-sm'
+                      : isDark ? 'bg-white/5 text-slate-400 hover:text-white' : 'bg-slate-100 text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Students
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setParticipantTypeFilter('EXTERNAL'); setAttendeePage(1); }}
+                  className={`px-3 py-1 rounded-xl text-xs font-bold transition cursor-pointer ${
+                    participantTypeFilter === 'EXTERNAL'
+                      ? 'bg-[#FF5733] text-white shadow-sm'
+                      : isDark ? 'bg-white/5 text-slate-400 hover:text-white' : 'bg-slate-100 text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  External Guests
+                </button>
               </div>
 
               {attendeesLoading ? (
@@ -801,7 +881,9 @@ export function ManagerEventDetailClient({
                 </div>
               ) : !attendeesData?.registrations || attendeesData.registrations.length === 0 ? (
                 <div className="py-8 text-center text-slate-400 text-xs font-medium">
-                  No students have registered for this event yet.
+                  {participantTypeFilter === 'ALL'
+                    ? 'No attendees have registered for this event yet.'
+                    : `No ${participantTypeFilter.toLowerCase()} attendees found.`}
                 </div>
               ) : (
                 <div className="space-y-4">
@@ -816,50 +898,91 @@ export function ManagerEventDetailClient({
                           }`}
                         >
                           <th className="py-3 px-4">Attendee</th>
+                          <th className="py-3 px-4">Type</th>
                           <th className="py-3 px-4">Email</th>
-                          <th className="py-3 px-4">Registration Date</th>
+                          <th className="py-3 px-4">Institution / Roll No</th>
+                          <th className="py-3 px-4">Registered Date</th>
+                          <th className="py-3 px-4">Status</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-white/5">
-                        {attendeesData.registrations.map((reg) => (
-                          <tr
-                            key={reg.id}
-                            className={`transition-colors ${
-                              isDark
-                                ? 'hover:bg-white/5 text-slate-200'
-                                : 'hover:bg-slate-50 text-[#0F172A]'
-                            }`}
-                          >
-                            <td className="py-3 px-4 flex items-center gap-3">
-                              {reg.user?.avatarUrl ? (
-                                <img
-                                  src={reg.user.avatarUrl}
-                                  alt={reg.user.name || 'User'}
-                                  className="w-8 h-8 rounded-full object-cover border border-white/10"
-                                />
-                              ) : (
-                                <div className="w-8 h-8 rounded-full bg-[#FF5733] text-white flex items-center justify-center font-bold text-xs uppercase">
-                                  {(reg.user?.name || 'U').slice(0, 2)}
-                                </div>
-                              )}
-                              <span className="font-bold">
-                                {reg.user?.name || 'Anonymous Student'}
-                              </span>
-                            </td>
-                            <td className="py-3 px-4 text-slate-400">
-                              {reg.user?.email || '—'}
-                            </td>
-                            <td className="py-3 px-4 text-slate-400">
-                              {new Date(reg.registeredAt).toLocaleDateString('en-US', {
-                                month: 'short',
-                                day: 'numeric',
-                                year: 'numeric',
-                                hour: 'numeric',
-                                minute: '2-digit',
-                              })}
-                            </td>
-                          </tr>
-                        ))}
+                        {attendeesData.registrations.map((reg) => {
+                          const displayName = reg.participantName || reg.user?.name || 'Anonymous Attendee';
+                          const displayEmail = reg.participantEmail || reg.user?.email || '—';
+                          const isExternal = reg.participantType === 'EXTERNAL';
+                          const isCross = Boolean(reg.homeCollegeId && event?.collegeId && reg.homeCollegeId !== event.collegeId);
+                          const institutionOrRoll =
+                            reg.participantCollegeName ||
+                            reg.participantRollNumber ||
+                            (isExternal ? 'Guest / External' : 'Campus Student');
+
+                          return (
+                            <tr
+                              key={reg.id}
+                              className={`transition-colors ${
+                                isDark
+                                  ? 'hover:bg-white/5 text-slate-200'
+                                  : 'hover:bg-slate-50 text-[#0F172A]'
+                              }`}
+                            >
+                              <td className="py-3 px-4 flex items-center gap-3">
+                                {reg.user?.avatarUrl ? (
+                                  <img
+                                    src={reg.user.avatarUrl}
+                                    alt={displayName}
+                                    className="w-8 h-8 rounded-full object-cover border border-white/10"
+                                  />
+                                ) : (
+                                  <div
+                                    className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs uppercase ${
+                                      isExternal ? 'bg-orange-500 text-white' : 'bg-[#FF5733] text-white'
+                                    }`}
+                                  >
+                                    {displayName.slice(0, 2)}
+                                  </div>
+                                )}
+                                <span className="font-bold">{displayName}</span>
+                              </td>
+                              <td className="py-3 px-4">
+                                {isExternal ? (
+                                  <span className="px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-orange-500/15 text-orange-400 border border-orange-500/30">
+                                    External Guest
+                                  </span>
+                                ) : isCross ? (
+                                  <span className="px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-indigo-500/15 text-indigo-400 border border-indigo-500/30">
+                                    Cross-College
+                                  </span>
+                                ) : (
+                                  <span className="px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                                    Student
+                                  </span>
+                                )}
+                              </td>
+                              <td className="py-3 px-4 text-slate-400">{displayEmail}</td>
+                              <td className="py-3 px-4 text-slate-400">{institutionOrRoll}</td>
+                              <td className="py-3 px-4 text-slate-400">
+                                {new Date(reg.registeredAt).toLocaleDateString('en-US', {
+                                  month: 'short',
+                                  day: 'numeric',
+                                  year: 'numeric',
+                                  hour: 'numeric',
+                                  minute: '2-digit',
+                                })}
+                              </td>
+                              <td className="py-3 px-4">
+                                {reg.isUserDeleted ? (
+                                  <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-amber-500/15 text-amber-400 border border-amber-500/20">
+                                    User Deleted (Snapshot)
+                                  </span>
+                                ) : (
+                                  <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-emerald-500/10 text-emerald-400">
+                                    Confirmed
+                                  </span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>

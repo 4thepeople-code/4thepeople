@@ -7,6 +7,7 @@ import ErrorBoundary from './components/common/ErrorBoundary';
 
 // Public Unauthenticated Pages
 import PublicHomePage from './pages/public/PublicHomePage';
+import PublicEventsListPage from './pages/public/PublicEventsListPage';
 import PublicClubsListPage from './pages/public/PublicClubsListPage';
 import PublicClubDetailPage from './pages/public/PublicClubDetailPage';
 import PublicEventDetailPage from './pages/public/PublicEventDetailPage';
@@ -49,6 +50,7 @@ function App() {
               <Routes>
                 {/* Public Unauthenticated Routes */}
                 <Route path="/" element={<PublicHomePage />} />
+                <Route path="/events" element={<PublicEventsListPage />} />
                 <Route path="/events/:eventId" element={<PublicEventDetailPage />} />
                 <Route path="/clubs" element={<PublicClubsListPage />} />
                 <Route path="/clubs/:clubId" element={<PublicClubDetailPage />} />

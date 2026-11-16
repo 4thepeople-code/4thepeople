@@ -137,3 +137,25 @@ export function clearStoredAuth(): void {
     window.localStorage.removeItem(key);
   }
 }
+
+const EXTERNAL_REGISTRATION_TOKEN_KEY = 'yuva_external_reg_token';
+
+/**
+ * Safe session storage reader for temporary external participant tokens.
+ * Scoped to sessionStorage so it stays isolated from persistent student/manager logins
+ * and automatically clears when the tab/browser is closed.
+ */
+export function getStoredExternalToken(): string | null {
+  if (typeof window === 'undefined' || !window.sessionStorage) return null;
+  return window.sessionStorage.getItem(EXTERNAL_REGISTRATION_TOKEN_KEY);
+}
+
+export function setStoredExternalToken(token: string): void {
+  if (typeof window === 'undefined' || !window.sessionStorage) return;
+  window.sessionStorage.setItem(EXTERNAL_REGISTRATION_TOKEN_KEY, token);
+}
+
+export function clearStoredExternalToken(): void {
+  if (typeof window === 'undefined' || !window.sessionStorage) return;
+  window.sessionStorage.removeItem(EXTERNAL_REGISTRATION_TOKEN_KEY);
+}

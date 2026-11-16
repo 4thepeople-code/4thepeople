@@ -37,6 +37,13 @@ model College {
   certificates           EventCertificate[]
   certificateTemplates   EventCertificateTemplate[]
   certificateBatches     CertificateBatch[]
+  externalParticipants   ExternalParticipant[]
+  seatReservations       SeatReservation[]
+  collegePaymentConfig   CollegePaymentConfig?
+  paymentTransactions    PaymentTransaction[]
+  paymentRefunds         PaymentRefund[]
+  attendedRegistrations  EventRegistration[]        @relation("StudentHomeCollege")
+  externalAuthOtps       ExternalAuthOtp[]
 
   @@map("colleges")
 }
@@ -86,6 +93,9 @@ model User {
   revokedCertificates       EventCertificate[]     @relation("RevokedCertificates")
   createdCertificateTemplates EventCertificateTemplate[]
   createdCertificateBatches CertificateBatch[]
+  seatReservations          SeatReservation[]
+  paymentTransactions       PaymentTransaction[]
+  adminRegistrations        EventRegistration[]    @relation("AdminRegistrations")
   college                   College                @relation(fields: [collegeId], references: [id], onUpdate: NoAction, map: "users_college_id_fkey")
   department                Department?            @relation(fields: [collegeId, departmentId], references: [collegeId, id], onDelete: SetNull, onUpdate: NoAction, map: "fk_users_department")
 
@@ -196,6 +206,10 @@ model Event {
   registrationMode     EventRegistrationMode  @default(INTERNAL) @map("registration_mode")
   customFormDefinition Json?                  @map("custom_form_definition")
   registrationDeadline DateTime?              @map("registration_deadline") @db.Timestamptz(6)
+  visibility           EventVisibility        @default(COLLEGE)
+  isPaid               Boolean                @default(false) @map("is_paid")
+  fee                  Int                    @default(0)
+  currency             String                 @default("INR")
   legacyMongoId        String?                @unique @map("legacy_mongo_id")
   createdAt            DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt            DateTime               @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
@@ -204,6 +218,8 @@ model Event {
   certificates         EventCertificate[]
   certificateTemplates EventCertificateTemplate[]
   certificateBatches   CertificateBatch[]
+  seatReservations     SeatReservation[]
+  paymentTransactions  PaymentTransaction[]
   colleges             College                @relation(fields: [collegeId], references: [id], onDelete: Cascade, onUpdate: NoAction)
   club                 Club                   @relation(fields: [collegeId, clubId], references: [collegeId, id], onDelete: Cascade, onUpdate: NoAction, map: "fk_events_club")
 
@@ -230,19 +246,36 @@ model EventGalleryImage {
 }
 
 model EventRegistration {
-  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  collegeId    String   @map("college_id") @db.Uuid
-  eventId      String   @map("event_id") @db.Uuid
-  userId       String   @map("user_id") @db.Uuid
-  formAnswers  Json?    @map("form_answers")
-  registeredAt DateTime @default(now()) @map("registered_at") @db.Timestamptz(6)
-  colleges     College  @relation(fields: [collegeId], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  event        Event    @relation(fields: [collegeId, eventId], references: [collegeId, id], onDelete: Cascade, onUpdate: NoAction, map: "fk_registrations_event")
-  user         User     @relation(fields: [collegeId, userId], references: [collegeId, id], onDelete: Cascade, onUpdate: NoAction, map: "fk_registrations_user")
+  id                     String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  collegeId              String              @map("college_id") @db.Uuid
+  eventId                String              @map("event_id") @db.Uuid
+  userId                 String?             @map("user_id") @db.Uuid
+  participantType        ParticipantType     @default(STUDENT) @map("participant_type")
+  homeCollegeId          String?             @map("home_college_id") @db.Uuid
+  externalParticipantId   String?             @map("external_participant_id") @db.Uuid
+  paymentTransactionId   String?             @unique @map("payment_transaction_id") @db.Uuid
+  participantName        String              @map("participant_name")
+  participantEmail       String              @map("participant_email")
+  participantRollNumber  String?             @map("participant_roll_number")
+  participantCollegeName String?             @map("participant_college_name")
+  isUserDeleted          Boolean             @default(false) @map("is_user_deleted")
+  registeredByRole       String              @default("SELF") @map("registered_by_role")
+  createdByAdminId       String?             @map("created_by_admin_id") @db.Uuid
+  formAnswers            Json?               @map("form_answers")
+  registeredAt           DateTime            @default(now()) @map("registered_at") @db.Timestamptz(6)
+  colleges               College             @relation(fields: [collegeId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  event                  Event               @relation(fields: [collegeId, eventId], references: [collegeId, id], onDelete: Cascade, onUpdate: NoAction, map: "fk_registrations_event")
+  user                   User?               @relation(fields: [userId], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "fk_registrations_user_direct")
+  homeCollege            College?            @relation("StudentHomeCollege", fields: [homeCollegeId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "fk_registrations_home_college")
+  externalParticipant    ExternalParticipant? @relation(fields: [externalParticipantId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "fk_registrations_external_participant")
+  paymentTransaction     PaymentTransaction? @relation(fields: [paymentTransactionId], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "fk_registrations_payment_transaction")
+  createdByAdmin         User?               @relation("AdminRegistrations", fields: [createdByAdminId], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "fk_registrations_created_by_admin")
 
   @@unique([userId, eventId], map: "uq_event_registrations_user_event")
+  @@unique([externalParticipantId, eventId], map: "uq_event_registrations_external_event")
   @@index([collegeId, eventId], map: "idx_event_registrations_college_event")
   @@index([collegeId, userId], map: "idx_event_registrations_college_user")
+  @@index([externalParticipantId, eventId], map: "idx_event_registrations_external_event")
   @@map("event_registrations")
 }
 
@@ -331,6 +364,10 @@ view EventsWithStatus {
   registrationMode      EventRegistrationMode @default(INTERNAL) @map("registration_mode")
   customFormDefinition  Json?                 @map("custom_form_definition")
   registrationDeadline  DateTime?             @map("registration_deadline") @db.Timestamptz(6)
+  visibility            EventVisibility       @default(COLLEGE)
+  isPaid                Boolean               @default(false) @map("is_paid")
+  fee                   Int                   @default(0)
+  currency              String                @default("INR")
 
   @@map("events_with_status")
 }
@@ -421,7 +458,7 @@ model EventCertificate {
   id                  String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   collegeId           String            @map("college_id") @db.Uuid
   eventId             String            @map("event_id") @db.Uuid
-  userId              String            @map("user_id") @db.Uuid
+  userId              String?           @map("user_id") @db.Uuid
   certificateNumber   String            @unique @map("certificate_number")
   certificatePublicId String?           @map("certificate_public_id")
   certificateUrl      String?           @map("certificate_url")
@@ -439,7 +476,7 @@ model EventCertificate {
 
   college             College           @relation(fields: [collegeId], references: [id], onDelete: Restrict, onUpdate: NoAction)
   event               Event             @relation(fields: [collegeId, eventId], references: [collegeId, id], onDelete: Cascade, onUpdate: NoAction, map: "fk_certificates_event")
-  user                User              @relation("UserCertificates", fields: [collegeId, userId], references: [collegeId, id], onDelete: Cascade, onUpdate: NoAction, map: "fk_certificates_user")
+  user                User?             @relation("UserCertificates", fields: [userId], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "fk_certificates_user")
   batch               CertificateBatch? @relation(fields: [collegeId, batchId], references: [collegeId, id], onDelete: SetNull, onUpdate: NoAction, map: "fk_certificates_batch")
   issuedBy            User?             @relation("IssuedCertificates", fields: [collegeId, issuedById], references: [collegeId, id], onDelete: SetNull, onUpdate: NoAction, map: "fk_certificates_issuer")
   revokedBy           User?             @relation("RevokedCertificates", fields: [collegeId, revokedById], references: [collegeId, id], onDelete: SetNull, onUpdate: NoAction, map: "fk_certificates_revoker")
@@ -480,5 +517,252 @@ enum CertificateBatchMethod {
   GENERATED
 
   @@map("certificate_batch_method_enum")
+}
+
+enum EventVisibility {
+  COLLEGE
+  PUBLIC
+
+  @@map("event_visibility_enum")
+}
+
+enum ParticipantType {
+  STUDENT
+  EXTERNAL
+
+  @@map("participant_type_enum")
+}
+
+enum CollegePaymentMode {
+  COLLEGE_OWNED_GATEWAY
+  PLATFORM_MANAGED_GATEWAY
+
+  @@map("college_payment_mode_enum")
+}
+
+enum PaymentGatewayProvider {
+  RAZORPAY
+  CASHFREE
+
+  @@map("payment_gateway_provider_enum")
+}
+
+enum PaymentConfigStatus {
+  NOT_CONFIGURED
+  PENDING_VERIFICATION
+  ACTIVE
+  SUSPENDED
+
+  @@map("payment_config_status_enum")
+}
+
+enum SeatReservationStatus {
+  HELD
+  CONFIRMED
+  EXPIRED
+  RELEASED
+
+  @@map("seat_reservation_status_enum")
+}
+
+enum TransactionPaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  LATE_PAYMENT
+  REFUND_PENDING
+  REFUNDED
+  PARTIALLY_REFUNDED
+
+  @@map("transaction_payment_status_enum")
+}
+
+enum RefundStatus {
+  INITIATED
+  PROCESSED
+  FAILED
+
+  @@map("refund_status_enum")
+}
+
+enum WebhookProcessStatus {
+  RECEIVED
+  PROCESSED
+  IGNORED
+  FAILED
+
+  @@map("webhook_process_status_enum")
+}
+
+model ExternalParticipant {
+  id              String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  collegeId       String              @map("college_id") @db.Uuid
+  name            String
+  email           String              @db.Citext
+  phone           String?
+  institutionName String?             @map("institution_name")
+  isEmailVerified Boolean             @default(false) @map("is_email_verified")
+  createdAt       DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime            @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  college         College             @relation(fields: [collegeId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  registrations   EventRegistration[]
+  seatReservations SeatReservation[]
+  transactions    PaymentTransaction[]
+
+  @@unique([collegeId, email], map: "uq_external_participants_college_email")
+  @@index([collegeId], map: "idx_external_participants_college")
+  @@map("external_participants")
+}
+
+model SeatReservation {
+  id                    String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  collegeId             String                @map("college_id") @db.Uuid
+  eventId               String                @map("event_id") @db.Uuid
+  participantType       ParticipantType       @map("participant_type")
+  userId                String?               @map("user_id") @db.Uuid
+  externalParticipantId String?               @map("external_participant_id") @db.Uuid
+  status                SeatReservationStatus @default(HELD)
+  expiresAt             DateTime              @map("expires_at") @db.Timestamptz(6)
+  createdAt             DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime              @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  college               College               @relation(fields: [collegeId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  event                 Event                 @relation(fields: [collegeId, eventId], references: [collegeId, id], onDelete: Cascade, onUpdate: NoAction, map: "fk_seat_reservations_event")
+  user                  User?                 @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_seat_reservations_user")
+  externalParticipant   ExternalParticipant?  @relation(fields: [externalParticipantId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  paymentTransaction    PaymentTransaction?
+
+  @@index([eventId, status, expiresAt], map: "idx_seat_reservations_capacity")
+  @@map("seat_reservations")
+}
+
+model CollegePaymentConfig {
+  id                         String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  collegeId                  String                 @unique @map("college_id") @db.Uuid
+  mode                       CollegePaymentMode     @default(COLLEGE_OWNED_GATEWAY)
+  provider                   PaymentGatewayProvider @default(RAZORPAY)
+  status                     PaymentConfigStatus    @default(NOT_CONFIGURED)
+  keyIdEncrypted             String?                @map("key_id_encrypted")
+  keySecretEncrypted         String?                @map("key_secret_encrypted")
+  webhookSecretEncrypted     String?                @map("webhook_secret_encrypted")
+  merchantAccountIdEncrypted String?                @map("merchant_account_id_encrypted")
+  displayMerchantName        String?                @map("display_merchant_name")
+  verifiedAt                 DateTime?              @map("verified_at") @db.Timestamptz(6)
+  createdAt                  DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt                  DateTime               @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  college                    College                @relation(fields: [collegeId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  audits                     CollegePaymentConfigAudit[]
+
+  @@map("college_payment_configs")
+}
+
+model CollegePaymentConfigAudit {
+  id               String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  configId         String                 @map("config_id") @db.Uuid
+  collegeId        String                 @map("college_id") @db.Uuid
+  changedByAdminId String                 @map("changed_by_admin_id") @db.Uuid
+  previousMode     CollegePaymentMode?    @map("previous_mode")
+  newMode          CollegePaymentMode     @map("new_mode")
+  previousStatus   PaymentConfigStatus?   @map("previous_status")
+  newStatus        PaymentConfigStatus    @map("new_status")
+  changeReason     String?                @map("change_reason")
+  ipAddress        String?                @map("ip_address")
+  createdAt        DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  config           CollegePaymentConfig   @relation(fields: [configId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([collegeId, createdAt(sort: Desc)], map: "idx_payment_config_audits")
+  @@map("college_payment_config_audits")
+}
+
+model PaymentTransaction {
+  id                    String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  collegeId             String                   @map("college_id") @db.Uuid
+  eventId               String                   @map("event_id") @db.Uuid
+  reservationId         String?                  @unique @map("reservation_id") @db.Uuid
+  participantType       ParticipantType          @map("participant_type")
+  userId                String?                  @map("user_id") @db.Uuid
+  externalParticipantId String?                  @map("external_participant_id") @db.Uuid
+  amount                Int
+  currency              String                   @default("INR")
+  status                TransactionPaymentStatus @default(PENDING)
+  gatewayProvider       PaymentGatewayProvider   @default(RAZORPAY) @map("gateway_provider")
+  paymentMode           CollegePaymentMode       @map("payment_mode")
+  merchantAccountId     String?                  @map("merchant_account_id")
+  gatewayOrderId        String?                  @unique @map("gateway_order_id")
+  gatewayPaymentId      String?                  @unique @map("gateway_payment_id")
+  gatewaySignature      String?                  @map("gateway_signature")
+  paymentMethod         String?                  @map("payment_method")
+  vpaMasked             String?                  @map("vpa_masked")
+  idempotencyKey        String                   @unique @map("idempotency_key")
+  registrationPayload   Json?                    @map("registration_payload")
+  failureReason         String?                  @map("failure_reason")
+  createdAt             DateTime                 @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime                 @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  college               College                  @relation(fields: [collegeId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  event                 Event                    @relation(fields: [collegeId, eventId], references: [collegeId, id], onDelete: Restrict, onUpdate: NoAction, map: "fk_payment_transactions_event")
+  reservation           SeatReservation?         @relation(fields: [reservationId], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "fk_payment_transactions_reservation")
+  user                  User?                    @relation(fields: [userId], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  externalParticipant   ExternalParticipant?     @relation(fields: [externalParticipantId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  registration          EventRegistration?
+  refunds               PaymentRefund[]
+
+  @@index([collegeId, eventId], map: "idx_payment_transactions_event")
+  @@index([gatewayOrderId], map: "idx_payment_transactions_order")
+  @@map("payment_transactions")
+}
+
+model PaymentRefund {
+  id                 String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  transactionId      String       @map("transaction_id") @db.Uuid
+  collegeId          String       @map("college_id") @db.Uuid
+  gatewayRefundId    String?      @unique @map("gateway_refund_id")
+  amount             Int
+  status             RefundStatus @default(INITIATED)
+  reason             String?
+  initiatedByAdminId String?      @map("initiated_by_admin_id") @db.Uuid
+  createdAt          DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  transaction        PaymentTransaction @relation(fields: [transactionId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "fk_payment_refunds_transaction")
+  college            College            @relation(fields: [collegeId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@map("payment_refunds")
+}
+
+model PaymentWebhookEvent {
+  id             String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  provider       PaymentGatewayProvider
+  gatewayEventId String               @map("gateway_event_id")
+  eventType      String               @map("event_type")
+  payload        Json
+  status         WebhookProcessStatus @default(RECEIVED)
+  errorMessage   String?              @map("error_message")
+  processedAt    DateTime?            @map("processed_at") @db.Timestamptz(6)
+  createdAt      DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@unique([provider, gatewayEventId], map: "uq_payment_webhooks_provider_event")
+  @@map("payment_webhook_events")
+}
+
+model ExternalAuthOtp {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  collegeId   String    @map("college_id") @db.Uuid
+  email       String    @db.Citext
+  salt        String    @db.VarChar(32)
+  codeHash    String    @map("code_hash")
+  attempts    Int       @default(0)
+  maxAttempts Int       @default(5) @map("max_attempts")
+  consumedAt  DateTime? @map("consumed_at") @db.Timestamptz(6)
+  expiresAt   DateTime  @map("expires_at") @db.Timestamptz(6)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  college     College   @relation(fields: [collegeId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([email, collegeId, consumedAt, expiresAt], map: "idx_external_otps_candidate")
+  @@map("external_auth_otps")
 }
 

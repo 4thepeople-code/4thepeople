@@ -116,6 +116,8 @@ export interface CustomFormDefinition {
   fields: CustomFormField[];
 }
 
+export type EventVisibility = 'COLLEGE' | 'PUBLIC';
+
 export interface Event {
   id: string;
   collegeId?: string;
@@ -150,17 +152,30 @@ export interface Event {
   gallery?: Array<{ url: string; publicId?: string }>;
   createdAt?: string;
   updatedAt?: string;
+  visibility?: EventVisibility;
   club?: Club;
+  college?: College;
 }
+
+export type ParticipantType = 'STUDENT' | 'EXTERNAL';
 
 export interface EventRegistration {
   id: string;
   collegeId: string;
   eventId: string;
-  userId: string;
+  userId?: string | null;
+  participantType?: ParticipantType;
+  externalParticipantId?: string | null;
+  homeCollegeId?: string | null;
+  participantName?: string | null;
+  participantEmail?: string | null;
+  participantRollNumber?: string | null;
+  participantCollegeName?: string | null;
+  isUserDeleted?: boolean;
+  registeredByRole?: string | null;
   formAnswers?: Record<string, unknown> | null;
   registeredAt: string;
-  user?: User;
+  user?: User | null;
   event?: Event;
 }
 

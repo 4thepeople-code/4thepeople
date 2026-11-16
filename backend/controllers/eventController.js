@@ -473,35 +473,322 @@ exports.listPastEvents = asyncHandler(async (req, res) => {
 });
 
 /**
+ * GET /events
+ * Platform-wide public event discovery endpoint.
+ * Allows unauthenticated visitors to discover eligible public events across active colleges.
+ */
+exports.discoverPublicEvents = asyncHandler(async (req, res) => {
+  const {
+    search,
+    collegeId,
+    collegeSlug,
+    startDate,
+    endDate,
+    isPaid,
+    location,
+    registrationMode,
+    page = 1,
+    limit = 12,
+  } = req.query;
+
+  const parsedPage = Math.max(1, parseInt(page, 10) || 1);
+  const parsedLimit = Math.min(50, Math.max(1, parseInt(limit, 10) || 12));
+  const skip = (parsedPage - 1) * parsedLimit;
+
+  // Use tenant if request came through college subdomain, or allow public-read
+  const targetCollegeId = req.collegeId || (collegeId && UUID_REGEX.test(collegeId) ? collegeId : null);
+
+  const result = await withTenant(targetCollegeId, async (tx) => {
+    // If collegeSlug was supplied, resolve college ID
+    let filterCollegeId = targetCollegeId;
+    if (!filterCollegeId && collegeSlug && typeof collegeSlug === 'string') {
+      const col = await tx.college.findFirst({
+        where: { slug: collegeSlug.toLowerCase().trim(), isActive: true },
+        select: { id: true },
+      });
+      if (col) {
+        filterCollegeId = col.id;
+      } else {
+        // Unknown college slug -> return empty result
+        return { events: [], total: 0, clubs: [], colleges: [] };
+      }
+    }
+
+    // Build deterministic filter criteria for public discovery
+    const where = {
+      visibility: 'PUBLIC',
+      cancelledAt: null,
+      status: { in: ['UPCOMING', 'ONGOING'] },
+      registrationMode: { in: ['INTERNAL', 'EXTERNAL'] },
+    };
+
+    if (filterCollegeId) {
+      where.collegeId = filterCollegeId;
+    }
+
+    if (search && typeof search === 'string' && search.trim()) {
+      where.title = { contains: search.trim(), mode: 'insensitive' };
+    }
+
+    if (startDate) {
+      const parsedStart = new Date(startDate);
+      if (!Number.isNaN(parsedStart.getTime())) {
+        where.startAt = { ...(where.startAt || {}), gte: parsedStart };
+      }
+    }
+
+    if (endDate) {
+      const parsedEnd = new Date(endDate);
+      if (!Number.isNaN(parsedEnd.getTime())) {
+        where.startAt = { ...(where.startAt || {}), lte: parsedEnd };
+      }
+    }
+
+    if (isPaid !== undefined && isPaid !== '') {
+      where.isPaid = isPaid === 'true' || isPaid === true;
+    }
+
+    if (location && typeof location === 'string' && location.trim()) {
+      where.location = { contains: location.trim(), mode: 'insensitive' };
+    }
+
+    if (registrationMode && typeof registrationMode === 'string') {
+      const mode = registrationMode.toUpperCase().trim();
+      if (mode === 'INTERNAL' || mode === 'EXTERNAL') {
+        where.registrationMode = mode;
+      }
+    }
+
+    const [eventsList, total] = await Promise.all([
+      tx.eventsWithStatus.findMany({
+        where,
+        orderBy: [{ startAt: 'asc' }, { id: 'asc' }],
+        skip,
+        take: parsedLimit,
+      }),
+      tx.eventsWithStatus.count({ where }),
+    ]);
+
+    const clubIds = [...new Set(eventsList.map((e) => e.clubId))];
+    const collegeIds = [...new Set(eventsList.map((e) => e.collegeId))];
+
+    const [clubs, colleges] = await Promise.all([
+      clubIds.length > 0
+        ? tx.club.findMany({
+            where: { id: { in: clubIds } },
+            select: {
+              id: true,
+              name: true,
+              description: true,
+              clubType: true,
+              logoUrl: true,
+              coverImageUrl: true,
+            },
+          })
+        : [],
+      collegeIds.length > 0
+        ? tx.college.findMany({
+            where: { id: { in: collegeIds }, isActive: true },
+            select: {
+              id: true,
+              name: true,
+              slug: true,
+              city: true,
+              state: true,
+            },
+          })
+        : [],
+    ]);
+
+    return { events: eventsList, total, clubs, colleges };
+  }, { isPublic: true });
+
+  const clubMap = new Map(result.clubs.map((c) => [c.id, c]));
+  const collegeMap = new Map(result.colleges.map((c) => [c.id, c]));
+
+  // Safe field serialization: do not expose private or internal tenant records
+  const formattedEvents = result.events.map((e) => {
+    const club = clubMap.get(e.clubId) || null;
+    const college = collegeMap.get(e.collegeId) || null;
+
+    const coverImage = (e.coverImageUrl || e.coverImagePublicId)
+      ? { url: e.coverImageUrl || null, publicId: e.coverImagePublicId || null }
+      : null;
+
+    return {
+      id: e.id,
+      collegeId: e.collegeId,
+      clubId: e.clubId,
+      title: e.title,
+      description: e.description,
+      location: e.location,
+      startAt: e.startAt,
+      endAt: e.endAt || null,
+      capacity: e.capacity ?? null,
+      registeredCount: e.registeredCount ?? 0,
+      status: e.status,
+      coverImage,
+      registrationUrl: e.registrationUrl || null,
+      registrationMode: e.registrationMode,
+      registrationDeadline: e.registrationDeadline || null,
+      visibility: e.visibility,
+      isPaid: e.isPaid,
+      fee: e.fee,
+      currency: e.currency,
+      createdAt: e.createdAt,
+      updatedAt: e.updatedAt,
+      club: club ? {
+        id: club.id,
+        name: club.name,
+        description: club.description,
+        clubType: club.clubType,
+        logoUrl: club.logoUrl,
+        coverImageUrl: club.coverImageUrl,
+      } : null,
+      college: college ? {
+        id: college.id,
+        name: college.name,
+        slug: college.slug,
+        city: college.city,
+        state: college.state,
+      } : null,
+    };
+  });
+
+  res.status(200).json({
+    success: true,
+    events: formattedEvents,
+    pagination: {
+      page: parsedPage,
+      limit: parsedLimit,
+      total: result.total,
+      totalPages: Math.ceil(result.total / parsedLimit) || 1,
+    },
+  });
+});
+
+/**
+ * GET /events/:eventId
+ * Public endpoint to fetch details of a specific publicly discoverable event.
+ */
+exports.getPublicEventById = asyncHandler(async (req, res) => {
+  const { eventId } = req.params;
+  validateUUID(eventId, 'event ID');
+
+  const result = await withTenant(req.collegeId || null, async (tx) => {
+    const event = await tx.eventsWithStatus.findFirst({
+      where: {
+        id: eventId,
+        ...(req.collegeId ? { collegeId: req.collegeId } : { visibility: 'PUBLIC', cancelledAt: null }),
+      },
+    });
+
+    if (!event) {
+      throw new AppError('Event not found', 404);
+    }
+
+    const [club, college, gallery] = await Promise.all([
+      tx.club.findFirst({
+        where: { id: event.clubId },
+        select: {
+          id: true,
+          name: true,
+          description: true,
+          clubType: true,
+          logoUrl: true,
+          coverImageUrl: true,
+        },
+      }),
+      tx.college.findFirst({
+        where: { id: event.collegeId, isActive: true },
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          city: true,
+          state: true,
+        },
+      }),
+      tx.eventGalleryImage.findMany({
+        where: { eventId, collegeId: event.collegeId },
+        orderBy: { position: 'asc' },
+        select: {
+          id: true,
+          imageUrl: true,
+          imagePublicId: true,
+          position: true,
+        },
+      }),
+    ]);
+
+    return {
+      event: serializeEvent(event, gallery),
+      club,
+      college,
+    };
+  }, { isPublic: true });
+
+  res.status(200).json({
+    success: true,
+    event: {
+      ...result.event,
+      club: result.club,
+      college: result.college,
+    },
+    club: result.club,
+    college: result.college,
+  });
+});
+
+/**
  * GET /events/upcoming
- * Public endpoint to list all upcoming and ongoing events for the current college.
+ * Public endpoint to list all upcoming and ongoing events for the current college,
+ * or across active colleges if accessed from the public platform root.
  */
 exports.listAllUpcomingEvents = asyncHandler(async (req, res) => {
-  if (!req.collegeId) {
-    throw new AppError('Tenant context required: request must be routed through a college subdomain', 400);
-  }
+  const events = await withTenant(req.collegeId || null, async (tx) => {
+    const where = {
+      status: { in: ['UPCOMING', 'ONGOING'] },
+      ...(req.collegeId
+        ? { collegeId: req.collegeId }
+        : { visibility: 'PUBLIC', cancelledAt: null, registrationMode: { in: ['INTERNAL', 'EXTERNAL'] } }),
+    };
 
-  const events = await withTenant(req.collegeId, async (tx) => {
     const list = await tx.eventsWithStatus.findMany({
-      where: {
-        collegeId: req.collegeId,
-        status: { in: ['UPCOMING', 'ONGOING'] },
-      },
+      where,
       orderBy: { startAt: 'asc' },
     });
 
     const clubIds = [...new Set(list.map((e) => e.clubId))];
-    const clubs = await tx.club.findMany({
-      where: { id: { in: clubIds }, collegeId: req.collegeId },
-      select: { id: true, name: true, description: true },
-    });
+    const collegeIds = [...new Set(list.map((e) => e.collegeId))];
+
+    const [clubs, colleges] = await Promise.all([
+      clubIds.length > 0
+        ? tx.club.findMany({
+            where: { id: { in: clubIds } },
+            select: { id: true, name: true, description: true, clubType: true, logoUrl: true, coverImageUrl: true },
+          })
+        : [],
+      collegeIds.length > 0
+        ? tx.college.findMany({
+            where: { id: { in: collegeIds }, isActive: true },
+            select: { id: true, name: true, slug: true, city: true, state: true },
+          })
+        : [],
+    ]);
+
     const clubMap = new Map(clubs.map((c) => [c.id, c]));
+    const collegeMap = new Map(colleges.map((c) => [c.id, c]));
 
     return list.map((e) => {
       const club = clubMap.get(e.clubId);
-      return serializeEvent({ ...e, club });
+      const college = collegeMap.get(e.collegeId);
+      return {
+        ...serializeEvent({ ...e, club }),
+        college: college ? { id: college.id, name: college.name, slug: college.slug, city: college.city, state: college.state } : null,
+      };
     });
-  });
+  }, { isPublic: true });
 
   res.status(200).json({ success: true, events });
 });

@@ -95,6 +95,26 @@ const updateEventBody = z.object({
 const attendeeQuery = z.object({
   page: z.coerce.number().int().positive().optional(),
   limit: z.coerce.number().int().positive().max(100).optional(),
+  participantType: z.enum(['STUDENT', 'EXTERNAL']).optional(),
+});
+
+// External participant OTP and registration schemas (Phase 3)
+const externalOtpRequestBody = z.object({
+  email: email,
+  eventId: uuid,
+});
+
+const externalOtpVerifyBody = z.object({
+  email: email,
+  code: z.string().regex(/^\d{6}$/, 'Code must be exactly 6 digits'),
+  eventId: uuid.optional(),
+});
+
+const externalRegisterBody = z.object({
+  name: z.string().trim().min(1, 'Name is required').max(100),
+  phone: z.string().trim().max(20).optional().nullable(),
+  institutionName: z.string().trim().max(200).optional().nullable(),
+  formAnswers: z.record(z.unknown()).optional().nullable(),
 });
 
 module.exports = {
@@ -102,5 +122,6 @@ module.exports = {
   loginBody, forgotPasswordBody, resetPasswordBody, deletionVerificationBody, adminRegisterBody, managerInviteBody,
   createClubBody, updateClubBody, createDepartmentBody, updateDepartmentBody, clubIdsBody, departmentIdsBody,
   membershipBody, existingManagerBody, acceptInviteBody, createEventBody, updateEventBody, attendeeQuery,
+  externalOtpRequestBody, externalOtpVerifyBody, externalRegisterBody,
   publicIdParams: z.object({ eventId: uuid, publicId: z.string().min(1).max(500) }),
 };

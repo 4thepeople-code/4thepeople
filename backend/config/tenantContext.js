@@ -64,10 +64,21 @@ function __setFailTransaction(config) {
  * @returns {Promise<T>} Result of the callback
  */
 async function withTenant(collegeId, callback, options = {}) {
-  if (!collegeId || typeof collegeId !== 'string' || !UUID_REGEX.test(collegeId)) {
-    const error = new Error('Invalid or missing tenant identifier (must be a valid UUID)');
-    error.statusCode = 400;
-    throw error;
+  const isPublic = options.isPublic === true || options.allowPublic === true;
+
+  if (!isPublic) {
+    if (!collegeId || typeof collegeId !== 'string' || !UUID_REGEX.test(collegeId)) {
+      const error = new Error('Invalid or missing tenant identifier (must be a valid UUID)');
+      error.statusCode = 400;
+      throw error;
+    }
+  } else {
+    // If public read mode, collegeId may be null/undefined, or a valid tenant UUID
+    if (collegeId !== null && collegeId !== undefined && (typeof collegeId !== 'string' || !UUID_REGEX.test(collegeId))) {
+      const error = new Error('Invalid tenant identifier (must be null or a valid UUID)');
+      error.statusCode = 400;
+      throw error;
+    }
   }
 
   if (typeof callback !== 'function') {
@@ -81,7 +92,11 @@ async function withTenant(collegeId, callback, options = {}) {
     return await prisma.$transaction(
       async (tx) => {
         // 1. Establish tenant context inside the transaction using parameterized SQL
-        await tx.$executeRaw`SELECT set_config('app.college_id', ${collegeId}, true)`;
+        if (collegeId) {
+          await tx.$executeRaw`SELECT set_config('app.college_id', ${collegeId}, true)`;
+        } else {
+          await tx.$executeRaw`SELECT set_config('app.college_id', '', true)`;
+        }
 
         if (process.env.NODE_ENV === 'development' && failTransactionConfig) {
           if (failTransactionConfig.skip > 0) {
