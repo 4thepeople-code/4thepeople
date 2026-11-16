@@ -2,6 +2,7 @@ import React from 'react';
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import CollegeHomePageClient from './CollegeHomePageClient';
+import { isRealCollegeSlug } from '@/lib/colleges/realColleges';
 
 export interface CollegePortalPageProps {
   params: Promise<{ slug: string }>;
@@ -10,9 +11,9 @@ export interface CollegePortalPageProps {
 export async function generateMetadata({ params }: CollegePortalPageProps): Promise<Metadata> {
   const { slug } = await params;
 
-  if (!slug || !/^[a-z0-9-]+$/i.test(slug)) {
+  if (!slug || !/^[a-z0-9-]+$/i.test(slug) || !isRealCollegeSlug(slug)) {
     return {
-      title: 'College Portal Not Found | 4 THE PEOPLE',
+      title: 'College Not Found | 4 THE PEOPLE',
     };
   }
 
@@ -36,7 +37,7 @@ export async function generateMetadata({ params }: CollegePortalPageProps): Prom
 export default async function CollegePortalPage({ params }: CollegePortalPageProps) {
   const { slug } = await params;
 
-  if (!slug || !/^[a-z0-9-]+$/i.test(slug)) {
+  if (!slug || !/^[a-z0-9-]+$/i.test(slug) || !isRealCollegeSlug(slug)) {
     notFound();
   }
 

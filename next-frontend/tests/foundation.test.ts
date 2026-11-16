@@ -1,5 +1,7 @@
 import assert from 'node:assert';
 import { resolveHost, normalizeHost } from '@/lib/routing/hostResolver';
+import { resolveCollegeRouting } from '@/lib/routing/collegePath';
+import { isRealCollegeSlug } from '@/lib/colleges/realColleges';
 import { makeQueryClient, getQueryClient, clearAllQueryCache } from '@/lib/query/queryClient';
 import { queryKeys } from '@/lib/api/queryKeys';
 import { apiClient, getApiBaseUrl } from '@/lib/api/axios';
@@ -152,6 +154,89 @@ async function runAllTests() {
     });
     assert.strictEqual(res.type, 'COLLEGE');
     assert.strictEqual(res.slug, 'lbrce');
+  });
+
+  // ----------------------------------------------------------------------------
+  // SUITE 1B: College Path Routing Decisions (middleware behavior, pure helper)
+  // ----------------------------------------------------------------------------
+  console.log('\n--- SUITE 1B: College Path Routing Decisions ---');
+
+  const publicPlain = resolveHost('localhost:3000', { isProduction: false });
+  const collegeSubdomain = resolveHost('lbrce.localhost:3000', { isProduction: false });
+
+  await test('1B.1: Plain-host /college/<slug> routes by path slug without rewrite', () => {
+    const decision = resolveCollegeRouting('/college/lbrce', publicPlain);
+    assert.strictEqual(decision.hostType, 'COLLEGE');
+    assert.strictEqual(decision.tenantSlug, 'lbrce');
+    assert.strictEqual(decision.rewritePath, undefined);
+    assert.strictEqual(decision.status, undefined);
+
+    const withSubPath = resolveCollegeRouting('/college/lbrce/clubs/abc', publicPlain);
+    assert.strictEqual(withSubPath.tenantSlug, 'lbrce');
+    assert.strictEqual(withSubPath.rewritePath, undefined);
+  });
+
+  await test('1B.2: College subdomain root rewrites to /college/<slug>', () => {
+    const decision = resolveCollegeRouting('/', collegeSubdomain);
+    assert.strictEqual(decision.hostType, 'COLLEGE');
+    assert.strictEqual(decision.tenantSlug, 'lbrce');
+    assert.strictEqual(decision.rewritePath, '/college/lbrce');
+  });
+
+  await test('1B.3: Mismatched path slug on a subdomain loses to the subdomain slug', () => {
+    const decision = resolveCollegeRouting('/college/northwood', collegeSubdomain);
+    assert.strictEqual(decision.tenantSlug, 'lbrce');
+    assert.strictEqual(decision.rewritePath, '/college/lbrce');
+
+    // Sub-paths are preserved during the rewrite.
+    const withSubPath = resolveCollegeRouting('/college/northwood/clubs/abc', collegeSubdomain);
+    assert.strictEqual(withSubPath.tenantSlug, 'lbrce');
+    assert.strictEqual(withSubPath.rewritePath, '/college/lbrce/clubs/abc');
+
+    // A matching path slug needs no rewrite at all.
+    const matching = resolveCollegeRouting('/college/lbrce/clubs', collegeSubdomain);
+    assert.strictEqual(matching.tenantSlug, 'lbrce');
+    assert.strictEqual(matching.rewritePath, undefined);
+  });
+
+  await test('1B.4: Reserved slugs stay blocked on both host styles', () => {
+    // Reserved subdomain: hostResolver rejects it outright.
+    const apiSubdomain = resolveHost('api.localhost', { isProduction: false });
+    assert.strictEqual(apiSubdomain.type, 'INVALID');
+    const wwwSubdomain = resolveHost('www.localhost', { isProduction: false });
+    assert.strictEqual(wwwSubdomain.type, 'PUBLIC');
+
+    // Reserved path slug on a plain host: rejected with 400.
+    const decision = resolveCollegeRouting('/college/demo', publicPlain);
+    assert.strictEqual(decision.status, 400);
+    const decisionAdmin = resolveCollegeRouting('/college/admin', publicPlain);
+    assert.strictEqual(decisionAdmin.status, 400);
+  });
+
+  await test('1B.5: /api and /admin are never rewritten, on any host', () => {
+    const apiOnSubdomain = resolveCollegeRouting('/api/clubs', collegeSubdomain);
+    assert.strictEqual(apiOnSubdomain.hostType, 'PUBLIC');
+    assert.strictEqual(apiOnSubdomain.rewritePath, undefined);
+
+    const adminPath = resolveCollegeRouting('/admin', collegeSubdomain);
+    assert.strictEqual(adminPath.hostType, 'PLATFORM_ADMIN');
+    assert.strictEqual(adminPath.rewritePath, undefined);
+  });
+
+  await test('1B.6: Unknown slugs pass middleware but are rejected by the real-college gate', () => {
+    // Middleware passes the slug through; the page layer decides existence.
+    const decision = resolveCollegeRouting('/college/notacollege', publicPlain);
+    assert.strictEqual(decision.tenantSlug, 'notacollege');
+    assert.strictEqual(decision.status, undefined);
+    assert.strictEqual(isRealCollegeSlug('notacollege'), false);
+  });
+
+  await test('1B.7: Demo slugs never render the real college page', () => {
+    const decision = resolveCollegeRouting('/college/northwood', publicPlain);
+    assert.strictEqual(decision.tenantSlug, 'northwood');
+    assert.strictEqual(decision.status, undefined);
+    assert.strictEqual(isRealCollegeSlug('northwood'), false);
+    assert.strictEqual(isRealCollegeSlug('lbrce'), true);
   });
 
   // ----------------------------------------------------------------------------
