@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { LIVE_COLLEGE } from "@/lib/landing/constants";
 import Search from "./Search";
-import HeroStage from "./HeroStage";
+import HeroStage from "../HeroStage";
 
 export default function Hero() {
   return (
