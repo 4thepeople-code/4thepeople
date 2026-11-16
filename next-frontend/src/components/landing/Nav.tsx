@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { BRAND_NAME } from "@/lib/landing/constants";
-import { colleges } from "@/lib/landing/data";
 import BrandLogo from "@/components/BrandLogo";
 
 const links = [
@@ -14,8 +13,6 @@ const links = [
   { href: "#cta", label: "Contact" },
 ];
 
-// First live college — data-driven so adding a college updates the link.
-const liveCollege = colleges.find((c) => c.status === "live") ?? colleges[0];
 
 export default function Nav() {
   const [solid, setSolid] = useState(false);
@@ -74,14 +71,6 @@ export default function Nav() {
 
         <div className="flex items-center gap-2 sm:gap-3">
           <Link
-            href={`/college/${liveCollege.slug}/login`}
-            className="inline-flex h-11 items-center justify-center rounded-xl px-3 py-2 text-[13px] font-semibold transition-colors hover:text-[var(--primary)] sm:px-4 sm:text-sm"
-            style={{ color: "var(--ink)" }}
-          >
-            Log in
-          </Link>
-
-          <Link
             href="#cta"
             className="inline-flex h-11 items-center justify-center rounded-xl px-3.5 text-[13px] font-semibold text-white transition-colors sm:px-5 sm:text-sm"
             style={{ backgroundColor: "var(--primary)" }}
@@ -126,15 +115,6 @@ export default function Nav() {
                 {l.label}
               </a>
             ))}
-            {/* Data-driven: first live college (see above) */}
-            <Link
-              href={`/college/${liveCollege.slug}/login`}
-              onClick={() => setOpen(false)}
-              className="rounded-lg px-3 py-3 text-sm font-semibold"
-              style={{ color: "var(--primary)" }}
-            >
-              Log in →
-            </Link>
           </div>
         </div>
       )}
