@@ -1,10 +1,10 @@
 /**
  * Theme-surface decision: where the global dark theme may apply.
  *
- * The college public side renders a single light campus theme, so the "dark"
- * class must never reach <html> there — even when localStorage says dark.
- * Dashboards keep their own chrome and toggle, so the three dashboard segments
- * are excluded from the block.
+ * The college public side and the student workspace render a single light
+ * campus theme, so the "dark" class must never reach <html> there — even when
+ * localStorage says dark. Manager and admin dashboards keep their own chrome
+ * and toggle, so those two segments are excluded from the block.
  *
  * Two consumers:
  * 1. isCollegeDarkBlockedSurface() — pure TS, used by ThemeProvider on every
@@ -18,11 +18,15 @@
 
 const RESERVED_HOST_SLUGS = ['api', 'mail', 'app', 'static', 'assets', 'public', 'auth'];
 
-/** Dashboard areas under /college/<slug>/ that keep their own theme toggle. */
-const COLLEGE_DASHBOARD_PATH = /^\/college\/[a-z0-9-]+\/(student|manager|admin)(\/|$)/;
+/**
+ * College Admin dashboard areas under /college/<slug>/ that keep their own
+ * theme toggle. The manager workspace is permanently light-themed and
+ * dark-blocked (like the student workspace and college public pages).
+ */
+const COLLEGE_DASHBOARD_PATH = /^\/college\/[a-z0-9-]+\/admin(\/|$)/;
 
-/** Dashboard URLs as served from a college subdomain root (/student, /manager, /admin). */
-const TOP_LEVEL_DASHBOARD_PATH = /^\/(student|manager|admin)(\/|$)/;
+/** College Admin dashboard URLs as served from a college subdomain root. */
+const TOP_LEVEL_DASHBOARD_PATH = /^\/admin(\/|$)/;
 
 /** Mirrors hostResolver's subdomain rules for the browser (hostname has no port). */
 export function isCollegeHost(
@@ -84,12 +88,12 @@ export function buildThemeBootScript(isProduction: boolean): string {
     var path = location.pathname.toLowerCase();
     var host = location.hostname.toLowerCase().split(':')[0].replace(/\\.$/, '');
     var isProd = ${JSON.stringify(isProduction)};
-    var dashOnPath = /^\\/college\\/[a-z0-9-]+\\/(student|manager|admin)(\\/|$)/.test(path);
+    var dashOnPath = /^\\/college\\/[a-z0-9-]+\\/admin(\\/|$)/.test(path);
     var hostSlugMatch = host.match(/^([a-z0-9-]+)\\.4thepeople\\.in$/);
     if (!isProd && !hostSlugMatch) hostSlugMatch = host.match(/^([a-z0-9-]+)\\.(localhost|local)$/);
     var slug = hostSlugMatch ? hostSlugMatch[1] : null;
     var collegeHost = !!slug && slug !== 'www' && slug !== 'admin' && ['api','mail','app','static','assets','public','auth'].indexOf(slug) === -1;
-    var dashOnHost = collegeHost && /^\\/(student|manager|admin)(\\/|$)/.test(path);
+    var dashOnHost = collegeHost && /^\\/admin(\\/|$)/.test(path);
     var collegePath = path === '/college' || path.indexOf('/college/') === 0;
     var dark = theme === 'dark' && !((collegePath || collegeHost) && !dashOnPath && !dashOnHost);
     var root = document.documentElement;

@@ -48,6 +48,120 @@
   --on-primary: #0d0f14;
 }
 
+/*
+ * Manager Dashboard scope — permanently light, pure white background (#ffffff),
+ * electric violet / purple accents, subtle borders, light neutral grey dividers.
+ */
+.manager-dashboard-scope,
+.dark .manager-dashboard-scope,
+.manager-dashboard-scope[data-theme="dark"],
+.manager-dashboard-scope[data-theme="light"] {
+  color-scheme: light !important;
+
+  /* Surfaces & ink (pure white page, pure white cards, dark ink text) */
+  --bg: #ffffff !important;
+  --surface: #ffffff !important;
+  --ink: #111827 !important;
+  --ink-soft: #6b7280 !important;
+  --line: #e5e7eb !important;
+
+  /* Electric violet / purple accents */
+  --primary: #7c3aed !important;
+  --primary-strong: #6d28d9 !important;
+  --primary-soft: #f5f3ff !important;
+  --secondary: #ff4a3d !important;
+  --secondary-soft: #ffe9e6 !important;
+  --on-primary: #ffffff !important;
+
+  background-color: #ffffff !important;
+  color: #111827 !important;
+}
+
+.manager-dashboard-scope aside {
+  background-color: #ffffff !important;
+  border-color: #e5e7eb !important;
+}
+
+.manager-dashboard-scope header {
+  background-color: rgba(255, 255, 255, 0.95) !important;
+  border-color: #e5e7eb !important;
+}
+
+.manager-dashboard-scope main {
+  background-color: #ffffff !important;
+}
+
+/*
+ * College Admin Dashboard scope — clean white background (#ffffff),
+ * white cards, subtle neutral grey dividers (#e5e7eb), electric violet accents (#7c3aed).
+ * Retains dark mode support when toggled via the dashboard header/sidebar switch.
+ */
+.college-admin-dashboard-scope {
+  /* Surfaces & ink (pure white page, pure white cards, dark ink text) */
+  --bg: #ffffff;
+  --surface: #ffffff;
+  --ink: #111827;
+  --ink-soft: #6b7280;
+  --line: #e5e7eb;
+
+  /* Electric violet / purple accents matching manager dashboard */
+  --primary: #7c3aed;
+  --primary-strong: #6d28d9;
+  --primary-soft: #f5f3ff;
+  --secondary: #ff4a3d;
+  --secondary-soft: #ffe9e6;
+  --on-primary: #ffffff;
+
+  background-color: var(--bg);
+  color: var(--ink);
+}
+
+.college-admin-dashboard-scope aside {
+  background-color: var(--surface);
+  border-color: var(--line);
+}
+
+.college-admin-dashboard-scope header {
+  background-color: rgba(255, 255, 255, 0.95);
+  border-color: var(--line);
+}
+
+.college-admin-dashboard-scope main {
+  background-color: var(--bg);
+}
+
+/* Dark mode styling for College Admin Dashboard when dark theme is enabled */
+.dark .college-admin-dashboard-scope {
+  --bg: #0d0f14;
+  --surface: #14171f;
+  --ink: #f2f3f7;
+  --ink-soft: #a7acbb;
+  --line: rgba(242, 243, 247, 0.12);
+  --primary: #8183ff;
+  --primary-strong: #6366f1;
+  --primary-soft: rgba(99, 102, 241, 0.2);
+  --secondary: #ff6a5c;
+  --secondary-soft: rgba(255, 74, 61, 0.18);
+  --on-primary: #0d0f14;
+
+  background-color: var(--bg);
+  color: var(--ink);
+}
+
+.dark .college-admin-dashboard-scope aside {
+  background-color: var(--surface);
+  border-color: var(--line);
+}
+
+.dark .college-admin-dashboard-scope header {
+  background-color: rgba(20, 23, 31, 0.95);
+  border-color: var(--line);
+}
+
+.dark .college-admin-dashboard-scope main {
+  background-color: var(--bg);
+}
+
 /* Font utilities resolve to the landing fonts inside the dashboard scope */
 .dashboard-scope .font-display {
   font-family: var(--font-sora), sans-serif;
@@ -106,5 +220,35 @@
 }
 
 .dashboard-scope .animate-dashboard-toast-in {
+  animation: dashboard-toast-in 180ms ease-out;
+}
+
+/*
+ * Student workspace bridge — the student dashboard renders the campus
+ * (.college-scope) single light theme. StudentShell puts both scope classes on
+ * its root; this block maps the shared dashboard primitive token names onto
+ * the campus semantic tier so shared ui components (Modal, ConfirmDialog,
+ * Toast, DashboardButton, Chip, EmptyState, Skeleton, Field) render campus
+ * inside the student workspace without being modified.
+ */
+.student-scope {
+  --bg: var(--surface-page);
+  --surface: var(--surface-card);
+  --ink: var(--text-primary);
+  --ink-soft: var(--text-secondary);
+  --line: var(--border-soft);
+  --primary: var(--accent-strong);
+  --primary-strong: var(--accent-strong-deep);
+  --primary-soft: var(--accent-soft);
+  --secondary: var(--accent-strong);
+  --secondary-soft: var(--accent-soft);
+  --on-primary: #ffffff;
+}
+
+.student-scope .animate-dashboard-skeleton {
+  animation: college-shimmer 1.4s ease-in-out infinite;
+}
+
+.student-scope .animate-dashboard-toast-in {
   animation: dashboard-toast-in 180ms ease-out;
 }

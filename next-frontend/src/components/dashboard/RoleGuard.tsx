@@ -86,9 +86,13 @@ export default function RoleGuard({ role, slug, children }: RoleGuardProps) {
     }
   }, [user, loading, role, slug, router, dashboardHref]);
 
+  const isManager = role === 'eventManager';
+  const isCollegeAdmin = role === 'collegeAdmin';
+  const scopeClass = `dashboard-scope ${isManager ? 'manager-dashboard-scope' : ''} ${isCollegeAdmin ? 'college-admin-dashboard-scope' : ''}`;
+
   if (loading || !user) {
     return (
-      <div className="dashboard-scope flex min-h-screen items-center justify-center bg-[var(--bg)] p-6">
+      <div className={`${scopeClass} flex min-h-screen items-center justify-center bg-[var(--bg)] p-6`}>
         <div className="w-full max-w-sm space-y-3" role="status" aria-label={guard.authChecking}>
           <SkeletonLines count={3} />
         </div>
@@ -110,7 +114,7 @@ export default function RoleGuard({ role, slug, children }: RoleGuardProps) {
         }
       };
       return (
-        <div className="dashboard-scope flex min-h-screen items-center justify-center bg-[var(--bg)] p-6 text-[var(--ink)]">
+        <div className={`${scopeClass} flex min-h-screen items-center justify-center bg-[var(--bg)] p-6 text-[var(--ink)]`}>
           <div className="w-full max-w-md space-y-5 rounded-3xl border border-[var(--line)] bg-[var(--surface)] p-8 text-center shadow-sm">
             <span
               aria-hidden="true"
@@ -165,7 +169,7 @@ export default function RoleGuard({ role, slug, children }: RoleGuardProps) {
       }
     };
     return (
-      <div className="dashboard-scope flex min-h-screen items-center justify-center bg-[var(--bg)] p-6 text-[var(--ink)]">
+      <div className={`${scopeClass} flex min-h-screen items-center justify-center bg-[var(--bg)] p-6 text-[var(--ink)]`}>
         <div className="w-full max-w-md space-y-5 rounded-3xl border border-[var(--line)] bg-[var(--surface)] p-8 text-center shadow-sm">
           <span
             aria-hidden="true"

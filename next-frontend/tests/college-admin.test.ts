@@ -225,6 +225,63 @@ runTest('5.2: Accept invitation input schema requires password matching and veri
 });
 
 // ============================================================================
+// SUITE 6: College Admin Dashboard Pure White Theme & Scope Contracts
+// ============================================================================
+console.log('\n--- SUITE 6: College Admin Dashboard Theme & Visual Identity Contracts ---');
+
+runTest('6.1: tokens.css defines .college-admin-dashboard-scope with white background and violet accents', () => {
+  const fs = require('fs');
+  const path = require('path');
+  const tokensPath = path.resolve(__dirname, '../src/app/tokens.css');
+  const tokensContent = fs.readFileSync(tokensPath, 'utf-8');
+
+  assert.ok(tokensContent.includes('.college-admin-dashboard-scope'), 'Must define .college-admin-dashboard-scope');
+  assert.ok(tokensContent.includes('--bg: #ffffff;'), 'Must have pure white page background');
+  assert.ok(tokensContent.includes('--surface: #ffffff;'), 'Must have pure white card surfaces');
+  assert.ok(tokensContent.includes('--line: #e5e7eb;'), 'Must have neutral grey borders');
+  assert.ok(tokensContent.includes('--primary: #7c3aed;'), 'Must have electric violet primary accents');
+  assert.ok(tokensContent.includes('.dark .college-admin-dashboard-scope'), 'Must support dark mode when theme is toggled');
+});
+
+runTest('6.2: College Admin brand href routes to /college/<slug>/admin', () => {
+  const computeBrandHref = (role: string, slug?: string) => {
+    const isManager = role === 'eventManager';
+    const isCollegeAdmin = role === 'collegeAdmin';
+    return slug
+      ? isManager
+        ? `/college/${slug}/manager`
+        : isCollegeAdmin
+          ? `/college/${slug}/admin`
+          : `/college/${slug}`
+      : isManager
+        ? '/manager'
+        : isCollegeAdmin
+          ? '/admin'
+          : '/';
+  };
+
+  assert.strictEqual(computeBrandHref('collegeAdmin', 'lbrce'), '/college/lbrce/admin');
+  assert.strictEqual(computeBrandHref('collegeAdmin', 'vrsec'), '/college/vrsec/admin');
+  assert.strictEqual(computeBrandHref('eventManager', 'lbrce'), '/college/lbrce/manager');
+});
+
+runTest('6.3: Role guard applies college-admin-dashboard-scope for collegeAdmin role', () => {
+  const getScopeClass = (role: string) => {
+    const isManager = role === 'eventManager';
+    const isCollegeAdmin = role === 'collegeAdmin';
+    return `dashboard-scope ${isManager ? 'manager-dashboard-scope' : ''} ${isCollegeAdmin ? 'college-admin-dashboard-scope' : ''}`.trim();
+  };
+
+  const adminScope = getScopeClass('collegeAdmin');
+  assert.ok(adminScope.includes('college-admin-dashboard-scope'));
+  assert.ok(!adminScope.includes('manager-dashboard-scope'));
+
+  const managerScope = getScopeClass('eventManager');
+  assert.ok(managerScope.includes('manager-dashboard-scope'));
+  assert.ok(!managerScope.includes('college-admin-dashboard-scope'));
+});
+
+// ============================================================================
 // SUMMARY
 // ============================================================================
 console.log('\n======================================================================');

@@ -3,8 +3,7 @@
 import { useAuth } from '@/context/AuthContext';
 import { useMyRegistrationsQuery } from '@/lib/api/events';
 import { useMeQuery } from '@/lib/api/auth';
-import PageHeader from '@/components/dashboard/ui/PageHeader';
-import DashboardCard from '@/components/dashboard/ui/DashboardCard';
+import CampusPageHeader from '../CampusPageHeader';
 import Chip from '@/components/dashboard/ui/Chip';
 import { SkeletonLines } from '@/components/dashboard/ui/Skeleton';
 import { student } from '@/lib/copy';
@@ -41,54 +40,54 @@ export default function ProfileClient({ slug }: ProfileClientProps) {
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
-      <PageHeader role="student" title={t.title} description={t.description} />
+      <CampusPageHeader title={t.title} description={t.description} />
 
-      <DashboardCard className="space-y-6">
+      <div className="space-y-6 rounded-3xl border-2 border-[var(--border-strong)] bg-[var(--surface-card)] p-6 shadow-brutal-md">
         {/* Identity */}
-        <div className="flex items-center gap-4 border-b border-[var(--line)] pb-6">
+        <div className="flex items-center gap-4 border-b-2 border-dashed border-[var(--border-soft)] pb-6">
           <span
             aria-hidden="true"
-            className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-[var(--primary-soft)] font-display text-xl font-bold text-[var(--primary)]"
+            className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl border-2 border-[var(--border-strong)] bg-[var(--accent-soft)] font-display text-xl font-bold text-[var(--accent-strong)]"
           >
             {studentUser?.name ? studentUser.name.slice(0, 2).toUpperCase() : 'ST'}
           </span>
           <div className="min-w-0">
-            <h2 className="font-display text-lg font-bold tracking-tight text-[var(--ink)]">
+            <h2 className="font-display text-lg font-bold tracking-tight text-[var(--text-primary)]">
               {studentUser?.name || t.noName}
             </h2>
-            <p className="text-xs text-[var(--ink-soft)]">{t.activeStudent}</p>
+            <p className="text-xs text-[var(--text-secondary)]">{t.activeStudent}</p>
           </div>
         </div>
 
         {/* Institutional details */}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div className="rounded-2xl border border-[var(--line)] bg-[var(--bg)] p-4">
-            <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-[var(--ink-soft)]">
+          <div className="rounded-2xl border-2 border-[var(--border-soft)] bg-[var(--surface-tile)] p-4">
+            <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-[var(--text-secondary)]">
               {t.rollNumber}
             </p>
-            <p className="truncate font-mono text-sm font-bold text-[var(--ink)]">
+            <p className="truncate font-mono text-sm font-bold text-[var(--text-primary)]">
               {studentUser?.rollNumber || t.noRoll}
             </p>
           </div>
 
-          <div className="rounded-2xl border border-[var(--line)] bg-[var(--bg)] p-4">
-            <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-[var(--ink-soft)]">
+          <div className="rounded-2xl border-2 border-[var(--border-soft)] bg-[var(--surface-tile)] p-4">
+            <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-[var(--text-secondary)]">
               {t.email}
             </p>
-            <p className="truncate text-xs font-bold text-[var(--ink)]">{studentUser?.email}</p>
+            <p className="truncate text-xs font-bold text-[var(--text-primary)]">{studentUser?.email}</p>
           </div>
 
-          <div className="rounded-2xl border border-[var(--line)] bg-[var(--bg)] p-4">
-            <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-[var(--ink-soft)]">
+          <div className="rounded-2xl border-2 border-[var(--border-soft)] bg-[var(--surface-tile)] p-4">
+            <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-[var(--text-secondary)]">
               {t.institution}
             </p>
-            <p className="truncate text-xs font-bold text-[var(--ink)]">
+            <p className="truncate text-xs font-bold text-[var(--text-primary)]">
               {collegeDisplay} ({slug})
             </p>
           </div>
 
-          <div className="rounded-2xl border border-[var(--line)] bg-[var(--bg)] p-4">
-            <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-[var(--ink-soft)]">
+          <div className="rounded-2xl border-2 border-[var(--border-soft)] bg-[var(--surface-tile)] p-4">
+            <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-[var(--text-secondary)]">
               {t.status}
             </p>
             <Chip variant="success" dot>
@@ -98,16 +97,16 @@ export default function ProfileClient({ slug }: ProfileClientProps) {
         </div>
 
         {/* Registrations stat */}
-        <div className="flex items-center justify-between gap-3 rounded-2xl border border-[var(--line)] bg-[var(--bg)] p-4">
+        <div className="flex items-center justify-between gap-3 rounded-2xl border-2 border-[var(--border-soft)] bg-[var(--surface-tile)] p-4">
           <div>
-            <p className="text-sm font-bold text-[var(--ink)]">{t.statRegistrations}</p>
-            <p className="text-[11px] text-[var(--ink-soft)]">{t.statRegistrationsHint}</p>
+            <p className="text-sm font-bold text-[var(--text-primary)]">{t.statRegistrations}</p>
+            <p className="text-[11px] text-[var(--text-secondary)]">{t.statRegistrationsHint}</p>
           </div>
-          <span className="font-display text-2xl font-bold text-[var(--primary)]">
+          <span className="font-display text-2xl font-bold text-[var(--accent-strong)]">
             {myRegistrations.length}
           </span>
         </div>
-      </DashboardCard>
+      </div>
     </div>
   );
 }

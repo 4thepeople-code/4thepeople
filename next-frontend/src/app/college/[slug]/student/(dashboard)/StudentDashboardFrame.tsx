@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { ArrowRight, Building2, GraduationCap } from 'lucide-react';
 import RoleGuard from '@/components/dashboard/RoleGuard';
-import DashboardShell from '@/components/dashboard/DashboardShell';
+import StudentShell from '@/components/dashboard/StudentShell';
 import DashboardButton from '@/components/dashboard/ui/DashboardButton';
 import { useMyClubsQuery } from '@/lib/api/manager';
 import { student } from '@/lib/copy';
@@ -15,7 +15,7 @@ export interface StudentDashboardFrameProps {
 
 /**
  * Student frame: RoleGuard (session + coarse role check; College Admin is
- * bounced to the admin workspace) around the shared DashboardShell. Students
+ * bounced to the admin workspace) around the campus StudentShell. Students
  * with active club-manager memberships get a persistent "switch to the manager
  * workspace" banner above every student screen.
  */
@@ -25,7 +25,7 @@ export default function StudentDashboardFrame({ slug, children }: StudentDashboa
 
   return (
     <RoleGuard role="student" slug={slug}>
-      <DashboardShell role="student" slug={slug} collegeName={slug ? slug.toUpperCase() : undefined}>
+      <StudentShell slug={slug} collegeName={slug ? slug.toUpperCase() : undefined}>
         {isManager && (
           <div className="mb-8 flex flex-col gap-3 rounded-3xl border border-[var(--primary)]/25 bg-[var(--primary-soft)] p-5 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-3">
@@ -56,7 +56,7 @@ export default function StudentDashboardFrame({ slug, children }: StudentDashboa
           </div>
         )}
         {children}
-      </DashboardShell>
+      </StudentShell>
     </RoleGuard>
   );
 }

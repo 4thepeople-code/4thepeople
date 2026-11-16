@@ -291,22 +291,32 @@ async function runAllTests() {
     );
   });
 
-  await test('1C.6: Dashboard segments keep their own theme toggle (not blocked)', () => {
-    assert.strictEqual(isCollegeDarkBlockedSurface('/college/lbrce/student', 'localhost:3000'), false);
-    assert.strictEqual(isCollegeDarkBlockedSurface('/college/lbrce/student/x', 'localhost:3000'), false);
-    assert.strictEqual(isCollegeDarkBlockedSurface('/college/lbrce/manager', 'localhost:3000'), false);
+  await test('1C.6: Admin dashboard keeps its toggle; manager and student workspaces are dark-blocked', () => {
+    // Admin dashboard is excluded from the block (its chrome owns the toggle).
+    assert.strictEqual(isCollegeDarkBlockedSurface('/college/lbrce/admin', 'localhost:3000'), false);
     assert.strictEqual(isCollegeDarkBlockedSurface('/college/lbrce/admin/settings', 'localhost:3000'), false);
-    // Top-level dashboard routes as served from a college subdomain root.
     assert.strictEqual(
-      isCollegeDarkBlockedSurface('/student', 'lbrce.localhost:3000', { isProduction: false }),
+      isCollegeDarkBlockedSurface('/admin', 'lbrce.localhost:3000', { isProduction: false }),
       false
     );
+    // The manager workspace is permanently light-themed and dark-blocked.
+    assert.strictEqual(isCollegeDarkBlockedSurface('/college/lbrce/manager', 'localhost:3000'), true);
+    assert.strictEqual(isCollegeDarkBlockedSurface('/college/lbrce/manager/x', 'localhost:3000'), true);
     assert.strictEqual(
       isCollegeDarkBlockedSurface('/manager', 'lbrce.localhost:3000', { isProduction: false }),
-      false
+      true
     );
-    // But the same segment on a non-college host is not a dashboard surface.
+    // The student workspace is part of the single-theme campus side.
+    assert.strictEqual(isCollegeDarkBlockedSurface('/college/lbrce/student', 'localhost:3000'), true);
+    assert.strictEqual(isCollegeDarkBlockedSurface('/college/lbrce/student/profile', 'localhost:3000'), true);
+    assert.strictEqual(isCollegeDarkBlockedSurface('/college/lbrce/student-admin', 'localhost:3000'), true);
+    assert.strictEqual(
+      isCollegeDarkBlockedSurface('/student', 'lbrce.localhost:3000', { isProduction: false }),
+      true
+    );
+    // But the same segments on a non-college host are not college surfaces.
     assert.strictEqual(isCollegeDarkBlockedSurface('/student', 'localhost:3000'), false);
+    assert.strictEqual(isCollegeDarkBlockedSurface('/manager', 'localhost:3000'), false);
   });
 
   await test('1C.7: Marketing surfaces stay dark-capable', () => {
@@ -363,14 +373,32 @@ async function runAllTests() {
     });
     assert.strictEqual(subdomain.isDark, false);
 
-    // Dashboard keeps dark.
-    const dashboard = runBoot(devScript, {
+    // Manager workspace boots light even with dark saved.
+    const managerDash = runBoot(devScript, {
+      pathname: '/college/lbrce/manager',
+      hostname: 'localhost:3000',
+      theme: 'dark',
+    });
+    assert.strictEqual(managerDash.isDark, false, 'Manager workspace must never boot dark');
+    assert.strictEqual(managerDash.colorScheme, 'light');
+
+    // Admin dashboard keeps dark.
+    const adminDash = runBoot(devScript, {
+      pathname: '/college/lbrce/admin',
+      hostname: 'localhost:3000',
+      theme: 'dark',
+    });
+    assert.strictEqual(adminDash.isDark, true);
+    assert.strictEqual(adminDash.colorScheme, 'dark');
+
+    // Student workspace boots light even with dark saved.
+    const student = runBoot(devScript, {
       pathname: '/college/lbrce/student',
       hostname: 'localhost:3000',
       theme: 'dark',
     });
-    assert.strictEqual(dashboard.isDark, true);
-    assert.strictEqual(dashboard.colorScheme, 'dark');
+    assert.strictEqual(student.isDark, false);
+    assert.strictEqual(student.colorScheme, 'light');
 
     // Marketing keeps dark.
     const marketing = runBoot(devScript, {

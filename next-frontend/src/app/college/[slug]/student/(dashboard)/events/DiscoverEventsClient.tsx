@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { ArrowRight, Calendar, CheckCircle2, MapPin, Palette, RefreshCw } from 'lucide-react';
 import { useMyRegistrationsQuery, useUpcomingEvents } from '@/lib/api/events';
-import PageHeader from '@/components/dashboard/ui/PageHeader';
+import CampusPageHeader from '../CampusPageHeader';
 import DashboardButton from '@/components/dashboard/ui/DashboardButton';
 import Chip from '@/components/dashboard/ui/Chip';
 import EmptyState from '@/components/dashboard/ui/EmptyState';
@@ -79,8 +79,7 @@ export default function DiscoverEventsClient({ slug }: DiscoverEventsClientProps
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        role="student"
+      <CampusPageHeader
         title={t.title}
         description={t.description}
         actions={
@@ -161,11 +160,12 @@ export default function DiscoverEventsClient({ slug }: DiscoverEventsClientProps
               <Link
                 key={ev.id}
                 href={`/college/${slug}/events/${ev.id}`}
-                className="group flex flex-col justify-between gap-4 rounded-3xl border border-[var(--line)] bg-[var(--surface)] p-5 shadow-sm transition-colors duration-150 motion-reduce:transition-none hover:border-[var(--primary)] focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-[var(--primary)]"
+                className="group flex flex-col justify-between gap-4 rounded-3xl border-2 border-[var(--border-strong)] bg-[var(--surface-card)] p-5 shadow-brutal-sm transition-shadow duration-200 hover:shadow-brutal-md focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] motion-reduce:transition-none"
               >
                 <div className="space-y-3">
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <Chip variant="brand">{ev.category || 'EVENT'}</Chip>
+                    {/* Events have no category field yet — neutral chip, not a colored pill. */}
+                    <Chip variant="neutral">{ev.category || 'EVENT'}</Chip>
                     {isRegistered && (
                       <Chip variant="success" dot>
                         {t.registeredBadge}
@@ -174,32 +174,35 @@ export default function DiscoverEventsClient({ slug }: DiscoverEventsClientProps
                   </div>
 
                   <div>
-                    <h3 className="line-clamp-1 font-display text-base font-bold tracking-tight text-[var(--ink)] group-hover:text-[var(--primary)]">
+                    <h3 className="line-clamp-1 font-display text-base font-bold tracking-tight text-[var(--text-primary)] group-hover:text-[var(--accent-strong)]">
                       {ev.title}
                     </h3>
-                    <p className="mt-0.5 text-[11px] text-[var(--ink-soft)]">
+                    <p className="mt-0.5 text-[11px] text-[var(--text-secondary)]">
                       {ev.club?.name || 'Campus event'}
                     </p>
                   </div>
 
-                  <div className="space-y-1 text-xs text-[var(--ink-soft)]">
+                  <div className="space-y-1 rounded-2xl border-2 border-[var(--border-soft)] bg-[var(--surface-tile)] p-3 text-xs text-[var(--text-secondary)]">
                     <div className="flex items-center gap-1.5">
-                      <Calendar aria-hidden="true" className="h-3.5 w-3.5 shrink-0 text-[var(--primary)]" />
+                      <Calendar aria-hidden="true" className="h-3.5 w-3.5 shrink-0 text-[var(--accent-strong)]" />
                       <span className="truncate">{formatFullDate(ev.startAt, t.noDate)}</span>
                     </div>
                     <div className="flex items-center gap-1.5">
-                      <MapPin aria-hidden="true" className="h-3.5 w-3.5 shrink-0 text-[var(--secondary)]" />
+                      <MapPin aria-hidden="true" className="h-3.5 w-3.5 shrink-0 text-[var(--accent-strong)]" />
                       <span className="truncate">{ev.location || t.noVenue}</span>
                     </div>
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between gap-2 border-t border-[var(--line)] pt-3">
-                  <span className="inline-flex items-center gap-1.5 text-xs font-bold text-[var(--primary)]">
+                <div className="flex items-center justify-between gap-2 border-t-2 border-dashed border-[var(--border-soft)] pt-3">
+                  <span className="inline-flex items-center gap-1.5 text-xs font-bold text-[var(--accent-strong)]">
                     <CheckCircle2 aria-hidden="true" className="h-3.5 w-3.5" />
                     {isRegistered ? t.viewRsvp : t.viewDetails}
                   </span>
-                  <ArrowRight aria-hidden="true" className="h-4 w-4 text-[var(--ink-soft)] transition-transform group-hover:translate-x-0.5" />
+                  <ArrowRight
+                    aria-hidden="true"
+                    className="h-4 w-4 text-[var(--text-secondary)] transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none motion-reduce:group-hover:translate-x-0"
+                  />
                 </div>
               </Link>
             );

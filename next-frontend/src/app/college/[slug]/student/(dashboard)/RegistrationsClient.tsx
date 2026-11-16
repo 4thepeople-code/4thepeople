@@ -16,7 +16,7 @@ import {
   useMyRegistrationsQuery,
 } from '@/lib/api/events';
 import type { EventRegistration } from '@/types/models';
-import PageHeader from '@/components/dashboard/ui/PageHeader';
+import CampusPageHeader from './CampusPageHeader';
 import DashboardButton from '@/components/dashboard/ui/DashboardButton';
 import Chip from '@/components/dashboard/ui/Chip';
 import ConfirmDialog from '@/components/dashboard/ui/ConfirmDialog';
@@ -95,7 +95,7 @@ export default function RegistrationsClient({ slug }: RegistrationsClientProps) 
   if (isError) {
     return (
       <div className="space-y-6">
-        <PageHeader role="student" title={t.title} description={t.description} />
+        <CampusPageHeader title={t.title} description={t.description} />
         <EmptyState
           icon={Ticket}
           title={emptyStates.loadingFailed.title}
@@ -109,8 +109,7 @@ export default function RegistrationsClient({ slug }: RegistrationsClientProps) 
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        role="student"
+      <CampusPageHeader
         title={t.title}
         description={t.description}
         actions={
@@ -140,7 +139,7 @@ export default function RegistrationsClient({ slug }: RegistrationsClientProps) 
             return (
               <div
                 key={reg.id}
-                className="flex flex-col justify-between gap-4 rounded-3xl border border-[var(--line)] bg-[var(--surface)] p-6 shadow-sm transition-colors duration-150 motion-reduce:transition-none hover:border-[var(--primary)]"
+                className="flex flex-col justify-between gap-4 rounded-3xl border-2 border-[var(--border-strong)] bg-[var(--surface-card)] p-6 shadow-brutal-sm transition-shadow duration-200 hover:shadow-brutal-md motion-reduce:transition-none"
               >
                 <div className="space-y-3">
                   <div className="flex items-start justify-between gap-3">
@@ -161,13 +160,13 @@ export default function RegistrationsClient({ slug }: RegistrationsClientProps) 
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 gap-2 text-xs text-[var(--ink-soft)] sm:grid-cols-2">
+                  <div className="grid grid-cols-1 gap-x-4 gap-y-2 rounded-2xl border-2 border-[var(--border-soft)] bg-[var(--surface-tile)] p-3.5 text-xs text-[var(--text-secondary)] sm:grid-cols-2">
                     <div className="flex items-center gap-1.5">
-                      <Clock aria-hidden="true" className="h-3.5 w-3.5 shrink-0 text-[var(--primary)]" />
+                      <Clock aria-hidden="true" className="h-3.5 w-3.5 shrink-0 text-[var(--accent-strong)]" />
                       <span className="truncate">{formatTime(ev?.startAt) || t.noTime}</span>
                     </div>
                     <div className="flex items-center gap-1.5">
-                      <MapPin aria-hidden="true" className="h-3.5 w-3.5 shrink-0 text-[var(--secondary)]" />
+                      <MapPin aria-hidden="true" className="h-3.5 w-3.5 shrink-0 text-[var(--accent-strong)]" />
                       <span className="truncate">{ev?.location || t.noLocation}</span>
                     </div>
                   </div>
@@ -177,15 +176,15 @@ export default function RegistrationsClient({ slug }: RegistrationsClientProps) 
                   </p>
                 </div>
 
-                <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--line)] pt-3 text-xs">
-                  <span className="flex items-center gap-1.5 text-[var(--ink-soft)]">
-                    <Calendar aria-hidden="true" className="h-3.5 w-3.5 text-[var(--primary)]" />
+                <div className="flex flex-wrap items-center justify-between gap-3 border-t-2 border-dashed border-[var(--border-soft)] pt-3 text-xs">
+                  <span className="flex items-center gap-1.5 text-[var(--text-secondary)]">
+                    <Calendar aria-hidden="true" className="h-3.5 w-3.5 text-[var(--accent-strong)]" />
                     {t.registeredOn(formatFullDate(reg.registeredAt) || '—')}
                   </span>
                   <div className="flex items-center gap-2">
                     <Link
                       href={`/college/${slug}/events/${reg.eventId}`}
-                      className="inline-flex min-h-9 items-center gap-1.5 rounded-lg px-3 text-xs font-bold text-[var(--primary)] underline-offset-2 transition-colors hover:bg-[var(--primary-soft)] hover:underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-[var(--primary)] motion-reduce:transition-none"
+                      className="inline-flex min-h-9 items-center gap-1.5 rounded-lg px-3 text-xs font-bold text-[var(--accent-strong)] underline-offset-2 transition-colors hover:bg-[var(--accent-soft)] hover:underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] motion-reduce:transition-none"
                     >
                       {t.details}
                       <ArrowRight aria-hidden="true" className="h-3.5 w-3.5" />

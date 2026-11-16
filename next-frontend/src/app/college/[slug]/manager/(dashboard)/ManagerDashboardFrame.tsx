@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useState } from 'react';
+import { createContext, useContext, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { CalendarPlus, Building2 } from 'lucide-react';
 import RoleGuard from '@/components/dashboard/RoleGuard';
@@ -36,6 +36,13 @@ export default function ManagerDashboardFrame({ slug, children }: ManagerDashboa
   const router = useRouter();
   const [pickerOpen, setPickerOpen] = useState(false);
   const [noClubsOpen, setNoClubsOpen] = useState(false);
+
+  // Permanently enforce light theme across the Manager Dashboard
+  useEffect(() => {
+    document.documentElement.classList.remove('dark');
+    document.documentElement.classList.add('light');
+    document.documentElement.style.colorScheme = 'light';
+  }, []);
 
   const { data: myClubs = [] } = useMyClubsQuery(slug);
 

@@ -8,6 +8,9 @@ import {
   ArrowLeft,
   Building2,
   Calendar,
+  CalendarPlus,
+  Clock,
+  ExternalLink,
   Image as ImageIcon,
   MapPin,
   Pencil,
@@ -28,16 +31,15 @@ import {
 } from '@/lib/api/manager';
 import { queryKeys } from '@/lib/api/queryKeys';
 import type { Event } from '@/types/models';
-import PageHeader from '@/components/dashboard/ui/PageHeader';
 import DashboardCard from '@/components/dashboard/ui/DashboardCard';
 import DashboardButton from '@/components/dashboard/ui/DashboardButton';
 import Chip from '@/components/dashboard/ui/Chip';
 import EmptyState from '@/components/dashboard/ui/EmptyState';
-import { Select } from '@/components/dashboard/ui/Field';
-import { SkeletonLines } from '@/components/dashboard/ui/Skeleton';
+import { SkeletonCard, SkeletonLines } from '@/components/dashboard/ui/Skeleton';
 import ConfirmDialog from '@/components/dashboard/ui/ConfirmDialog';
+import Field, { Input, Textarea } from '@/components/dashboard/ui/Field';
 import { useToast } from '@/components/dashboard/ui/Toast';
-import { actions, emptyStates, eventManager } from '@/lib/copy';
+import { actions, emptyStates, eventManager, roleNames } from '@/lib/copy';
 
 export interface ClubDetailClientProps {
   slug: string;
@@ -71,9 +73,8 @@ function formatEventTime(dateStr?: string) {
 
 /**
  * Event Manager club detail: identity banner, club media & branding (cover +
- * logo upload with named confirmations), inline info editing, members grid,
- * and the club's events with a status filter. Presentation moved to the new
- * UI system; same manager API hooks as before.
+ * logo upload with named confirmations), inline info editing, members list,
+ * and the club's events with status filter tabs.
  */
 export default function ClubDetailClient({ slug, clubId }: ClubDetailClientProps) {
   const t = eventManager.clubDetail;
@@ -220,6 +221,10 @@ export default function ClubDetailClient({ slug, clubId }: ClubDetailClientProps
 
   const memberCount = club?.members?.length ?? club?.memberCount ?? club?._count?.members ?? 0;
 
+  const upcomingCount = events.filter((e) => e.status === 'UPCOMING' || e.status === 'ONGOING').length;
+  const completedCount = events.filter((e) => e.status === 'COMPLETED').length;
+  const cancelledCount = events.filter((e) => e.status === 'CANCELLED').length;
+
   const filteredEvents = events.filter((evt) => {
     if (statusFilter === 'UPCOMING_ONGOING') {
       return evt.status === 'UPCOMING' || evt.status === 'ONGOING';
@@ -283,35 +288,67 @@ export default function ClubDetailClient({ slug, clubId }: ClubDetailClientProps
 
   return (
     <div className="space-y-10">
-      {/* Back */}
-      <Link
-        href={`/college/${slug}/manager/clubs`}
-        className="inline-flex min-h-9 items-center gap-2 rounded-lg px-2 text-xs font-semibold text-[var(--ink-soft)] underline-offset-2 transition-colors hover:text-[var(--ink)] hover:underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-[var(--primary)] motion-reduce:transition-none"
-      >
-        <ArrowLeft aria-hidden="true" className="h-4 w-4" />
-        {t.back}
-      </Link>
+      {/* Back button */}
+      <div>
+        <Link
+          href={`/college/${slug}/manager/clubs`}
+          className="inline-flex min-h-9 items-center gap-2 rounded-lg px-2 text-xs font-semibold text-[var(--ink-soft)] underline-offset-2 transition-colors hover:text-[var(--ink)] hover:underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-[var(--primary)] motion-reduce:transition-none"
+        >
+          <ArrowLeft aria-hidden="true" className="h-4 w-4" />
+          <span>{t.back}</span>
+        </Link>
+      </div>
 
-      <PageHeader
-        role="eventManager"
-        title={club.name}
-        description={club.description || t.noDescription}
-        actions={
-          <>
-            <DashboardButton variant="secondary" size="sm" onClick={() => void handleRefresh()} leftIcon={<RefreshCw aria-hidden="true" className="h-4 w-4" />}>
-              {em.refresh}
-            </DashboardButton>
-            <DashboardButton variant="secondary" size="sm" onClick={handleToggleEditInfo}>
-              <Pencil aria-hidden="true" className="h-4 w-4" />
-              {isEditingInfo ? t.cancelEdit : t.edit}
-            </DashboardButton>
-            <DashboardButton variant="primary" size="sm" onClick={handleCreateEvent}>
-              <Plus aria-hidden="true" className="h-4 w-4" />
-              {t.createEvent}
-            </DashboardButton>
-          </>
-        }
-      />
+      {/* Header */}
+      <header className="flex flex-col gap-5 border-b border-[var(--line)] pb-8 sm:flex-row sm:items-end sm:justify-between">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2 mb-2.5">
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--primary)]/20 bg-[var(--primary-soft)] px-3 py-1 text-xs font-bold uppercase tracking-wider text-[var(--primary)]">
+              <span className="h-1.5 w-1.5 rounded-full bg-[var(--primary)]" aria-hidden="true" />
+              {roleNames.eventManager}
+            </span>
+            {slug && (
+              <span className="inline-flex items-center rounded-full border border-[var(--line)] bg-[var(--surface)] px-2.5 py-1 text-xs font-semibold text-[var(--ink-soft)] uppercase tracking-wider">
+                {slug.toUpperCase()}
+              </span>
+            )}
+          </div>
+
+          <h1 className="font-display text-2xl font-bold tracking-tight text-[var(--ink)] sm:text-3xl lg:text-4xl">
+            {club.name}
+          </h1>
+          <p className="mt-2 max-w-2xl text-xs text-[var(--ink-soft)] sm:text-sm">
+            {club.description || t.noDescription}
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+          <DashboardButton
+            variant="secondary"
+            size="sm"
+            onClick={() => void handleRefresh()}
+            leftIcon={<RefreshCw aria-hidden="true" className="h-4 w-4" />}
+          >
+            {em.refresh}
+          </DashboardButton>
+          <DashboardButton
+            variant="secondary"
+            size="sm"
+            onClick={handleToggleEditInfo}
+            leftIcon={<Pencil aria-hidden="true" className="h-4 w-4" />}
+          >
+            {isEditingInfo ? t.cancelEdit : t.edit}
+          </DashboardButton>
+          <DashboardButton
+            variant="primary"
+            size="sm"
+            onClick={handleCreateEvent}
+            leftIcon={<Plus aria-hidden="true" className="h-4 w-4" />}
+          >
+            {t.createEvent}
+          </DashboardButton>
+        </div>
+      </header>
 
       {/* Club media & branding */}
       <DashboardCard>
@@ -326,47 +363,54 @@ export default function ClubDetailClient({ slug, clubId }: ClubDetailClientProps
             <img
               src={club.coverImageUrl || club.coverUrl || club.coverImage?.url || ''}
               alt={club.name}
-              className="h-40 w-full object-cover sm:h-48"
+              className="h-40 w-full object-cover sm:h-52"
             />
           ) : (
-            <div className="flex h-40 items-center justify-center bg-gradient-to-br from-[var(--primary-soft)] via-[var(--surface)] to-[var(--bg)] sm:h-48">
-              <Building2 aria-hidden="true" className="h-10 w-10 text-[var(--ink-soft)]" />
+            <div className="flex h-40 items-center justify-center bg-gradient-to-br from-[var(--primary-soft)] via-[var(--surface)] to-[var(--bg)] sm:h-52">
+              <Building2 aria-hidden="true" className="h-10 w-10 text-[var(--ink-soft)]/30" />
             </div>
           )}
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/85 via-black/45 to-black/10" />
           <div className="absolute right-4 top-4 z-10 flex flex-wrap gap-2">
-            <Chip variant="neutral">
-              {memberCount} {memberCount === 1 ? 'member' : 'members'}
-            </Chip>
-            <Chip variant="brand">{club.category || club.clubType || 'Student Club'}</Chip>
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-black/60 backdrop-blur-xs px-3 py-1 text-xs font-semibold text-white">
+              <Users className="h-3.5 w-3.5 text-white/80" />
+              <span>{memberCount} {memberCount === 1 ? 'member' : 'members'}</span>
+            </span>
+            <span className="inline-flex items-center rounded-full border border-white/20 bg-black/60 backdrop-blur-xs px-3 py-1 text-xs font-semibold text-white">
+              {club.category || club.clubType || 'Student Club'}
+            </span>
           </div>
           <div className="absolute bottom-4 left-4 z-10 flex items-center gap-3">
             {club.logo?.url || club.logoUrl ? (
               <img
                 src={club.logo?.url || club.logoUrl || ''}
                 alt={`${club.name} logo`}
-                className="h-14 w-14 rounded-2xl border-4 border-white/60 bg-[var(--surface)] object-cover"
+                className="h-14 w-14 rounded-2xl border-4 border-white/80 bg-[var(--surface)] object-cover shadow-md"
               />
             ) : (
               <span
                 aria-hidden="true"
-                className="grid h-14 w-14 place-items-center rounded-2xl border-4 border-white/60 bg-[var(--surface)] font-display text-base font-bold text-[var(--primary)]"
+                className="grid h-14 w-14 place-items-center rounded-2xl border-4 border-white/80 bg-[var(--surface)] font-display text-lg font-bold text-[var(--primary)] shadow-md"
               >
                 {club.name?.charAt(0).toUpperCase()}
               </span>
             )}
+            <div className="text-white drop-shadow-sm">
+              <p className="font-display text-base font-bold sm:text-lg">{club.name}</p>
+              <p className="text-xs text-white/80">{roleNames.eventManager}</p>
+            </div>
           </div>
         </div>
 
-        {/* Cover + logo management */}
+        {/* Cover + logo management controls */}
         <div className="mt-6 grid grid-cols-1 gap-6 md:grid-cols-2">
-          {/* Cover */}
-          <div className="rounded-2xl border border-[var(--line)] bg-[var(--bg)] p-5">
-            <h3 className="flex items-center gap-2 text-xs font-black uppercase tracking-wider text-[var(--ink)]">
+          {/* Cover Photo */}
+          <div className="rounded-2xl border border-[var(--line)] bg-[var(--bg)]/50 p-5">
+            <h3 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[var(--ink)]">
               <ImageIcon aria-hidden="true" className="h-4 w-4 text-[var(--primary)]" />
-              {t.coverTitle}
+              <span>{t.coverTitle}</span>
             </h3>
-            <p className="mt-1 text-xs font-medium leading-relaxed text-[var(--ink-soft)]">{t.coverHint}</p>
+            <p className="mt-1 text-xs leading-relaxed text-[var(--ink-soft)]">{t.coverHint}</p>
             <div className="mt-4 flex flex-wrap items-center gap-3">
               <DashboardButton
                 variant="primary"
@@ -403,12 +447,12 @@ export default function ClubDetailClient({ slug, clubId }: ClubDetailClientProps
           </div>
 
           {/* Logo */}
-          <div className="rounded-2xl border border-[var(--line)] bg-[var(--bg)] p-5">
-            <h3 className="flex items-center gap-2 text-xs font-black uppercase tracking-wider text-[var(--ink)]">
+          <div className="rounded-2xl border border-[var(--line)] bg-[var(--bg)]/50 p-5">
+            <h3 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[var(--ink)]">
               <Building2 aria-hidden="true" className="h-4 w-4 text-[var(--primary)]" />
-              {t.logoTitle}
+              <span>{t.logoTitle}</span>
             </h3>
-            <p className="mt-1 text-xs font-medium leading-relaxed text-[var(--ink-soft)]">{t.logoHint}</p>
+            <p className="mt-1 text-xs leading-relaxed text-[var(--ink-soft)]">{t.logoHint}</p>
             <div className="mt-4 flex flex-wrap items-center gap-3">
               <DashboardButton
                 variant="primary"
@@ -448,47 +492,39 @@ export default function ClubDetailClient({ slug, clubId }: ClubDetailClientProps
         {/* Edit info form */}
         {isEditingInfo && (
           <form onSubmit={(e) => void handleUpdateClubInfo(e)} className="mt-6 space-y-4 border-t border-[var(--line)] pt-5">
-            <h3 className="font-display text-base font-bold text-[var(--ink)]">{t.editTitle}</h3>
+            <h3 className="font-display text-sm font-bold text-[var(--ink)]">{t.editTitle}</h3>
 
             {clubFormError && (
-              <p role="alert" className="rounded-xl border border-[var(--secondary)]/40 bg-[var(--secondary-soft)] px-4 py-3 text-xs font-medium text-[var(--secondary)]">
+              <p role="alert" className="rounded-xl border border-[var(--secondary)]/40 bg-[var(--secondary-soft)] px-4 py-2.5 text-xs font-medium text-[var(--secondary)]">
                 {clubFormError}
               </p>
             )}
 
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div className="space-y-1.5">
-                <label htmlFor="club-name" className="block text-xs font-bold uppercase tracking-wider text-[var(--ink-soft)]">
-                  {t.formName}
-                </label>
-                <input
-                  id="club-name"
-                  type="text"
-                  value={clubName}
-                  onChange={(e) => setClubName(e.target.value)}
-                  className="min-h-11 w-full rounded-xl border border-[var(--line)] bg-[var(--surface)] px-3.5 text-sm text-[var(--ink)] focus-visible:outline-hidden focus-visible:border-[var(--primary)] focus-visible:ring-2 focus-visible:ring-[var(--primary)]/30"
-                  required
-                />
-              </div>
-              <div className="space-y-1.5">
-                <label htmlFor="club-description" className="block text-xs font-bold uppercase tracking-wider text-[var(--ink-soft)]">
-                  {t.formDescription}
-                </label>
-                <textarea
-                  id="club-description"
-                  rows={4}
-                  value={clubDescription}
-                  onChange={(e) => setClubDescription(e.target.value)}
-                  className="min-h-24 w-full rounded-xl border border-[var(--line)] bg-[var(--surface)] px-3.5 py-2.5 text-sm text-[var(--ink)] focus-visible:outline-hidden focus-visible:border-[var(--primary)] focus-visible:ring-2 focus-visible:ring-[var(--primary)]/30"
-                />
-              </div>
-            </div>
+            <Field label={t.formName} htmlFor="club-name" required>
+              <Input
+                id="club-name"
+                type="text"
+                value={clubName}
+                onChange={(e) => setClubName(e.target.value)}
+                required
+              />
+            </Field>
 
-            <div className="flex justify-end gap-3 border-t border-[var(--line)] pt-4">
+            <Field label={t.formDescription} htmlFor="club-description">
+              <Textarea
+                id="club-description"
+                rows={3}
+                value={clubDescription}
+                onChange={(e) => setClubDescription(e.target.value)}
+                placeholder="Club mission and student activities..."
+              />
+            </Field>
+
+            <div className="flex justify-end gap-3 pt-2">
               <DashboardButton variant="secondary" size="sm" onClick={() => setIsEditingInfo(false)}>
                 {t.cancelEdit}
               </DashboardButton>
-              <DashboardButton variant="primary" size="sm" type="submit" loading={updateClubMutation.isPending}>
+              <DashboardButton type="submit" variant="primary" size="sm" loading={updateClubMutation.isPending}>
                 {t.save}
               </DashboardButton>
             </div>
@@ -496,13 +532,13 @@ export default function ClubDetailClient({ slug, clubId }: ClubDetailClientProps
         )}
       </DashboardCard>
 
-      {/* Members */}
-      <DashboardCard className="mt-6">
+      {/* Members Section */}
+      <DashboardCard>
         <div className="flex flex-col gap-3 border-b border-[var(--line)] pb-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="flex items-center gap-2 font-display text-base font-bold text-[var(--ink)]">
               <Users aria-hidden="true" className="h-4 w-4 text-[var(--primary)]" />
-              {t.membersTitle}
+              <span>{t.membersTitle}</span>
             </h2>
             <p className="mt-0.5 text-xs text-[var(--ink-soft)]">{t.membersHint}</p>
           </div>
@@ -521,7 +557,7 @@ export default function ClubDetailClient({ slug, clubId }: ClubDetailClientProps
               return (
                 <li
                   key={member.id || email}
-                  className="flex items-center justify-between gap-3 rounded-2xl border border-[var(--line)] bg-[var(--bg)] p-4"
+                  className="flex items-center justify-between gap-3 rounded-2xl border border-[var(--line)] bg-[var(--bg)]/50 p-4 transition-colors hover:border-[var(--primary)]"
                 >
                   <div className="flex min-w-0 items-center gap-3">
                     <span
@@ -541,7 +577,9 @@ export default function ClubDetailClient({ slug, clubId }: ClubDetailClientProps
                       <p className="truncate text-[11px] text-[var(--ink-soft)]">{email}</p>
                     </div>
                   </div>
-                  <Chip variant={isManager ? 'brand' : 'neutral'}>{isManager ? t.memberManager : t.memberMember}</Chip>
+                  <Chip variant={isManager ? 'brand' : 'neutral'}>
+                    {isManager ? t.memberManager : t.memberMember}
+                  </Chip>
                 </li>
               );
             })}
@@ -553,34 +591,64 @@ export default function ClubDetailClient({ slug, clubId }: ClubDetailClientProps
         )}
       </DashboardCard>
 
-      {/* Events */}
-      <DashboardCard className="mt-6">
-        <div className="flex flex-col gap-3 border-b border-[var(--line)] pb-4 sm:flex-row sm:items-end sm:justify-between">
+      {/* Events Section with Filter Tabs */}
+      <DashboardCard>
+        <div className="flex flex-col gap-4 border-b border-[var(--line)] pb-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <h2 className="flex items-center gap-2 font-display text-base font-bold text-[var(--ink)]">
               <Calendar aria-hidden="true" className="h-4 w-4 text-[var(--primary)]" />
-              {t.eventsTitle}
+              <span>{t.eventsTitle}</span>
             </h2>
             <p className="mt-0.5 text-xs text-[var(--ink-soft)]">{t.eventsHint}</p>
           </div>
-          <div className="sm:self-end">
-            <Select
+
+          {events.length > 0 && (
+            <div
+              role="tablist"
               aria-label="Filter events by status"
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as EventStatusFilter)}
-              className="w-full sm:w-56"
+              className="flex flex-wrap items-center gap-1 rounded-2xl border border-[var(--line)] bg-[var(--bg)] p-1 shadow-xs"
             >
-              <option value="ALL">{t.statusAll}</option>
-              <option value="UPCOMING_ONGOING">{t.statusUpcoming}</option>
-              <option value="COMPLETED">{t.statusCompleted}</option>
-              <option value="CANCELLED">{t.statusCancelled}</option>
-            </Select>
-          </div>
+              {[
+                { key: 'ALL' as const, label: t.statusAll, count: events.length },
+                { key: 'UPCOMING_ONGOING' as const, label: t.statusUpcoming, count: upcomingCount },
+                { key: 'COMPLETED' as const, label: t.statusCompleted, count: completedCount },
+                { key: 'CANCELLED' as const, label: t.statusCancelled, count: cancelledCount },
+              ].map((tab) => {
+                const isActive = statusFilter === tab.key;
+                return (
+                  <button
+                    key={tab.key}
+                    type="button"
+                    role="tab"
+                    aria-selected={isActive}
+                    onClick={() => setStatusFilter(tab.key)}
+                    className={`inline-flex min-h-9 items-center gap-1.5 rounded-xl px-3 text-xs font-semibold transition-colors duration-150 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-[var(--primary)] ${
+                      isActive
+                        ? 'bg-[var(--surface)] text-[var(--ink)] shadow-xs font-bold'
+                        : 'text-[var(--ink-soft)] hover:text-[var(--ink)]'
+                    }`}
+                  >
+                    <span>{tab.label}</span>
+                    <span
+                      className={`rounded-full px-1.5 py-0.2 text-[10px] font-bold ${
+                        isActive
+                          ? 'bg-[var(--primary-soft)] text-[var(--primary)]'
+                          : 'bg-[var(--line)]/50 text-[var(--ink-soft)]'
+                      }`}
+                    >
+                      {tab.count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {eventsLoading ? (
-          <div className="mt-4">
-            <SkeletonLines count={3} />
+          <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <SkeletonCard />
+            <SkeletonCard />
           </div>
         ) : eventsIsError ? (
           <div className="mt-4">
@@ -603,59 +671,86 @@ export default function ClubDetailClient({ slug, clubId }: ClubDetailClientProps
             />
           </div>
         ) : (
-          <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <div className="mt-4 grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
             {filteredEvents.map((evt) => (
-              <Link
+              <article
                 key={evt.id}
-                href={`/college/${slug}/manager/clubs/${clubId}/events/${evt.id}`}
-                className="group flex flex-col overflow-hidden rounded-3xl border border-[var(--line)] bg-[var(--surface)] transition-colors duration-150 motion-reduce:transition-none hover:border-[var(--primary)] focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-[var(--primary)]"
+                className="group flex flex-col justify-between overflow-hidden rounded-3xl border border-[var(--line)] bg-[var(--surface)] shadow-sm transition-colors duration-150 motion-reduce:transition-none hover:border-[var(--primary)]"
               >
-                <div className="relative h-40 w-full overflow-hidden">
-                  {evt.coverImage?.url || evt.coverUrl ? (
-                    <img
-                      src={evt.coverImage?.url || evt.coverUrl || ''}
-                      alt={evt.title}
-                      className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-                    />
-                  ) : (
-                    <div className="flex h-full items-center justify-center bg-[var(--bg)] p-4">
-                      <Calendar aria-hidden="true" className="h-8 w-8 text-[var(--ink-soft)]" />
-                    </div>
-                  )}
-                  <div className="absolute right-3 top-3">{statusChip(evt.status)}</div>
-                </div>
-                <div className="flex flex-1 flex-col p-5">
-                  <h3 className="line-clamp-1 font-display text-base font-bold text-[var(--ink)] group-hover:text-[var(--primary)]">
-                    {evt.title}
-                  </h3>
-                  <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-[var(--ink-soft)]">{evt.description}</p>
-                  <div className="mt-4 space-y-1.5 border-t border-[var(--line)] pt-3 text-xs text-[var(--ink-soft)]">
-                    <div className="flex items-center gap-2">
-                      <Calendar aria-hidden="true" className="h-3.5 w-3.5 shrink-0 text-[var(--primary)]" />
-                      <span>
-                        {formatEventDate(evt.startAt)}
-                        {formatEventTime(evt.startAt) ? ` • ${formatEventTime(evt.startAt)}` : ''}
-                      </span>
-                    </div>
-                    {evt.location && (
-                      <div className="flex items-center gap-2">
-                        <MapPin aria-hidden="true" className="h-3.5 w-3.5 shrink-0 text-[var(--secondary)]" />
-                        <span className="truncate">{evt.location}</span>
+                <div>
+                  <div className="relative h-40 w-full overflow-hidden bg-[var(--bg)]">
+                    {evt.coverImage?.url || evt.coverUrl ? (
+                      <img
+                        src={evt.coverImage?.url || evt.coverUrl || ''}
+                        alt={evt.title}
+                        className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                      />
+                    ) : (
+                      <div className="flex h-full items-center justify-center bg-gradient-to-br from-[var(--primary-soft)]/50 to-[var(--bg)] p-4">
+                        <Calendar aria-hidden="true" className="h-8 w-8 text-[var(--ink-soft)]/30" />
                       </div>
                     )}
+                    <div className="absolute right-3 top-3">{statusChip(evt.status)}</div>
+                  </div>
+
+                  <div className="flex flex-1 flex-col p-5">
+                    <h3 className="line-clamp-1 font-display text-base font-bold text-[var(--ink)] group-hover:text-[var(--primary)]">
+                      {evt.title}
+                    </h3>
+                    <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-[var(--ink-soft)]">
+                      {evt.description || em.noDescription}
+                    </p>
+
+                    <div className="mt-4 space-y-1.5 border-t border-[var(--line)] pt-3 text-xs text-[var(--ink-soft)]">
+                      <div className="flex items-center gap-2">
+                        <Calendar aria-hidden="true" className="h-3.5 w-3.5 shrink-0 text-[var(--primary)]" />
+                        <span>
+                          {formatEventDate(evt.startAt)}
+                          {formatEventTime(evt.startAt) ? ` • ${formatEventTime(evt.startAt)}` : ''}
+                        </span>
+                      </div>
+                      {evt.location && (
+                        <div className="flex items-center gap-2">
+                          <MapPin aria-hidden="true" className="h-3.5 w-3.5 shrink-0 text-[var(--secondary)]" />
+                          <span className="truncate">{evt.location}</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </Link>
+
+                <div className="flex items-center justify-between gap-2 border-t border-[var(--line)] p-4 pt-3">
+                  <Link
+                    href={`/college/${slug}/manager/clubs/${clubId}/events/${evt.id}`}
+                    className="inline-flex min-h-11 items-center gap-1.5 rounded-xl border border-[var(--line)] bg-[var(--surface)] px-3 text-xs font-semibold text-[var(--ink)] transition-colors hover:border-[var(--primary)] focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-[var(--primary)]"
+                  >
+                    <Pencil aria-hidden="true" className="h-3.5 w-3.5" />
+                    <span>{em.manageEvent}</span>
+                  </Link>
+                  <Link
+                    href={`/college/${slug}/events/${evt.id}`}
+                    className="inline-flex min-h-11 items-center gap-1.5 rounded-xl px-3 text-xs font-semibold text-[var(--primary)] transition-colors hover:bg-[var(--primary-soft)] focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-[var(--primary)]"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <span>{em.publicEventPage}</span>
+                    <ExternalLink aria-hidden="true" className="h-3.5 w-3.5" />
+                  </Link>
+                </div>
+              </article>
             ))}
           </div>
         )}
       </DashboardCard>
 
-      {/* Delete confirmations (irreversible — name the object + consequence) */}
+      {/* Confirmation Modals */}
       <ConfirmDialog
         open={logoConfirmOpen}
         onClose={() => setLogoConfirmOpen(false)}
-        onConfirm={() => void handleLogoDelete()}
+        onConfirm={() => {
+          setLogoConfirmOpen(false);
+          void handleLogoDelete();
+        }}
         title={t.removeLogoTitle(club.name)}
         confirmLabel={t.removeLogo}
         variant="danger"
@@ -667,7 +762,10 @@ export default function ClubDetailClient({ slug, clubId }: ClubDetailClientProps
       <ConfirmDialog
         open={coverConfirmOpen}
         onClose={() => setCoverConfirmOpen(false)}
-        onConfirm={() => void handleCoverDelete()}
+        onConfirm={() => {
+          setCoverConfirmOpen(false);
+          void handleCoverDelete();
+        }}
         title={t.removeCoverTitle(club.name)}
         confirmLabel={t.removeCover}
         variant="danger"

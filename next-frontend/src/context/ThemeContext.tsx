@@ -43,7 +43,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     try {
       localStorage.setItem('yuva_theme', theme);
-      localStorage.setItem('yuva_manager_theme', theme);
+      localStorage.removeItem('yuva_manager_theme');
     } catch {
       // Ignore
     }

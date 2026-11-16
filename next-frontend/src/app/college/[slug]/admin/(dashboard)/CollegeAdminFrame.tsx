@@ -34,6 +34,7 @@ export default function CollegeAdminFrame({
         <DashboardShell
           role="collegeAdmin"
           slug={slug}
+          collegeName={slug ? slug.toUpperCase() : undefined}
           secondaryAction={{
             label: actions.inviteManager,
             icon: UserPlus,
