@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import { Compass, Menu, X, ArrowUpRight, LogIn, Sun, Moon, UserCheck } from 'lucide-react';
 import { useTheme } from '@/context/ThemeContext';
 import { useAuth } from '@/context/AuthContext';
+import BrandLogo from '@/components/BrandLogo';
 
 export interface PublicNavbarProps {
   collegeSlug?: string;
@@ -19,6 +20,11 @@ export function PublicNavbar({ collegeSlug, collegeName }: PublicNavbarProps) {
   const { isDark, toggleTheme } = useTheme();
   const { user, isAuthenticated } = useAuth();
 
+  // College pages (collegeSlug present) render the single-theme campus chrome
+  // with no theme toggle. Marketing surfaces (e.g. /directory) keep the
+  // original theme-aware chrome and its toggle.
+  const campus = Boolean(collegeSlug);
+
   useEffect(() => {
     const handleScroll = () => {
       setIsScrolled(window.scrollY > 20);
@@ -26,6 +32,18 @@ export function PublicNavbar({ collegeSlug, collegeName }: PublicNavbarProps) {
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
+
+  // Keyboard-operable mobile menu: Escape closes and returns focus to the toggle.
+  useEffect(() => {
+    if (!mobileMenuOpen) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setMobileMenuOpen(false);
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [mobileMenuOpen]);
 
   // Compute canonical navigation URLs based on whether we are on a direct /college/[slug] path or subdomain
   const getPath = (subPath: string) => {
@@ -43,6 +61,210 @@ export function PublicNavbar({ collegeSlug, collegeName }: PublicNavbarProps) {
   const studentHref = getPath('/student');
   const managerHref = getPath('/manager');
 
+  const scrollToEvents = (event: React.MouseEvent) => {
+    if (pathname === homeHref || pathname === '/') {
+      event.preventDefault();
+      document.getElementById('upcoming-events')?.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
+  /* ================================================================== */
+  /* Campus chrome (college pages) — single light theme, no toggle       */
+  /* ================================================================== */
+  if (campus) {
+    const desktopLink = (active: boolean) =>
+      `inline-flex h-11 items-center text-sm font-semibold transition-colors ${
+        active
+          ? 'font-bold text-[var(--accent-strong)]'
+          : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+      }`;
+
+    const portalLink = (active: boolean) =>
+      `inline-flex h-11 items-center gap-1.5 rounded-xl border-2 px-4 text-xs font-bold uppercase tracking-wider transition-colors ${
+        active
+          ? 'border-[var(--border-strong)] bg-[var(--surface-inverse)] text-[var(--text-inverse)]'
+          : 'border-[var(--border-strong)] bg-[var(--surface-card)] text-[var(--text-primary)] hover:bg-[var(--surface-tile)]'
+      }`;
+
+    return (
+      <header
+        className={`fixed left-0 right-0 top-0 z-50 border-b bg-[var(--surface-page)] transition-all duration-300 ${
+          isScrolled ? 'border-[var(--border-strong)] py-3 shadow-brutal-xs' : 'border-transparent py-5'
+        }`}
+      >
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between">
+            {/* Logo */}
+            <Link href={homeHref} className="group flex items-center gap-2.5">
+              <BrandLogo size="md" className="text-[var(--text-primary)]" />
+              <span aria-hidden className="hidden h-4 w-px bg-[var(--border-strong)] sm:inline-block" />
+              {collegeName && (
+                <span className="hidden font-display text-xs font-bold uppercase tracking-wide text-[var(--text-secondary)] sm:inline">
+                  {collegeName}
+                </span>
+              )}
+            </Link>
+
+            {/* Desktop Nav Links */}
+            <nav className="hidden items-center gap-6 md:flex" aria-label="College">
+              <Link href={homeHref} className={desktopLink(pathname === homeHref || pathname === '/')}>
+                Home
+              </Link>
+
+              <a href={eventsHref} onClick={scrollToEvents} className={desktopLink(false)}>
+                Events
+              </a>
+
+              <Link href={clubsHref} className={desktopLink(pathname.includes('/clubs'))}>
+                Clubs Directory
+              </Link>
+
+              <Link href={departmentsHref} className={desktopLink(pathname.includes('/departments'))}>
+                Departments
+              </Link>
+            </nav>
+
+            {/* Right Actions & Portal Links */}
+            <div className="hidden items-center gap-3 md:flex">
+              {isAuthenticated && (user?.role === 'MANAGER' || user?.role === 'COLLEGE_ADMIN') ? (
+                <Link href={managerHref} className={portalLink(pathname.includes('/manager'))}>
+                  <UserCheck className="h-3.5 w-3.5" aria-hidden />
+                  <span>Manager Portal</span>
+                </Link>
+              ) : isAuthenticated && user?.role === 'USER' ? (
+                <Link href={studentHref} className={portalLink(pathname.includes('/student'))}>
+                  <UserCheck className="h-3.5 w-3.5" aria-hidden />
+                  <span>Student Portal</span>
+                </Link>
+              ) : (
+                <Link href={loginHref} className={portalLink(false)}>
+                  <LogIn className="h-3.5 w-3.5" aria-hidden />
+                  <span>Portal Login</span>
+                </Link>
+              )}
+
+              <Link
+                href={clubsHref}
+                className="inline-flex h-11 items-center gap-2 rounded-xl bg-[var(--accent-strong)] px-5 text-sm font-bold text-white transition-transform hover:-translate-y-0.5"
+              >
+                <Compass className="h-4 w-4" aria-hidden />
+                <span>Explore Clubs</span>
+                <ArrowUpRight className="h-4 w-4" aria-hidden />
+              </Link>
+            </div>
+
+            {/* Mobile Hamburger Toggle */}
+            <div className="flex items-center gap-2 md:hidden">
+              <button
+                type="button"
+                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                aria-expanded={mobileMenuOpen}
+                aria-controls="campus-mobile-menu"
+                className="grid h-11 w-11 place-items-center rounded-xl border-2 border-[var(--border-strong)] bg-[var(--surface-card)] text-[var(--text-primary)] transition-colors hover:bg-[var(--surface-tile)]"
+              >
+                <span className="sr-only">{mobileMenuOpen ? 'Close menu' : 'Open menu'}</span>
+                {mobileMenuOpen ? <X className="h-6 w-6" aria-hidden /> : <Menu className="h-6 w-6" aria-hidden />}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Mobile Drawer Menu */}
+        {mobileMenuOpen && (
+          <div
+            id="campus-mobile-menu"
+            className="border-b-2 border-[var(--border-strong)] bg-[var(--surface-page)] md:hidden"
+          >
+            <div className="flex flex-col gap-1 px-4 pb-6 pt-4">
+              <Link
+                href={homeHref}
+                onClick={() => setMobileMenuOpen(false)}
+                className={`flex min-h-11 items-center rounded-lg px-3 text-sm font-semibold transition-colors ${
+                  pathname === homeHref || pathname === '/'
+                    ? 'bg-[var(--surface-tile)] font-bold text-[var(--accent-strong)]'
+                    : 'text-[var(--text-secondary)] hover:bg-[var(--surface-tile)] hover:text-[var(--text-primary)]'
+                }`}
+              >
+                Home
+              </Link>
+              <a
+                href={eventsHref}
+                onClick={(e) => {
+                  setMobileMenuOpen(false);
+                  scrollToEvents(e);
+                }}
+                className="flex min-h-11 items-center rounded-lg px-3 text-sm font-semibold text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-tile)] hover:text-[var(--text-primary)]"
+              >
+                Events
+              </a>
+              <Link
+                href={clubsHref}
+                onClick={() => setMobileMenuOpen(false)}
+                className={`flex min-h-11 items-center rounded-lg px-3 text-sm font-semibold transition-colors ${
+                  pathname.includes('/clubs')
+                    ? 'bg-[var(--surface-tile)] font-bold text-[var(--accent-strong)]'
+                    : 'text-[var(--text-secondary)] hover:bg-[var(--surface-tile)] hover:text-[var(--text-primary)]'
+                }`}
+              >
+                Clubs Directory
+              </Link>
+              <Link
+                href={departmentsHref}
+                onClick={() => setMobileMenuOpen(false)}
+                className={`flex min-h-11 items-center rounded-lg px-3 text-sm font-semibold transition-colors ${
+                  pathname.includes('/departments')
+                    ? 'bg-[var(--surface-tile)] font-bold text-[var(--accent-strong)]'
+                    : 'text-[var(--text-secondary)] hover:bg-[var(--surface-tile)] hover:text-[var(--text-primary)]'
+                }`}
+              >
+                Departments
+              </Link>
+              {isAuthenticated && (user?.role === 'MANAGER' || user?.role === 'COLLEGE_ADMIN') ? (
+                <Link
+                  href={managerHref}
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="flex min-h-11 items-center rounded-lg px-3 text-sm font-semibold text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-tile)] hover:text-[var(--text-primary)]"
+                >
+                  Manager Portal
+                </Link>
+              ) : isAuthenticated && user?.role === 'USER' ? (
+                <Link
+                  href={studentHref}
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="flex min-h-11 items-center rounded-lg px-3 text-sm font-semibold text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-tile)] hover:text-[var(--text-primary)]"
+                >
+                  Student Portal
+                </Link>
+              ) : (
+                <Link
+                  href={loginHref}
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="flex min-h-11 items-center rounded-lg px-3 text-sm font-semibold text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-tile)] hover:text-[var(--text-primary)]"
+                >
+                  Portal Login
+                </Link>
+              )}
+
+              <div className="mt-2 border-t-2 border-dashed border-[var(--border-soft)] pt-3">
+                <Link
+                  href={clubsHref}
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[var(--accent-strong)] px-5 text-sm font-bold text-white transition-transform hover:-translate-y-0.5"
+                >
+                  <Compass className="h-4 w-4" aria-hidden />
+                  <span>Explore Clubs</span>
+                </Link>
+              </div>
+            </div>
+          </div>
+        )}
+      </header>
+    );
+  }
+
+  /* ================================================================== */
+  /* Marketing chrome (e.g. /directory) — original theme-aware look      */
+  /* ================================================================== */
   return (
     <header
       className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
@@ -103,12 +325,7 @@ export function PublicNavbar({ collegeSlug, collegeName }: PublicNavbarProps) {
 
             <a
               href={eventsHref}
-              onClick={(e) => {
-                if (pathname === homeHref || pathname === '/') {
-                  e.preventDefault();
-                  document.getElementById('upcoming-events')?.scrollIntoView({ behavior: 'smooth' });
-                }
-              }}
+              onClick={scrollToEvents}
               className={`transition-colors ${
                 isDark ? 'text-gray-300 hover:text-[#00F0FF]' : 'text-slate-600 hover:text-cyan-600'
               }`}
@@ -237,6 +454,8 @@ export function PublicNavbar({ collegeSlug, collegeName }: PublicNavbarProps) {
             <button
               type="button"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              aria-expanded={mobileMenuOpen}
+              aria-controls="marketing-mobile-menu"
               className={`p-2 rounded-xl border transition-colors ${
                 isDark
                   ? 'bg-white/5 border-white/10 text-white hover:bg-white/10'
@@ -253,6 +472,7 @@ export function PublicNavbar({ collegeSlug, collegeName }: PublicNavbarProps) {
       {/* Mobile Drawer Menu */}
       {mobileMenuOpen && (
         <div
+          id="marketing-mobile-menu"
           className={`md:hidden border-b overflow-hidden transition-all duration-300 animate-in fade-in slide-in-from-top-2 ${
             isDark ? 'bg-[#0F1117] border-white/10' : 'bg-white border-slate-200 shadow-xl'
           }`}
@@ -277,10 +497,7 @@ export function PublicNavbar({ collegeSlug, collegeName }: PublicNavbarProps) {
               href={eventsHref}
               onClick={(e) => {
                 setMobileMenuOpen(false);
-                if (pathname === homeHref || pathname === '/') {
-                  e.preventDefault();
-                  document.getElementById('upcoming-events')?.scrollIntoView({ behavior: 'smooth' });
-                }
+                scrollToEvents(e);
               }}
               className={`block py-2 px-3 rounded-lg font-semibold transition-colors ${
                 isDark
@@ -411,4 +628,3 @@ export function PublicNavbar({ collegeSlug, collegeName }: PublicNavbarProps) {
 }
 
 export default PublicNavbar;
-

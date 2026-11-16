@@ -1,6 +1,8 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { usePathname } from 'next/navigation';
+import { isCollegeDarkBlockedSurface } from '@/lib/routing/themeSurface';
 
 export type Theme = 'light' | 'dark';
 
@@ -14,6 +16,10 @@ export interface ThemeContextValue {
 const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
+  // pathname re-runs the class effect on client navigation, so moving from a
+  // dark marketing page into a college page (and back) re-applies the decision.
+  const pathname = usePathname();
+
   const [theme, setThemeState] = useState<Theme>(() => {
     if (typeof window === 'undefined') return 'light';
     try {
@@ -27,6 +33,13 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     return 'light';
   });
 
+  // The college public side is single-theme: consumers there must render light
+  // even when the saved preference is dark (mirrors the DOM class decision and
+  // keeps SSR light rendering consistent, avoiding hydration mismatches).
+  const onCollegeSurface =
+    typeof window !== 'undefined' &&
+    isCollegeDarkBlockedSurface(pathname, window.location.hostname);
+
   useEffect(() => {
     try {
       localStorage.setItem('yuva_theme', theme);
@@ -36,7 +49,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     }
 
     const root = document.documentElement;
-    if (theme === 'dark') {
+    const dark = theme === 'dark' && !onCollegeSurface;
+    if (dark) {
       root.classList.add('dark');
       root.classList.remove('light');
       root.style.colorScheme = 'dark';
@@ -45,7 +59,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       root.classList.add('light');
       root.style.colorScheme = 'light';
     }
-  }, [theme]);
+  }, [theme, pathname, onCollegeSurface]);
 
   const setTheme = (newTheme: Theme) => {
     setThemeState(newTheme);
@@ -55,7 +69,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     setThemeState((prev) => (prev === 'dark' ? 'light' : 'dark'));
   };
 
-  const isDark = theme === 'dark';
+  const isDark = theme === 'dark' && !onCollegeSurface;
 
   return (
     <ThemeContext.Provider value={{ theme, setTheme, toggleTheme, isDark }}>

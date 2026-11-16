@@ -14,6 +14,19 @@ export interface PublicLayoutProps {
 export function PublicLayout({ children, collegeSlug, collegeName }: PublicLayoutProps) {
   const { isDark } = useTheme();
 
+  // College public pages render the single-theme campus shell. Marketing pages
+  // (e.g. /directory render this layout without a college slug) keep the
+  // original theme-aware chrome.
+  if (collegeSlug) {
+    return (
+      <div className="college-scope flex min-h-screen flex-col justify-between overflow-x-hidden antialiased">
+        <PublicNavbar collegeSlug={collegeSlug} collegeName={collegeName} />
+        <main className="w-full flex-1 pt-20">{children}</main>
+        <PublicFooter collegeSlug={collegeSlug} collegeName={collegeName} />
+      </div>
+    );
+  }
+
   return (
     <div
       className={`min-h-screen font-sans selection:bg-[#00F0FF] selection:text-black antialiased flex flex-col justify-between overflow-x-hidden transition-colors duration-300 ${
@@ -28,4 +41,3 @@ export function PublicLayout({ children, collegeSlug, collegeName }: PublicLayou
 }
 
 export default PublicLayout;
-
