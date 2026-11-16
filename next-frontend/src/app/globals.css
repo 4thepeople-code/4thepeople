@@ -98,6 +98,12 @@ input[type="datetime-local"] {
   --color-orange: #ff7a18;
   --color-lime: #d8ff3e;
   --color-violet: #7c3aed;
+
+  /* Campus brutal offset shadows — hard Npx Npx 0 0, no blur */
+  --shadow-brutal-xs: 2px 2px 0 0 var(--color-warm-ink, #241209);
+  --shadow-brutal-sm: 3px 3px 0 0 var(--color-warm-ink, #241209);
+  --shadow-brutal-md: 6px 6px 0 0 var(--color-warm-ink, #241209);
+  --shadow-brutal-lg: 8px 8px 0 0 var(--color-warm-ink, #241209);
 }
 
 /* Scoped Landing & Demo Typography and Styles */
@@ -154,6 +160,102 @@ input[type="datetime-local"] {
 .demo-scope {
   font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
   scroll-behavior: smooth;
+}
+
+/*
+ * College home scope — the real college page renders the demo's campus look.
+ *
+ * Single light theme: tokens are fixed values, so nothing inside this scope reacts
+ * to the global `.dark` class (the navbar toggle stays functional for itself).
+ * `color-scheme: light` keeps native form controls and scrollbars light inside
+ * the scope regardless of the page-level theme.
+ *
+ * Components reference these semantic tokens only — no raw hex in JSX.
+ * Contrast notes (WCAG AA, measured on --surface-page cream #fff4e6 / white):
+ * - text-primary 16.6:1, text-secondary 6.1:1 (6.6:1 on white)
+ * - text-muted 4.9:1 (5.3:1 on white), text-inverse 16.6:1, text-inverse-muted 9.0:1
+ * - accent-strong #c93524 ≥4.7:1 everywhere; accent-primary coral is large-display
+ *   and decoration only (3.1:1 on cream passes the 3:1 large-text/UI threshold,
+ *   5.4:1 on the dark band passes AA for any size)
+ */
+.college-scope {
+  color-scheme: light;
+
+  /* Surfaces */
+  --surface-page: var(--color-cream);
+  --surface-card: var(--color-white);
+  --surface-tile: var(--color-cream);
+  --surface-inverse: var(--color-warm-ink);
+  --surface-inverse-tile: rgba(255, 244, 230, 0.06);
+  --surface-inverse-hover: var(--color-ink-900);
+
+  /* Ink on light surfaces */
+  --text-primary: var(--color-warm-ink);
+  --text-secondary: rgba(36, 18, 9, 0.68);
+  --text-muted: rgba(36, 18, 9, 0.62);
+
+  /* Ink on inverse (dark) surfaces */
+  --text-inverse: var(--color-cream);
+  --text-inverse-muted: rgba(255, 244, 230, 0.72);
+
+  /* Borders */
+  --border-strong: var(--color-warm-ink);
+  --border-soft: rgba(36, 18, 9, 0.15);
+  --border-inverse: rgba(255, 244, 230, 0.25);
+
+  /* Accents */
+  --accent-primary: var(--color-coral);
+  --accent-strong: #c93524;
+
+  font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  background-color: var(--surface-page);
+  color: var(--text-primary);
+  scroll-behavior: smooth;
+}
+
+.college-scope .font-display {
+  font-family: var(--font-sora), sans-serif;
+}
+
+.college-scope .font-campus {
+  font-family: var(--font-anton), sans-serif;
+}
+
+/* Visible keyboard focus everywhere inside the scope; currentColor keeps the
+   outline readable on both light and dark bands. */
+.college-scope :focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+
+@keyframes college-shimmer {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+.college-scope .animate-college-skeleton {
+  animation: college-shimmer 1.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .college-scope .animate-college-skeleton,
+  .college-scope .animate-scroll-x,
+  .college-scope .animate-marquee {
+    animation: none;
+  }
+
+  .college-scope *,
+  .college-scope *::before,
+  .college-scope *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
 }
 
 @keyframes floaty {

@@ -10,7 +10,6 @@ import {
   Users,
   Search,
   X,
-  Layers,
   Building2,
   CheckCircle2,
   Clock,
@@ -19,16 +18,19 @@ import {
 } from 'lucide-react';
 import { useUpcomingEvents } from '@/lib/api/events';
 import { useClubs } from '@/lib/api/clubs';
-import { useTheme } from '@/context/ThemeContext';
+import { useDepartments } from '@/lib/api/departments';
 import PublicLayout from '@/components/public/PublicLayout';
 import EventModal from '@/components/public/EventModal';
 import GalleryLightbox from '@/components/public/GalleryLightbox';
-import { getClubCoverImage } from '@/lib/utils/clubCovers';
 import type { Event } from '@/types/models';
 
 export interface CollegeHomePageClientProps {
   slug: string;
 }
+
+/* ------------------------------------------------------------------ */
+/* Helpers                                                             */
+/* ------------------------------------------------------------------ */
 
 const formatDateParts = (dateString?: string, endDateString?: string) => {
   if (!dateString) return { day: 'TBA', month: 'TBA', weekday: 'TBA', time: 'Time TBA' };
@@ -50,16 +52,82 @@ const formatDateParts = (dateString?: string, endDateString?: string) => {
   return { day, month, weekday, time };
 };
 
-const categories = ['ALL', 'TECHNOLOGY', 'CULTURAL', 'SPORTS', 'ARTS', 'LITERARY', 'SOCIAL'];
+/** Season label from the current date (e.g. "Fall 2026"). */
+const getSeasonLabel = (now = new Date()) => {
+  const month = now.getMonth();
+  const season = month >= 8 ? 'Fall' : month >= 5 ? 'Summer' : month >= 2 ? 'Spring' : 'Winter';
+  return `${season} ${now.getFullYear()}`;
+};
 
-const categoryList = [
-  { code: '01', name: 'TECHNOLOGY', count: '14 CLUBS', eventsCount: '28 EVENTS', description: 'Hackathons, AI, Software, Coding Challenges & Cloud Dev.', accent: '#00F0FF' },
-  { code: '02', name: 'CULTURAL', count: '08 CLUBS', eventsCount: '16 EVENTS', description: 'Music, Dance, Stage Plays, Campus Celebrations & Concerts.', accent: '#EC4899' },
-  { code: '03', name: 'SPORTS', count: '10 CLUBS', eventsCount: '22 EVENTS', description: 'Tournaments, Esports, Fitness Challenges & Athletics.', accent: '#F59E0B' },
-  { code: '04', name: 'ARTS', count: '06 CLUBS', eventsCount: '12 EVENTS', description: 'Photography, Digital Illustration, UI/UX & Fine Arts.', accent: '#8B5CF6' },
-  { code: '05', name: 'LITERARY', count: '05 CLUBS', eventsCount: '09 EVENTS', description: 'Debates, Poetry Slams, Creative Writing & Journalism.', accent: '#10B981' },
-  { code: '06', name: 'SOCIAL', count: '07 CLUBS', eventsCount: '15 EVENTS', description: 'Volunteering, Sustainability, Social Outreach & Networking.', accent: '#3B82F6' },
-];
+/**
+ * First real image URL from the backend (Cloudinary uploads). Returns null when
+ * the record has no upload — callers render a neutral token tile instead of a
+ * stock photo, so nothing pretends to be real content.
+ */
+const resolveImageUrl = (...urls: Array<string | null | undefined>): string | null => {
+  for (const url of urls) {
+    if (typeof url === 'string' && url.trim() !== '') return url;
+  }
+  return null;
+};
+
+const eventImageUrl = (event: Event) =>
+  resolveImageUrl(event.coverImageUrl, event.coverUrl, event.bannerUrl, event.coverImage?.url);
+
+/* ------------------------------------------------------------------ */
+/* Shared state blocks (loading / empty / error)                       */
+/* ------------------------------------------------------------------ */
+
+function CardSkeletons({ count = 3 }: { count?: number }) {
+  return (
+    <>
+      {Array.from({ length: count }).map((_, index) => (
+        <div
+          key={index}
+          aria-hidden
+          className="rounded-3xl border-2 border-[var(--border-soft)] bg-[var(--surface-tile)] p-6"
+        >
+          <div className="h-6 w-28 rounded-full bg-[var(--border-soft)] animate-college-skeleton" />
+          <div className="mt-5 h-12 w-36 rounded-xl bg-[var(--border-soft)] animate-college-skeleton" />
+          <div className="mt-5 h-4 w-full rounded bg-[var(--border-soft)] animate-college-skeleton" />
+          <div className="mt-2 h-4 w-2/3 rounded bg-[var(--border-soft)] animate-college-skeleton" />
+          <div className="mt-6 h-24 w-full rounded-2xl bg-[var(--border-soft)] animate-college-skeleton" />
+        </div>
+      ))}
+    </>
+  );
+}
+
+function LoadingRow({ label }: { label: string }) {
+  return (
+    <p role="status" className="sr-only">
+      {label}
+    </p>
+  );
+}
+
+function ErrorBlock({ title, message, onRetry }: { title: string; message: string; onRetry: () => void }) {
+  return (
+    <div
+      role="alert"
+      className="rounded-3xl border-2 border-[var(--border-strong)] bg-[var(--surface-card)] p-8 text-center shadow-brutal-xs md:col-span-2 lg:col-span-3"
+    >
+      <p className="font-display text-xl font-bold uppercase tracking-tight text-[var(--text-primary)]">{title}</p>
+      <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-[var(--text-secondary)]">{message}</p>
+      <button
+        type="button"
+        onClick={onRetry}
+        className="mt-5 inline-flex min-h-11 items-center justify-center rounded-xl bg-[var(--accent-strong)] px-5 text-sm font-bold text-white transition-transform hover:-translate-y-0.5"
+      >
+        Try again
+      </button>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Static page copy (platform messaging, not data)                     */
+/* ------------------------------------------------------------------ */
 
 const benefits = [
   { num: '01', title: 'WORD OF MOUTH VERIFIED', description: 'Heard friends talking about a hackathon or concert? Find official timings, venues, and registration links instantly here.', highlight: 'Instant access' },
@@ -68,13 +136,17 @@ const benefits = [
   { num: '04', title: 'BUILD EXPERIENCES', description: 'Turn ideas into memories. Participate, volunteer, or lead teams in campus-wide events.', highlight: 'Hands-on leadership' },
 ];
 
+/* ------------------------------------------------------------------ */
+/* Page                                                                */
+/* ------------------------------------------------------------------ */
+
 export function CollegeHomePageClient({ slug }: CollegeHomePageClientProps) {
   const router = useRouter();
-  const { isDark } = useTheme();
 
   // TanStack Query Hooks scoped strictly to tenant slug
-  const { data: events = [], isLoading: eventsLoading, error: eventsError } = useUpcomingEvents(slug);
-  const { data: clubs = [], isLoading: clubsLoading, error: clubsError } = useClubs(slug);
+  const { data: events = [], isLoading: eventsLoading, error: eventsError, refetch: refetchEvents } = useUpcomingEvents(slug);
+  const { data: clubs = [], isLoading: clubsLoading, error: clubsError, refetch: refetchClubs } = useClubs(slug);
+  const { data: departments = [], isLoading: departmentsLoading, error: departmentsError, refetch: refetchDepartments } = useDepartments(slug);
 
   // Student Search & Category Filter State
   const [searchQuery, setSearchQuery] = useState('');
@@ -105,893 +177,908 @@ export function CollegeHomePageClient({ slug }: CollegeHomePageClientProps) {
     });
   }, [events, searchQuery, activeCategory]);
 
-  const spotlightEvent = events[0];
-  const nextUpEvents = events.slice(1, 3);
+  // Categories derived from real fetched data (events + clubs), nothing hardcoded.
+  const derivedCategories = useMemo(() => {
+    const set = new Set<string>();
+    events.forEach((ev) => {
+      const category = ev.category?.trim().toUpperCase();
+      if (category) set.add(category);
+    });
+    clubs.forEach((club) => {
+      const category = club.category?.trim().toUpperCase();
+      if (category) set.add(category);
+    });
+    return Array.from(set).sort();
+  }, [events, clubs]);
+
+  // Per-category counts derived from the same fetched data (mirror the filter logic).
+  const categoryStats = useMemo(
+    () =>
+      derivedCategories.map((category) => ({
+        name: category,
+        eventCount: events.filter(
+          (ev) => ev.category?.toUpperCase() === category || ev.club?.category?.toUpperCase().includes(category)
+        ).length,
+        clubCount: clubs.filter((club) => club.category?.toUpperCase() === category).length,
+      })),
+    [derivedCategories, events, clubs]
+  );
+
+  // Hero features the first upcoming event.
+  const heroEvent = events[0];
+  const heroDateParts = formatDateParts(heroEvent?.startAt || heroEvent?.startDate || heroEvent?.date, heroEvent?.endAt);
+
+  // Spotlight never repeats the hero event: the highest registeredCount among the
+  // rest, falling back to the second event. Hidden with fewer than 2 events.
+  const spotlightEvent = useMemo(() => {
+    const rest = events.slice(1);
+    if (rest.length === 0) return null;
+    return rest.reduce((best, ev) => ((ev.registeredCount ?? 0) > (best.registeredCount ?? 0) ? ev : best), rest[0]);
+  }, [events]);
+  const spotlightDateParts = formatDateParts(
+    spotlightEvent?.startAt || spotlightEvent?.startDate || spotlightEvent?.date,
+    spotlightEvent?.endAt
+  );
 
   const handleNavigateToEvent = (ev: Event) => {
     if (!ev) return;
     router.push(`/college/${slug}/events/${ev.id}`);
   };
 
+  const scrollToEvents = () => {
+    const el = document.getElementById('upcoming-events');
+    if (el) el.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  const seasonLabel = getSeasonLabel();
   const collegeDisplay = slug.toUpperCase();
 
   return (
     <PublicLayout collegeSlug={slug} collegeName={collegeDisplay}>
-      {/* 🔴 HIGH-SPEED CAMPUS DISPATCH TICKER */}
-      {events.length > 0 && (
-        <div
-          className={`relative w-full border-b overflow-hidden flex items-center transition-colors h-12 ${
-            isDark ? 'bg-[#0B0C10] border-white/10' : 'bg-slate-900 border-slate-800'
-          }`}
-        >
-          <div className="flex-1 h-full overflow-hidden relative flex items-center">
-            <div className="flex w-max items-center animate-scroll-x hover:[animation-play-state:paused]">
-              {[...events, ...events, ...events, ...events].map((ev, idx) => {
-                const dateParts = formatDateParts(ev.startAt || ev.startDate || ev.date);
-                return (
-                  <button
-                    key={`${ev.id}-${idx}`}
-                    type="button"
-                    onClick={() => handleNavigateToEvent(ev)}
-                    className="inline-flex items-center gap-3 px-5 py-1.5 group cursor-pointer transition-all hover:bg-white/10 rounded-xl mx-1.5 shrink-0 text-left border border-transparent hover:border-white/10"
+      {/* Single light campus theme — this scope ignores the global color scheme. */}
+      <div className="college-scope">
+        {/* 🔴 HIGH-SPEED CAMPUS DISPATCH TICKER */}
+        {events.length > 0 && (
+          <div className="relative flex h-14 w-full items-center overflow-hidden border-b border-[var(--border-inverse)] bg-[var(--surface-inverse)]">
+            <p className="sr-only">Upcoming events ticker</p>
+            <ul className="sr-only">
+              {events.slice(0, 8).map((ev) => (
+                <li key={`ticker-sr-${ev.id}`}>
+                  <Link
+                    href={`/college/${slug}/events/${ev.id}`}
+                    className="focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:inline-flex focus:min-h-11 focus:items-center focus:rounded-lg focus:border-2 focus:border-[var(--border-strong)] focus:bg-[var(--surface-card)] focus:px-3 focus:py-2 focus:text-sm focus:font-bold focus:text-[var(--text-primary)]"
                   >
-                    <span className="font-mono text-[11px] font-black uppercase tracking-widest text-cyan-400 group-hover:text-cyan-300 transition-colors">
-                      {ev.club?.name || collegeDisplay}
-                    </span>
-                    <span className="text-white/20 text-xs font-light">/</span>
-                    <span className="font-semibold text-slate-200 group-hover:text-white transition-colors text-sm whitespace-nowrap">
-                      {ev.title}
-                    </span>
-                    <span className="text-[10px] font-mono text-slate-300 group-hover:text-white transition-colors bg-white/10 px-2 py-0.5 rounded-md border border-white/10 flex items-center gap-1.5 ml-1">
-                      <Calendar className="w-3 h-3 opacity-60" />
-                      {dateParts.month} {dateParts.day}
-                    </span>
-                    <ArrowUpRight className="w-3.5 h-3.5 text-cyan-500 opacity-0 group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all" />
-                  </button>
-                );
-              })}
+                    {ev.club?.name || collegeDisplay}: {ev.title}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+            <div aria-hidden className="relative h-full flex-1 overflow-hidden">
+              <div className="animate-scroll-x flex w-max items-center hover:[animation-play-state:paused]">
+                {[...events, ...events, ...events, ...events].map((ev, idx) => {
+                  const dateParts = formatDateParts(ev.startAt || ev.startDate || ev.date);
+                  return (
+                    <button
+                      key={`${ev.id}-${idx}`}
+                      type="button"
+                      tabIndex={-1}
+                      onClick={() => handleNavigateToEvent(ev)}
+                      className="mx-1.5 inline-flex h-11 shrink-0 cursor-pointer items-center gap-3 rounded-xl border border-transparent px-5 py-2 text-left transition-colors hover:border-[var(--border-inverse)] hover:bg-[var(--surface-inverse-tile)]"
+                    >
+                      <span className="text-[11px] font-black uppercase tracking-widest text-[var(--accent-primary)]">
+                        {ev.club?.name || collegeDisplay}
+                      </span>
+                      <span className="text-xs font-light text-[var(--text-inverse-muted)]">/</span>
+                      <span className="whitespace-nowrap text-sm font-semibold text-[var(--text-inverse)]">{ev.title}</span>
+                      <span className="ml-1 flex items-center gap-1.5 rounded-md border border-[var(--border-inverse)] bg-[var(--surface-inverse-tile)] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-[var(--text-inverse-muted)]">
+                        <Calendar className="h-3 w-3 opacity-70" />
+                        {dateParts.month} {dateParts.day}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* 1. STUDENT-FOCUSED HERO SECTION */}
-      <section
-        className={`relative pt-10 pb-4 md:pt-8 md:pb-4 flex items-center overflow-hidden transition-colors duration-300 ${
-          isDark ? 'bg-[#0B0C10]' : 'bg-[#FAF9F5]'
-        }`}
-      >
-        <div
-          className={`absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] sm:w-[700px] h-[350px] rounded-full blur-[140px] pointer-events-none ${
-            isDark
-              ? 'bg-gradient-to-tr from-cyan-500/12 via-blue-600/8 to-pink-500/10'
-              : 'bg-gradient-to-tr from-cyan-500/8 via-indigo-500/5 to-pink-500/8'
-          }`}
-        />
+        {/* 1. CAMPUS HERO */}
+        <section className="relative overflow-hidden bg-[var(--surface-page)] text-[var(--text-primary)]">
+          <div aria-hidden className="absolute -left-20 bottom-0 h-96 w-96 rounded-full border-[16px] border-[var(--border-soft)]" />
 
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 w-full">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 items-center">
-            {/* Left Headline & Search */}
-            <div className="lg:col-span-7 flex flex-col justify-center">
-              <h1
-                className={`font-['Poppins'] text-5xl sm:text-7xl lg:text-8xl font-extrabold tracking-tight leading-[0.96] uppercase mb-4 ${
-                  isDark ? 'text-white' : 'text-[#0F172A]'
-                }`}
-              >
-                HEARD ABOUT AN EVENT? <br />
-                <span
-                  className={`text-transparent italic font-light bg-clip-text ${
-                    isDark
-                      ? 'bg-gradient-to-r from-[#00F0FF] via-cyan-200 to-white'
-                      : 'bg-gradient-to-r from-cyan-600 via-teal-600 to-[#0F172A]'
-                  }`}
-                >
-                  FIND IT RIGHT HERE.
+          <div className="relative mx-auto max-w-7xl px-4 pb-16 pt-10 sm:px-6 lg:px-8 lg:pb-24 lg:pt-16">
+            <div className="flex flex-col gap-12 min-[900px]:grid min-[900px]:grid-cols-[1.4fr_1fr] min-[900px]:items-end min-[900px]:gap-16">
+              <div className="max-w-4xl">
+                {/* Season badge — "Now booking" only with at least one upcoming event. */}
+                <span className="inline-flex items-center gap-2 rounded-full border-2 border-[var(--border-strong)] bg-[var(--surface-card)] px-4 py-2 text-xs font-bold uppercase tracking-[0.16em] shadow-brutal-sm">
+                  <span aria-hidden className="h-2.5 w-2.5 rounded-full bg-[var(--accent-primary)]" />
+                  {events.length > 0 ? `Now booking · ${seasonLabel}` : seasonLabel}
                 </span>
-              </h1>
 
-              <p
-                className={`text-base sm:text-lg max-w-xl font-normal leading-relaxed mb-6 ${
-                  isDark ? 'text-gray-300' : 'text-slate-600'
-                }`}
-              >
-                Look up event timings, venues, organizing clubs, and direct registration links for all campus activities at {collegeDisplay}.
-              </p>
+                {heroEvent ? (
+                  <>
+                    <p className="mt-8 text-xs font-bold uppercase tracking-[0.28em] text-[var(--accent-strong)]">
+                      ★ Next up · {heroDateParts.weekday} {heroDateParts.month} {heroDateParts.day}
+                    </p>
+                    <h1 className="font-campus mt-4 text-[40px] uppercase leading-[0.95] tracking-tight text-[var(--text-primary)] sm:text-[64px] lg:text-[88px]">
+                      {heroEvent.title.toUpperCase()}
+                    </h1>
+                    {heroEvent.description && (
+                      <p className="mt-6 max-w-xl text-lg leading-snug text-[var(--text-secondary)]">{heroEvent.description}</p>
+                    )}
 
-              {/* Instant Search Bar */}
-              <div className="relative max-w-xl mb-4">
-                <div
-                  className={`flex items-center rounded-2xl border transition-all p-1.5 shadow-sm ${
-                    isDark
-                      ? 'bg-[#12141C] border-white/15 focus-within:border-cyan-400 focus-within:shadow-cyan-500/20'
-                      : 'bg-white border-slate-300 focus-within:border-cyan-500 focus-within:ring-2 focus-within:ring-cyan-500/20'
-                  }`}
-                >
-                  <div className="pl-3.5 pr-2 text-cyan-500">
-                    <Search className="w-5 h-5" />
-                  </div>
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search by event title, club name, or venue..."
-                    className={`w-full bg-transparent text-sm font-medium focus:outline-hidden py-2 ${
-                      isDark ? 'text-white placeholder-gray-500' : 'text-[#0F172A] placeholder-slate-400'
-                    }`}
-                  />
-                  {searchQuery && (
-                    <button
-                      type="button"
-                      onClick={() => setSearchQuery('')}
-                      className={`p-1.5 rounded-lg mr-1 transition-colors ${
-                        isDark ? 'text-gray-400 hover:text-white hover:bg-white/10' : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'
-                      }`}
-                      aria-label="Clear search"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  )}
-                  <a
-                    href="#upcoming-events"
-                    className="px-4 py-2 bg-[#00F0FF] hover:bg-[#38f2ff] text-black font-extrabold text-xs uppercase tracking-wider rounded-xl transition-all shrink-0 shadow-sm cursor-pointer"
-                  >
-                    Find
-                  </a>
-                </div>
-              </div>
-
-              {/* Quick Category Filter Pills */}
-              <div className="flex items-center gap-1.5 overflow-x-auto pb-2 scrollbar-none max-w-xl">
-                <span className={`text-[11px] font-bold uppercase tracking-wider mr-1 shrink-0 ${isDark ? 'text-gray-400' : 'text-slate-500'}`}>
-                  Quick Filter:
-                </span>
-                {categories.slice(0, 5).map((cat) => (
-                  <button
-                    key={cat}
-                    type="button"
-                    onClick={() => setActiveCategory(cat)}
-                    className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider transition-all whitespace-nowrap cursor-pointer border ${
-                      activeCategory === cat
-                        ? 'bg-[#00F0FF] text-black border-[#00F0FF] shadow-xs'
-                        : isDark
-                        ? 'bg-white/5 text-gray-300 border-white/10 hover:border-white/20'
-                        : 'bg-white text-slate-700 border-slate-200 hover:border-slate-300 shadow-2xs'
-                    }`}
-                  >
-                    {cat}
-                  </button>
-                ))}
-              </div>
-
-              {/* Quick Stats Strip */}
-              <div
-                className={`mt-6 pt-5 border-t flex items-center gap-6 text-xs font-medium ${
-                  isDark ? 'border-white/10 text-gray-400' : 'border-slate-200 text-slate-500'
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  <Calendar className="w-4 h-4 text-cyan-600 dark:text-[#00F0FF]" />
-                  <span>
-                    <strong className={`font-bold text-sm ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                      {events.length}+
-                    </strong>{' '}
-                    Events Scheduled
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Users className="w-4 h-4 text-cyan-600 dark:text-[#00F0FF]" />
-                  <span>
-                    <strong className={`font-bold text-sm ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                      {clubs.length}+
-                    </strong>{' '}
-                    Campus Clubs
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Right: Spotlight Event Card */}
-            <div className="lg:col-span-5">
-              {spotlightEvent ? (
-                <div
-                  className={`rounded-3xl border transition-all duration-300 overflow-hidden shadow-xl ${
-                    isDark ? 'bg-[#12141C] border-white/15 shadow-cyan-500/5' : 'bg-white border-slate-200 shadow-slate-200'
-                  }`}
-                >
-                  <div className="relative h-28 w-full bg-slate-900 overflow-hidden">
-                    <img
-                      src={
-                        spotlightEvent.coverImage?.url ||
-                        spotlightEvent.coverUrl ||
-                        spotlightEvent.bannerUrl ||
-                        spotlightEvent.coverImageUrl ||
-                        'https://images.unsplash.com/photo-1540575467063-178a50c2df87?q=80&w=800&auto=format&fit=crop'
-                      }
-                      alt={spotlightEvent.title}
-                      className="w-full h-full object-cover"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-black/20" />
-
-                    <div className="absolute top-3 left-3 right-3 flex items-center justify-between z-10">
-                      <span className="px-2.5 py-0.5 rounded-full bg-black/70 backdrop-blur-md border border-white/20 text-[10px] font-black uppercase tracking-wider text-[#00F0FF]">
-                        ★ SPOTLIGHT EVENT
+                    <div className="mt-7 flex flex-wrap items-center gap-3">
+                      <span className="rounded-full bg-[var(--surface-inverse)] px-4 py-2 text-xs font-bold uppercase tracking-wider text-[var(--text-inverse)]">
+                        {heroDateParts.time}
                       </span>
-                      <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-bold uppercase tracking-wider">
-                        RSVP Open
+                      <span className="rounded-full border-2 border-[var(--border-strong)] bg-[var(--surface-card)] px-4 py-2 text-xs font-bold uppercase tracking-wider text-[var(--text-primary)]">
+                        {heroEvent.venue || heroEvent.location || 'Venue to be announced'}
                       </span>
                     </div>
 
-                    <div className="absolute bottom-2 left-3 z-10 text-xs font-semibold text-cyan-300 flex items-center gap-1.5">
-                      <Building2 className="w-3.5 h-3.5" />
-                      <span>{spotlightEvent.club?.name || `${collegeDisplay} Club`}</span>
-                    </div>
-                  </div>
-
-                  <div className="p-5 space-y-4">
-                    <div>
-                      <h3
-                        className={`font-['Syne',sans-serif] text-xl font-bold uppercase tracking-tight line-clamp-1 ${
-                          isDark ? 'text-white' : 'text-[#0F172A]'
-                        }`}
+                    <div className="mt-9 flex flex-wrap items-center gap-4">
+                      <Link
+                        href={`/college/${slug}/events/${heroEvent.id}`}
+                        className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-[var(--accent-strong)] px-8 py-3 text-base font-bold text-white transition-transform hover:-translate-y-0.5"
                       >
-                        {spotlightEvent.title}
-                      </h3>
-                      <p
-                        className={`text-xs mt-1 line-clamp-2 leading-relaxed ${
-                          isDark ? 'text-gray-300' : 'text-slate-600'
-                        }`}
-                      >
-                        {spotlightEvent.description || 'Join this exciting student-organized event on campus. Meet members, learn new skills, and connect.'}
-                      </p>
-                    </div>
-
-                    {/* Metadata Badges */}
-                    <div className="grid grid-cols-2 gap-2 text-xs">
-                      <div
-                        className={`p-2.5 rounded-xl border flex items-center gap-2 ${
-                          isDark ? 'bg-white/5 border-white/10 text-gray-200' : 'bg-slate-50 border-slate-200 text-slate-800'
-                        }`}
-                      >
-                        <Calendar className="w-4 h-4 text-cyan-500 shrink-0" />
-                        <span className="truncate font-medium">
-                          {formatDateParts(spotlightEvent.startAt || spotlightEvent.startDate || spotlightEvent.date, spotlightEvent.endAt).day}{' '}
-                          {formatDateParts(spotlightEvent.startAt || spotlightEvent.startDate || spotlightEvent.date, spotlightEvent.endAt).month} •{' '}
-                          {formatDateParts(spotlightEvent.startAt || spotlightEvent.startDate || spotlightEvent.date, spotlightEvent.endAt).time}
-                        </span>
-                      </div>
-                      <div
-                        className={`p-2.5 rounded-xl border flex items-center gap-2 ${
-                          isDark ? 'bg-white/5 border-white/10 text-gray-200' : 'bg-slate-50 border-slate-200 text-slate-800'
-                        }`}
-                      >
-                        <MapPin className="w-4 h-4 text-purple-500 shrink-0" />
-                        <span className="truncate font-medium">{spotlightEvent.venue || spotlightEvent.location || 'Campus Auditorium'}</span>
-                      </div>
-                    </div>
-
-                    {/* Action Button */}
-                    <div className="pt-1">
+                        View event details
+                        {typeof heroEvent.registeredCount === 'number' ? ` · ${heroEvent.registeredCount} going` : ''}
+                      </Link>
                       <button
                         type="button"
-                        onClick={() => handleNavigateToEvent(spotlightEvent)}
-                        className="w-full py-2.5 px-4 rounded-xl bg-[#00F0FF] hover:bg-[#38f2ff] text-black font-extrabold text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-sm hover:shadow-cyan-500/25 cursor-pointer group"
+                        onClick={scrollToEvents}
+                        className="inline-flex min-h-11 cursor-pointer items-center justify-center rounded-2xl border-2 border-[var(--border-strong)] bg-[var(--surface-card)] px-8 py-3 text-base font-bold text-[var(--text-primary)] transition-transform hover:-translate-y-0.5"
                       >
-                        <span>View Event Details & RSVP</span>
-                        <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                        Browse the lineup
                       </button>
                     </div>
+                  </>
+                ) : (
+                  <h1 className="font-campus mt-8 text-[40px] uppercase leading-[0.95] tracking-tight text-[var(--text-primary)] sm:text-[64px] lg:text-[88px]">
+                    Every event.
+                    <br />
+                    One place.
+                  </h1>
+                )}
 
-                    {/* Next Up Mini-List */}
-                    {nextUpEvents.length > 0 && (
-                      <div className={`pt-3 border-t text-xs ${isDark ? 'border-white/10' : 'border-slate-100'}`}>
-                        <p className={`text-[10px] font-extrabold uppercase tracking-widest mb-2 ${isDark ? 'text-gray-400' : 'text-slate-500'}`}>
-                          Also Coming Up Next:
-                        </p>
-                        <div className="space-y-1.5">
-                          {nextUpEvents.map((nextEv) => (
-                            <div
-                              key={nextEv.id}
-                              onClick={() => handleNavigateToEvent(nextEv)}
-                              className={`flex items-center justify-between p-2 rounded-xl border cursor-pointer transition-all ${
-                                isDark
-                                  ? 'bg-white/5 border-white/5 hover:border-cyan-500/40'
-                                  : 'bg-[#FAF9F5] border-slate-200 hover:border-cyan-400'
-                              }`}
-                            >
-                              <div className="flex items-center gap-2 truncate pr-2">
-                                <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 shrink-0" />
-                                <span className={`font-semibold truncate text-xs ${isDark ? 'text-white' : 'text-[#0F172A]'}`}>
-                                  {nextEv.title}
-                                </span>
-                              </div>
-                              <span className="text-[11px] font-bold text-cyan-600 dark:text-cyan-400 shrink-0">
-                                {formatDateParts(nextEv.startAt || nextEv.startDate || nextEv.date, nextEv.endAt).day}{' '}
-                                {formatDateParts(nextEv.startAt || nextEv.startDate || nextEv.date, nextEv.endAt).month}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
+                {/* Instant Search Bar */}
+                <div className="relative mt-10 max-w-xl">
+                  <div className="flex items-center rounded-2xl border-2 border-[var(--border-strong)] bg-[var(--surface-card)] p-1.5 shadow-brutal-sm">
+                    <div className="pl-3.5 pr-2 text-[var(--text-secondary)]">
+                      <Search className="h-5 w-5" aria-hidden />
+                    </div>
+                    <input
+                      type="text"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      placeholder="Search by event title, club name, or venue…"
+                      aria-label="Search events"
+                      className="w-full bg-transparent py-2 text-sm font-medium text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none"
+                    />
+                    {searchQuery && (
+                      <button
+                        type="button"
+                        onClick={() => setSearchQuery('')}
+                        className="mr-1 grid min-h-11 min-w-11 place-items-center rounded-lg p-2 text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-tile)] hover:text-[var(--text-primary)]"
+                        aria-label="Clear search"
+                      >
+                        <X className="h-4 w-4" aria-hidden />
+                      </button>
                     )}
+                    <button
+                      type="button"
+                      onClick={scrollToEvents}
+                      className="inline-flex min-h-11 shrink-0 cursor-pointer items-center rounded-xl bg-[var(--surface-inverse)] px-5 py-2 text-xs font-bold uppercase tracking-wider text-[var(--text-inverse)] transition-colors hover:bg-[var(--surface-inverse-hover)]"
+                    >
+                      Find
+                    </button>
                   </div>
                 </div>
-              ) : (
-                <div
-                  className={`p-8 rounded-3xl border text-center ${
-                    isDark ? 'bg-[#12141C] border-white/10 text-gray-400' : 'bg-white border-slate-200 text-slate-500'
-                  }`}
-                >
-                  <Calendar className="w-8 h-8 text-cyan-500 mx-auto mb-2" />
-                  <p className="text-sm font-semibold">{eventsLoading ? 'Loading upcoming events...' : 'No upcoming events scheduled.'}</p>
+
+                {/* Quick Category Filter Pills — derived from real data */}
+                {derivedCategories.length > 0 && (
+                  <div className="mt-4 flex max-w-xl items-center gap-2 overflow-x-auto pb-2">
+                    <span className="mr-1 shrink-0 text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
+                      Quick filter:
+                    </span>
+                    {['ALL', ...derivedCategories].slice(0, 6).map((category) => (
+                      <button
+                        key={category}
+                        type="button"
+                        onClick={() => setActiveCategory(category)}
+                        aria-pressed={activeCategory === category}
+                        className={`inline-flex min-h-11 shrink-0 cursor-pointer items-center whitespace-nowrap rounded-full border-2 px-4 py-2 text-xs font-bold uppercase tracking-wider transition-all ${
+                          activeCategory === category
+                            ? 'bg-[var(--surface-inverse)] text-[var(--text-inverse)]'
+                            : 'border-[var(--border-strong)] bg-[var(--surface-card)] text-[var(--text-primary)] hover:bg-[var(--surface-tile)]'
+                        }`}
+                      >
+                        {category}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* Quick Stats Strip — real counts */}
+                <div className="mt-6 flex items-center gap-6 border-t-2 border-[var(--border-soft)] pt-5 text-xs font-medium text-[var(--text-secondary)]">
+                  <div className="flex items-center gap-2">
+                    <Calendar className="h-4 w-4 text-[var(--accent-strong)]" aria-hidden />
+                    <span>
+                      <strong className="text-sm font-bold text-[var(--text-primary)]">
+                        {eventsLoading ? '…' : events.length}
+                      </strong>{' '}
+                      events scheduled
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Users className="h-4 w-4 text-[var(--accent-strong)]" aria-hidden />
+                    <span>
+                      <strong className="text-sm font-bold text-[var(--text-primary)]">
+                        {clubsLoading ? '…' : clubs.length}
+                      </strong>{' '}
+                      campus clubs
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Right: featured-event poster (real upload, else neutral tile) */}
+              {heroEvent && (
+                <div className="w-full max-w-sm min-[900px]:justify-self-end">
+                  {eventsLoading ? (
+                    <div aria-hidden className="aspect-[4/5] rotate-2 rounded-2xl border-[3px] border-[var(--border-strong)] bg-[var(--surface-tile)] shadow-brutal-lg">
+                      <div className="h-full w-full rounded-[13px] bg-[var(--border-soft)] animate-college-skeleton" />
+                    </div>
+                  ) : (
+                    <Link
+                      href={`/college/${slug}/events/${heroEvent.id}`}
+                      className="group block rounded-2xl"
+                      aria-label={`View details for ${heroEvent.title}`}
+                    >
+                      <div className="relative aspect-[4/5] rotate-2 rounded-2xl border-[3px] border-[var(--border-strong)] bg-[var(--surface-tile)] shadow-brutal-lg transition-transform duration-200 will-change-transform group-hover:[@media(hover:hover)_and_(prefers-reduced-motion:no-preference)]:rotate-0 group-hover:[@media(hover:hover)_and_(prefers-reduced-motion:no-preference)]:-translate-y-1">
+                        {eventImageUrl(heroEvent) ? (
+                          <img
+                            src={eventImageUrl(heroEvent) as string}
+                            alt={`Poster for ${heroEvent.title}`}
+                            className="h-full w-full rounded-[13px] object-cover"
+                          />
+                        ) : (
+                          <div className="flex h-full w-full flex-col justify-end rounded-[13px] bg-[var(--accent-primary)] p-6">
+                            <span className="text-xs font-bold uppercase tracking-[0.24em] text-[var(--text-primary)]">
+                              ★ Featured event
+                            </span>
+                            <p className="font-campus mt-3 text-4xl uppercase leading-[0.95] text-[var(--text-primary)]">
+                              {heroEvent.title}
+                            </p>
+                          </div>
+                        )}
+                        <span className="absolute -left-2 -top-3 rounded-xl border-[3px] border-[var(--border-strong)] bg-[var(--surface-card)] px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-[var(--text-primary)] shadow-brutal-xs">
+                          {heroDateParts.month} {heroDateParts.day}
+                        </span>
+                      </div>
+                    </Link>
+                  )}
+
+                  {!eventsLoading && (
+                    <div className="mt-5 flex flex-col items-start gap-1.5">
+                      <p className="text-sm font-semibold text-[var(--text-secondary)]">
+                        {heroEvent.venue || heroEvent.location || 'Venue to be announced'}
+                      </p>
+                      {typeof heroEvent.registeredCount === 'number' && (
+                        <p className="text-sm text-[var(--text-muted)]">{heroEvent.registeredCount} students going</p>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* 2. UPCOMING & RECENT EVENTS SECTION */}
-      <section
-        id="upcoming-events"
-        className={`py-16 md:py-20 relative overflow-hidden transition-colors duration-300 ${
-          isDark ? 'bg-[#0F1117]' : 'bg-white'
-        }`}
-      >
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-          <div
-            className={`flex flex-col lg:flex-row lg:items-end justify-between mb-10 pb-6 border-b gap-6 ${
-              isDark ? 'border-white/10' : 'border-slate-200'
-            }`}
-          >
-            <div>
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/10 text-cyan-600 dark:text-[#00F0FF] text-xs font-bold uppercase tracking-wider mb-2.5">
-                <Calendar className="w-3.5 h-3.5" />
-                <span>Campus Event Schedule</span>
-              </div>
-              <h2
-                className={`font-['Syne',sans-serif] text-3xl sm:text-5xl font-extrabold uppercase tracking-tight ${
-                  isDark ? 'text-white' : 'text-[#0F172A]'
-                }`}
-              >
-                RECENT & UPCOMING <span className="text-[#00F0FF]">EVENTS</span>
-              </h2>
-              <p
-                className={`text-sm sm:text-base max-w-xl mt-1.5 font-normal ${
-                  isDark ? 'text-gray-400' : 'text-slate-600'
-                }`}
-              >
-                Find full schedules, locations, host clubs, and RSVP details for {collegeDisplay}.
-              </p>
-            </div>
-
-            {/* Category Filter Bar */}
-            <div className="flex flex-wrap items-center gap-2">
-              {categories.map((cat) => (
-                <button
-                  key={cat}
-                  type="button"
-                  onClick={() => setActiveCategory(cat)}
-                  className={`px-3.5 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all whitespace-nowrap cursor-pointer border ${
-                    activeCategory === cat
-                      ? 'bg-[#00F0FF] text-black border-[#00F0FF] shadow-xs'
-                      : isDark
-                      ? 'bg-white/5 text-gray-300 border-white/10 hover:border-white/25 hover:text-white'
-                      : 'bg-slate-100 text-slate-700 border-slate-200 hover:border-slate-300 hover:text-slate-900'
-                  }`}
-                >
-                  {cat}
-                </button>
+        {/* 2. CATEGORY MARQUEE — only when real categories exist */}
+        {derivedCategories.length > 0 && (
+          <div aria-hidden className="overflow-hidden bg-[var(--surface-inverse)] py-5 text-[var(--text-inverse)]">
+            <div className="animate-marquee flex w-max">
+              {[0, 1].map((row) => (
+                <div key={row} className="flex shrink-0 items-center gap-12 pr-12">
+                  {derivedCategories.map((category) => (
+                    <span
+                      key={`${row}-${category}`}
+                      className="font-display whitespace-nowrap text-3xl font-bold uppercase tracking-wide lg:text-4xl"
+                    >
+                      {category}
+                    </span>
+                  ))}
+                </div>
               ))}
             </div>
           </div>
+        )}
 
-          {/* Search Result Feedback Bar */}
-          {searchQuery && (
-            <div
-              className={`mb-6 p-3 rounded-xl border flex items-center justify-between text-xs font-medium ${
-                isDark ? 'bg-cyan-500/10 border-cyan-500/20 text-cyan-300' : 'bg-cyan-50 border-cyan-200 text-cyan-900'
-              }`}
-            >
-              <span>
-                Showing results matching &quot;<strong>{searchQuery}</strong>&quot; ({filteredEvents.length} found)
-              </span>
-              <button
-                type="button"
-                onClick={() => setSearchQuery('')}
-                className="underline hover:no-underline font-bold text-xs cursor-pointer ml-3"
-              >
-                Clear Search
-              </button>
+        {/* 3. UPCOMING EVENTS */}
+        <section id="upcoming-events" className="bg-[var(--surface-card)] py-16 md:py-20">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+            <div className="mb-10 flex flex-col justify-between gap-6 border-b-2 border-[var(--border-soft)] pb-6 lg:flex-row lg:items-end">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.22em] text-[var(--accent-strong)]">
+                  Campus event schedule
+                </p>
+                <h2 className="font-display mt-3 text-3xl font-bold uppercase tracking-tight text-[var(--text-primary)] sm:text-5xl">
+                  Recent &amp; upcoming <span className="text-[var(--accent-primary)]">events</span>
+                </h2>
+                <p className="mt-3 max-w-xl text-sm text-[var(--text-secondary)] sm:text-base">
+                  Full schedules, locations, host clubs, and RSVP details at {collegeDisplay}.
+                </p>
+              </div>
+
+              {/* Category Filter Bar — derived from real data */}
+              {derivedCategories.length > 0 && (
+                <div className="flex flex-wrap items-center gap-2">
+                  {['ALL', ...derivedCategories].map((category) => (
+                    <button
+                      key={category}
+                      type="button"
+                      onClick={() => setActiveCategory(category)}
+                      aria-pressed={activeCategory === category}
+                      className={`inline-flex min-h-11 cursor-pointer items-center whitespace-nowrap rounded-full border-2 px-4 py-2 text-xs font-bold uppercase tracking-wider transition-all ${
+                        activeCategory === category
+                          ? 'bg-[var(--surface-inverse)] text-[var(--text-inverse)]'
+                          : 'border-[var(--border-strong)] bg-[var(--surface-card)] text-[var(--text-primary)] hover:bg-[var(--surface-tile)]'
+                      }`}
+                    >
+                      {category}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
-          )}
 
-          {/* Events Grid */}
-          {eventsLoading ? (
-            <div className={`text-center py-16 text-sm ${isDark ? 'text-gray-400' : 'text-slate-500'}`}>
-              <div className="animate-spin w-8 h-8 border-2 border-cyan-400 border-t-transparent rounded-full mx-auto mb-3" />
-              Loading upcoming campus events...
-            </div>
-          ) : eventsError ? (
-            <div className="p-6 bg-red-500/10 border border-red-500/20 rounded-2xl text-red-400 text-sm">
-              Failed to load upcoming events for this college.
-            </div>
-          ) : filteredEvents.length === 0 ? (
-            <div
-              className={`text-center py-16 px-4 rounded-3xl border ${
-                isDark ? 'bg-[#12141C] border-white/10 text-gray-400' : 'bg-[#FAF9F5] border-slate-200 text-slate-500'
-              }`}
-            >
-              <Calendar className="w-10 h-10 text-cyan-500 mx-auto mb-3 opacity-60" />
-              <p className="text-base font-bold mb-1">No events match your criteria</p>
-              <p className="text-xs max-w-sm mx-auto mb-4">Try clearing your search query or choosing another category.</p>
-              <button
-                type="button"
-                onClick={() => {
-                  setSearchQuery('');
-                  setActiveCategory('ALL');
-                }}
-                className="px-4 py-2 bg-[#00F0FF] text-black font-extrabold text-xs uppercase tracking-wider rounded-xl transition cursor-pointer"
-              >
-                Reset Filters
-              </button>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredEvents.map((event) => {
-                const dateParts = formatDateParts(event.startAt || event.startDate || event.date, event.endAt);
+            {/* Search Result Feedback Bar */}
+            {searchQuery && (
+              <div className="mb-6 flex items-center justify-between gap-3 rounded-2xl border-2 border-[var(--border-soft)] bg-[var(--surface-tile)] p-3 text-xs font-medium text-[var(--text-secondary)]">
+                <span>
+                  Showing results for &quot;<strong className="font-bold">{searchQuery}</strong>&quot; ({filteredEvents.length} found)
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="min-h-11 font-bold underline hover:no-underline"
+                >
+                  Clear search
+                </button>
+              </div>
+            )}
 
-                return (
-                  <div
-                    key={event.id}
-                    onClick={() => handleNavigateToEvent(event)}
-                    className={`group relative rounded-2xl overflow-hidden border transition-all duration-300 flex flex-col justify-between cursor-pointer ${
-                      isDark
-                        ? 'bg-[#12141C] border-white/10 hover:border-cyan-500/50 hover:shadow-xl hover:shadow-cyan-500/10'
-                        : 'bg-white border-slate-200 hover:border-cyan-400 shadow-xs hover:shadow-lg'
-                    }`}
-                  >
-                    <div className="relative h-28 sm:h-32 w-full overflow-hidden bg-slate-900">
-                      <img
-                        src={
-                          event.coverImage?.url ||
-                          event.coverUrl ||
-                          event.bannerUrl ||
-                          event.coverImageUrl ||
-                          'https://images.unsplash.com/photo-1504384308090-c894fdcc538d?q=80&w=600&auto=format&fit=crop'
-                        }
-                        alt={event.title}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/40 to-transparent" />
+            {/* Events Grid */}
+            {eventsLoading ? (
+              <>
+                <LoadingRow label="Loading upcoming campus events" />
+                <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+                  <CardSkeletons />
+                </div>
+              </>
+            ) : eventsError ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+                <ErrorBlock
+                  title="Couldn't load events"
+                  message="The upcoming events didn't load. Check your connection and try again."
+                  onRetry={() => refetchEvents()}
+                />
+              </div>
+            ) : filteredEvents.length === 0 ? (
+              <div className="rounded-3xl border-2 border-[var(--border-strong)] bg-[var(--surface-page)] p-10 text-center shadow-brutal-xs">
+                <Calendar className="mx-auto mb-3 h-10 w-10 text-[var(--accent-strong)]" aria-hidden />
+                {events.length === 0 ? (
+                  <>
+                    <p className="font-display text-xl font-bold uppercase tracking-tight text-[var(--text-primary)]">
+                      No upcoming events are scheduled yet
+                    </p>
+                    <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-[var(--text-secondary)]">
+                      Clubs post new events as they are announced. Browse the clubs to see what each community is planning.
+                    </p>
+                    <Link
+                      href={`/college/${slug}/clubs`}
+                      className="mt-5 inline-flex min-h-11 items-center justify-center rounded-xl bg-[var(--accent-strong)] px-5 text-sm font-bold text-white transition-transform hover:-translate-y-0.5"
+                    >
+                      Browse clubs
+                    </Link>
+                  </>
+                ) : (
+                  <>
+                    <p className="font-display text-xl font-bold uppercase tracking-tight text-[var(--text-primary)]">
+                      No events match your filters
+                    </p>
+                    <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-[var(--text-secondary)]">
+                      Try a different category, or clear the search and filters to see every upcoming event.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSearchQuery('');
+                        setActiveCategory('ALL');
+                      }}
+                      className="mt-5 inline-flex min-h-11 cursor-pointer items-center justify-center rounded-xl bg-[var(--accent-strong)] px-5 text-sm font-bold text-white transition-transform hover:-translate-y-0.5"
+                    >
+                      Clear filters
+                    </button>
+                  </>
+                )}
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+                {filteredEvents.map((event) => {
+                  const dateParts = formatDateParts(event.startAt || event.startDate || event.date, event.endAt);
+                  const status = (event.status || 'Upcoming').toUpperCase();
 
-                      <div className="absolute top-2.5 left-2.5 px-2.5 py-1 rounded-xl bg-black/80 backdrop-blur-md border border-white/20 text-center shadow-md">
-                        <span className="block font-['Syne',sans-serif] text-base font-black leading-none text-white">
-                          {dateParts.day}
-                        </span>
-                        <span className="block text-[9px] font-bold uppercase tracking-wider text-cyan-400">
-                          {dateParts.month}
-                        </span>
-                      </div>
-
-                      <div className="absolute top-2.5 right-2.5 flex items-center gap-1.5">
-                        <span className="px-2 py-0.5 rounded-full bg-black/70 backdrop-blur-md border border-white/20 text-[10px] font-bold uppercase tracking-wider text-[#00F0FF]">
-                          {event.category || 'EVENT'}
-                        </span>
-                      </div>
-
-                      <div className="absolute bottom-2 left-2.5 right-2.5 flex items-center justify-between text-xs text-white">
-                        <span className="inline-flex items-center gap-1.5 font-semibold text-cyan-200 truncate text-[11px]">
-                          <Building2 className="w-3 h-3 shrink-0 text-cyan-400" />
-                          <span className="truncate">{event.club?.name || `${collegeDisplay} Club`}</span>
-                        </span>
-                        <span className="text-[10px] font-mono text-gray-300 shrink-0">
-                          {dateParts.weekday}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="p-4 sm:p-5 flex-1 flex flex-col justify-between space-y-3">
-                      <div>
-                        <h3
-                          className={`font-['Syne',sans-serif] text-lg font-bold uppercase tracking-tight line-clamp-1 transition-colors ${
-                            isDark ? 'text-white group-hover:text-cyan-400' : 'text-[#0F172A] group-hover:text-cyan-600'
-                          }`}
-                          title={event.title}
-                        >
-                          {event.title}
-                        </h3>
-
-                        <div className="mt-2 space-y-1.5 text-xs font-medium">
-                          <div className={`flex items-center gap-2 ${isDark ? 'text-gray-300' : 'text-slate-700'}`}>
-                            <Clock className="w-3.5 h-3.5 text-cyan-500 shrink-0" />
-                            <span className="truncate font-mono">
-                              {dateParts.weekday}, {dateParts.month} {dateParts.day} • {dateParts.time}
-                            </span>
-                          </div>
-
-                          <div className={`flex items-center gap-2 ${isDark ? 'text-gray-400' : 'text-slate-600'}`}>
-                            <MapPin className="w-3.5 h-3.5 text-purple-500 shrink-0" />
-                            <span className="truncate font-semibold">{event.venue || event.location || 'Campus Main Venue'}</span>
-                          </div>
+                  return (
+                    <Link key={event.id} href={`/college/${slug}/events/${event.id}`} className="group block" aria-label={`View details for ${event.title}`}>
+                      <article className="flex h-full flex-col rounded-3xl border-2 border-[var(--border-strong)] bg-[var(--surface-card)] p-6 shadow-brutal-md transition-transform duration-200 group-hover:[@media(hover:hover)_and_(prefers-reduced-motion:no-preference)]:-translate-x-1 group-hover:[@media(hover:hover)_and_(prefers-reduced-motion:no-preference)]:-translate-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--surface-inverse)] px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-[var(--text-inverse)]">
+                            {status === 'ONGOING' && (
+                              <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-[var(--accent-primary)]" />
+                            )}
+                            {status.toLowerCase()}
+                          </span>
+                          <span className="font-display text-sm font-bold uppercase tracking-wide text-[var(--text-muted)]">
+                            {dateParts.weekday}
+                          </span>
                         </div>
 
-                        <p
-                          className={`text-xs mt-2.5 line-clamp-2 leading-relaxed ${
-                            isDark ? 'text-gray-400' : 'text-slate-600'
-                          }`}
-                        >
-                          {event.description || 'Student event with workshops, guest speakers, activities, and peer networking.'}
+                        <div className="mt-5 flex items-end gap-3">
+                          <span className="font-display text-6xl font-bold leading-none text-[var(--text-primary)]">{dateParts.day}</span>
+                          <span className="font-display pb-1 text-xl font-bold uppercase text-[var(--text-primary)]">{dateParts.month}</span>
+                        </div>
+
+                        <h3 className="font-display mt-5 text-2xl font-bold uppercase tracking-tight text-[var(--text-primary)] transition-colors group-hover:text-[var(--accent-primary)]" title={event.title}>
+                          {event.title}
+                        </h3>
+                        <p className="mt-2 text-sm font-medium text-[var(--text-muted)]">
+                          {event.club?.name || collegeDisplay}
+                          {event.category ? ` · ${event.category}` : ''}
                         </p>
-                      </div>
+                        {event.description && (
+                          <p className="mt-3 text-sm leading-relaxed text-[var(--text-secondary)]">{event.description}</p>
+                        )}
 
-                      <div className={`pt-3 border-t ${isDark ? 'border-white/10' : 'border-slate-100'}`}>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleNavigateToEvent(event);
-                          }}
-                          className="w-full py-2.5 px-3 rounded-xl bg-[#00F0FF] hover:bg-[#38f2ff] text-black font-extrabold text-xs uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all shadow-xs hover:shadow-cyan-500/20 cursor-pointer group/btn"
-                        >
-                          <span>View Event Details & RSVP</span>
-                          <ArrowRight className="w-3.5 h-3.5 group-hover/btn:translate-x-1 transition-transform" />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      </section>
+                        <div className="mt-6 grid gap-2 rounded-2xl bg-[var(--surface-tile)] p-4 text-sm font-medium text-[var(--text-secondary)]">
+                          <p className="flex items-center gap-2">
+                            <Clock className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                            {dateParts.time}
+                          </p>
+                          <p className="flex items-center gap-2">
+                            <MapPin className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                            <span className="truncate">{event.venue || event.location || 'Venue to be announced'}</span>
+                          </p>
+                          {typeof event.registeredCount === 'number' && (
+                            <p className="flex items-center gap-2">
+                              <Users className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                              {event.registeredCount} students going
+                            </p>
+                          )}
+                        </div>
 
-      {/* 3. CAMPUS CLUBS SECTION */}
-      <section
-        id="featured-clubs"
-        className={`py-16 md:py-20 relative overflow-hidden transition-colors duration-300 ${
-          isDark ? 'bg-[#0B0C10]' : 'bg-[#FAF9F5]'
-        }`}
-      >
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-          <div
-            className={`flex flex-col md:flex-row md:items-end justify-between mb-10 pb-6 border-b gap-4 ${
-              isDark ? 'border-white/10' : 'border-slate-200'
-            }`}
-          >
-            <div>
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/10 text-cyan-600 dark:text-[#00F0FF] text-xs font-bold uppercase tracking-wider mb-2.5">
-                <Users className="w-3.5 h-3.5" />
-                <span>Student Organizations</span>
+                        <span className="mt-5 inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl bg-[var(--accent-strong)] px-3 text-sm font-bold text-white">
+                          View details &amp; RSVP
+                          <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" aria-hidden />
+                        </span>
+                      </article>
+                    </Link>
+                  );
+                })}
               </div>
-              <h2
-                className={`font-['Syne',sans-serif] text-3xl sm:text-5xl font-extrabold uppercase tracking-tight ${
-                  isDark ? 'text-white' : 'text-[#0F172A]'
-                }`}
-              >
-                EXPLORE CAMPUS <span className="text-[#00F0FF]">CLUBS</span>
-              </h2>
-              <p
-                className={`text-sm sm:text-base max-w-xl mt-1.5 font-normal ${
-                  isDark ? 'text-gray-400' : 'text-slate-600'
-                }`}
-              >
-                The student communities hosting these events across {collegeDisplay}. Join a club to participate, organize, or lead.
-              </p>
-            </div>
-
-            <Link
-              href={`/college/${slug}/clubs`}
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#00F0FF] text-black font-extrabold text-xs uppercase tracking-wider hover:bg-[#38f2ff] transition-all shadow-sm cursor-pointer self-start md:self-end"
-            >
-              <span>View All Clubs</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </Link>
+            )}
           </div>
+        </section>
 
-          {/* Clubs Grid */}
-          {clubsLoading ? (
-            <div className={`text-center py-12 text-sm ${isDark ? 'text-gray-400' : 'text-slate-500'}`}>
-              Loading campus clubs...
-            </div>
-          ) : clubsError ? (
-            <div className="p-6 bg-red-500/10 border border-red-500/20 rounded-2xl text-red-400 text-sm">
-              Failed to load campus clubs.
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {clubs.slice(0, 6).map((club) => (
-                <div
-                  key={club.id}
-                  onClick={() => router.push(`/college/${slug}/clubs/${club.id}`)}
-                  className={`group relative rounded-2xl overflow-hidden border transition-all duration-300 flex flex-col justify-between cursor-pointer ${
-                    isDark
-                      ? 'bg-[#12141C] border-white/10 hover:border-cyan-500/40 hover:shadow-xl hover:shadow-cyan-500/5'
-                      : 'bg-white border-slate-200 hover:border-cyan-500/40 shadow-xs hover:shadow-md'
-                  }`}
-                >
-                  <div className="relative h-20 w-full overflow-hidden bg-slate-900">
-                    <img
-                      src={getClubCoverImage(club)}
-                      alt={club.name}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 opacity-60"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent" />
+        {/* 4. SPOTLIGHT BAND — highest registeredCount excluding the hero event */}
+        {spotlightEvent && (
+          <section id="spotlight" className="bg-[var(--surface-inverse)] text-[var(--text-inverse)]">
+            <div className="mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8 lg:py-28">
+              <span className="inline-flex items-center gap-2 rounded-full border border-[var(--border-inverse)] bg-[var(--surface-inverse-tile)] px-4 py-2 text-xs font-bold uppercase tracking-[0.16em] text-[var(--text-inverse-muted)]">
+                ★ Crowd favourite
+              </span>
 
-                    <div className="absolute top-2.5 right-2.5 z-10">
-                      <span className="px-2.5 py-0.5 rounded-full bg-black/70 backdrop-blur-md border border-white/15 text-[10px] font-extrabold uppercase tracking-widest text-[#00F0FF]">
-                        {club.category || 'CLUB'}
-                      </span>
+              <h2 className="font-campus mt-7 text-[44px] uppercase leading-[0.92] tracking-tight text-[var(--text-inverse)] sm:text-[68px]">
+                {spotlightEvent.title.toUpperCase()}
+              </h2>
+
+              <div className="mt-10 grid gap-10 lg:grid-cols-2 lg:items-center">
+                <div>
+                  <p className="font-display text-7xl font-bold leading-none text-[var(--text-inverse)]">{spotlightDateParts.day}</p>
+                  <p className="font-display mt-2 text-xl font-bold uppercase text-[var(--accent-primary)]">{spotlightDateParts.month}</p>
+                  {spotlightEvent.description && (
+                    <p className="mt-8 text-lg leading-relaxed text-[var(--text-inverse-muted)]">{spotlightEvent.description}</p>
+                  )}
+                  <div className="mt-8 grid gap-3 sm:grid-cols-2">
+                    <div className="rounded-2xl border border-[var(--border-inverse)] bg-[var(--surface-inverse-tile)] p-4">
+                      <p className="text-xs font-bold uppercase tracking-wider text-[var(--text-inverse-muted)]">Starts</p>
+                      <p className="mt-1 font-semibold text-[var(--text-inverse)]">{spotlightDateParts.time}</p>
                     </div>
-                  </div>
-
-                  <div className="p-5 flex-1 flex flex-col justify-between space-y-3">
-                    <div>
-                      <h3
-                        className={`font-['Syne',sans-serif] text-xl font-bold tracking-tight uppercase group-hover:text-cyan-600 dark:group-hover:text-[#00F0FF] transition-colors ${
-                          isDark ? 'text-white' : 'text-[#0F172A]'
-                        }`}
-                      >
-                        {club.name}
-                      </h3>
-                      <p
-                        className={`text-xs mt-1.5 leading-relaxed line-clamp-2 ${
-                          isDark ? 'text-gray-300' : 'text-slate-600'
-                        }`}
-                      >
-                        {club.description || 'Student organization promoting innovation, collaboration, and learning on campus.'}
+                    <div className="rounded-2xl border border-[var(--border-inverse)] bg-[var(--surface-inverse-tile)] p-4">
+                      <p className="text-xs font-bold uppercase tracking-wider text-[var(--text-inverse-muted)]">Where</p>
+                      <p className="mt-1 font-semibold text-[var(--text-inverse)]">
+                        {spotlightEvent.venue || spotlightEvent.location || 'Venue to be announced'}
                       </p>
                     </div>
+                    <div className="rounded-2xl border border-[var(--border-inverse)] bg-[var(--surface-inverse-tile)] p-4">
+                      <p className="text-xs font-bold uppercase tracking-wider text-[var(--text-inverse-muted)]">Host club</p>
+                      <p className="mt-1 font-semibold text-[var(--text-inverse)]">{spotlightEvent.club?.name || collegeDisplay}</p>
+                    </div>
+                    <div className="rounded-2xl border border-[var(--border-inverse)] bg-[var(--surface-inverse-tile)] p-4">
+                      <p className="text-xs font-bold uppercase tracking-wider text-[var(--text-inverse-muted)]">Attending</p>
+                      <p className="mt-1 font-semibold text-[var(--text-inverse)]">
+                        {typeof spotlightEvent.registeredCount === 'number' ? `${spotlightEvent.registeredCount} students` : 'Opening soon'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
 
-                    <div
-                      className={`pt-3 border-t flex items-center justify-between text-xs font-semibold ${
-                        isDark ? 'border-white/10 text-gray-400' : 'border-slate-100 text-slate-500'
-                      }`}
+                <div className="relative">
+                  <div aria-hidden className="absolute -inset-6 -rotate-3 rounded-[2rem] bg-[var(--accent-primary)]" />
+                  <div className="relative rounded-[2rem] border-2 border-[var(--border-inverse)] bg-[var(--surface-inverse-hover)] px-8 py-12 text-center">
+                    {typeof spotlightEvent.registeredCount === 'number' ? (
+                      <>
+                        <p className="font-display text-6xl font-bold text-[var(--text-inverse)]">{spotlightEvent.registeredCount}</p>
+                        <p className="mt-2 text-xs font-bold uppercase tracking-[0.2em] text-[var(--text-inverse-muted)]">Students are going</p>
+                      </>
+                    ) : (
+                      <p className="font-display text-4xl font-bold uppercase text-[var(--text-inverse)]">Registrations open</p>
+                    )}
+                    <Link
+                      href={`/college/${slug}/events/${spotlightEvent.id}`}
+                      className="mt-8 inline-flex min-h-14 items-center justify-center rounded-2xl bg-[var(--accent-primary)] px-8 py-3 text-xl font-bold text-[var(--text-primary)] transition-transform hover:-rotate-1"
                     >
-                      <span className="flex items-center gap-1.5">
-                        <Users className="w-3.5 h-3.5 text-cyan-500" />
-                        <span>{club._count?.members || club.membersCount || club.memberCount || 100}+ Members</span>
-                      </span>
+                      Grab your spot
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+        )}
 
-                      <span className="inline-flex items-center gap-1 text-cyan-600 dark:text-[#00F0FF] font-extrabold uppercase text-[11px] group-hover:translate-x-1 transition-transform">
-                        <span>Explore</span>
-                        <ArrowUpRight className="w-3.5 h-3.5" />
+        {/* 5. CAMPUS CLUBS */}
+        <section id="featured-clubs" className="bg-[var(--surface-page)] py-16 md:py-20">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+            <div className="mb-10 flex flex-col justify-between gap-6 border-b-2 border-[var(--border-soft)] pb-6 md:flex-row md:items-end">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.22em] text-[var(--accent-strong)]">Student organizations</p>
+                <h2 className="font-display mt-3 text-3xl font-bold uppercase tracking-tight text-[var(--text-primary)] sm:text-5xl">
+                  Explore campus <span className="text-[var(--accent-primary)]">clubs</span>
+                </h2>
+                <p className="mt-3 max-w-xl text-sm text-[var(--text-secondary)] sm:text-base">
+                  The student communities hosting these events across {collegeDisplay}. Join a club to participate, organize, or lead.
+                </p>
+              </div>
+
+              <Link
+                href={`/college/${slug}/clubs`}
+                className="inline-flex min-h-11 items-center justify-center gap-2 self-start rounded-2xl bg-[var(--surface-inverse)] px-6 py-3 text-xs font-bold uppercase tracking-wider text-[var(--text-inverse)] transition-transform hover:-translate-y-0.5 md:self-end"
+              >
+                <span>View all clubs</span>
+                <ArrowRight className="h-3.5 w-3.5" aria-hidden />
+              </Link>
+            </div>
+
+            {/* Clubs Grid */}
+            {clubsLoading ? (
+              <>
+                <LoadingRow label="Loading campus clubs" />
+                <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                  <CardSkeletons />
+                </div>
+              </>
+            ) : clubsError ? (
+              <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                <ErrorBlock
+                  title="Couldn't load clubs"
+                  message="The campus clubs didn't load. Check your connection and try again."
+                  onRetry={() => refetchClubs()}
+                />
+              </div>
+            ) : clubs.length === 0 ? (
+              <div className="rounded-3xl border-2 border-[var(--border-strong)] bg-[var(--surface-card)] p-10 text-center shadow-brutal-xs">
+                <p className="font-display text-xl font-bold uppercase tracking-tight text-[var(--text-primary)]">No clubs are listed yet</p>
+                <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-[var(--text-secondary)]">
+                  Student organizations appear here once they are registered at {collegeDisplay}.
+                </p>
+              </div>
+            ) : (
+              <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                {clubs.slice(0, 6).map((club) => {
+                  const clubImage = resolveImageUrl(
+                    club.coverImageUrl,
+                    club.coverImage?.url,
+                    club.coverUrl,
+                    club.bannerUrl,
+                    club.logoUrl,
+                    club.logo?.url
+                  );
+                  const memberCount = club._count?.members ?? club.membersCount ?? club.memberCount;
+
+                  return (
+                    <Link key={club.id} href={`/college/${slug}/clubs/${club.id}`} className="group block" aria-label={`View the ${club.name} club`}>
+                      <article className="flex h-full flex-col rounded-3xl border-2 border-[var(--border-strong)] bg-[var(--surface-card)] p-6 shadow-brutal-md transition-transform duration-200 group-hover:[@media(hover:hover)_and_(prefers-reduced-motion:no-preference)]:-translate-x-1 group-hover:[@media(hover:hover)_and_(prefers-reduced-motion:no-preference)]:-translate-y-1">
+                        {clubImage ? (
+                          <img
+                            src={clubImage}
+                            alt={`Cover for ${club.name}`}
+                            className="aspect-[4/3] w-full rounded-2xl border border-[var(--border-soft)] object-cover"
+                          />
+                        ) : (
+                          <div className="grid aspect-[4/3] w-full place-items-center rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-tile)]">
+                            <span aria-hidden className="font-display text-6xl font-bold text-[var(--text-muted)]">
+                              {club.name.charAt(0).toUpperCase()}
+                            </span>
+                          </div>
+                        )}
+
+                        <div className="mt-5 flex items-start justify-between gap-3">
+                          <div>
+                            <h3 className="font-display text-2xl font-bold uppercase tracking-tight text-[var(--text-primary)] transition-colors group-hover:text-[var(--accent-primary)]">
+                              {club.name}
+                            </h3>
+                            {club.category && (
+                              <p className="mt-1 text-xs font-bold uppercase tracking-wider text-[var(--accent-strong)]">{club.category}</p>
+                            )}
+                          </div>
+                          {typeof memberCount === 'number' && (
+                            <span className="shrink-0 rounded-full border-2 border-[var(--border-strong)] px-3 py-1 text-xs font-bold text-[var(--text-primary)]">
+                              {memberCount} members
+                            </span>
+                          )}
+                        </div>
+
+                        {club.description && (
+                          <p className="mt-3 line-clamp-2 text-sm font-medium text-[var(--text-secondary)]">{club.description}</p>
+                        )}
+                      </article>
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </section>
+
+        {/* 6. ACADEMIC DEPARTMENTS */}
+        <section
+          id="departments"
+          className="border-t-2 border-dashed border-[var(--border-soft)] bg-[var(--surface-page)] py-16 md:py-20"
+        >
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+            <div className="mb-12 flex flex-col justify-between gap-6 md:flex-row md:items-end">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.22em] text-[var(--accent-strong)]">Academic divisions</p>
+                <h2 className="font-display mt-3 text-3xl font-bold uppercase tracking-tight text-[var(--text-primary)] sm:text-5xl">
+                  Departments &amp; chapters
+                </h2>
+                <p className="mt-3 max-w-xl text-sm leading-relaxed text-[var(--text-secondary)] sm:text-base">
+                  Academic divisions across {collegeDisplay} anchor departmental clubs, student hackathons, and technical symposiums.
+                </p>
+              </div>
+
+              {!departmentsLoading && departments.length > 0 && (
+                <span className="inline-flex items-center self-start rounded-full border-2 border-[var(--border-strong)] bg-[var(--surface-card)] px-4 py-2 text-xs font-bold uppercase tracking-wider text-[var(--text-primary)] shadow-brutal-xs md:self-end">
+                  {departments.length} departments
+                </span>
+              )}
+            </div>
+
+            {departmentsLoading ? (
+              <>
+                <LoadingRow label="Loading departments" />
+                <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                  <CardSkeletons />
+                </div>
+              </>
+            ) : departmentsError ? (
+              <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                <ErrorBlock
+                  title="Couldn't load departments"
+                  message="The department list didn't load. Check your connection and try again."
+                  onRetry={() => refetchDepartments()}
+                />
+              </div>
+            ) : departments.length === 0 ? (
+              <div className="rounded-3xl border-2 border-[var(--border-strong)] bg-[var(--surface-card)] p-10 text-center shadow-brutal-xs">
+                <Building2 className="mx-auto mb-3 h-10 w-10 text-[var(--accent-strong)]" aria-hidden />
+                <p className="font-display text-xl font-bold uppercase tracking-tight text-[var(--text-primary)]">No departments are listed yet</p>
+                <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-[var(--text-secondary)]">
+                  Departments appear here once they are added to {collegeDisplay}.
+                </p>
+              </div>
+            ) : (
+              <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                {departments.map((dept) => (
+                  <Link
+                    key={dept.id}
+                    href={`/college/${slug}/departments/${dept.id}`}
+                    className="group block"
+                    aria-label={`View the ${dept.name} department`}
+                  >
+                    <article className="flex h-full flex-col justify-between rounded-3xl border-2 border-[var(--border-strong)] bg-[var(--surface-card)] p-6 shadow-brutal-md transition-transform duration-200 group-hover:[@media(hover:hover)_and_(prefers-reduced-motion:no-preference)]:-translate-x-1 group-hover:[@media(hover:hover)_and_(prefers-reduced-motion:no-preference)]:-translate-y-1">
+                      <div>
+                        <div className="flex items-start justify-between gap-3">
+                          {(dept.shortCode || dept.code) && (
+                            <span className="rounded-xl border border-[var(--border-soft)] bg-[var(--surface-tile)] px-3 py-1 text-xs font-black uppercase tracking-wider text-[var(--text-primary)]">
+                              {dept.shortCode || dept.code}
+                            </span>
+                          )}
+                        </div>
+
+                        <h3 className="font-display mt-4 text-2xl font-bold uppercase tracking-tight text-[var(--text-primary)] transition-colors group-hover:text-[var(--accent-primary)]">
+                          {dept.name}
+                        </h3>
+
+                        {dept.description && (
+                          <p className="mt-2 line-clamp-3 text-xs leading-relaxed text-[var(--text-secondary)]">{dept.description}</p>
+                        )}
+                      </div>
+
+                      <div className="mt-6 flex items-center justify-between border-t border-[var(--border-soft)] pt-4 text-xs font-bold">
+                        {typeof dept.clubCount === 'number' && (
+                          <span className="flex items-center gap-1.5 text-[var(--text-secondary)]">
+                            <Building2 className="h-3.5 w-3.5" aria-hidden />
+                            {dept.clubCount} clubs associated
+                          </span>
+                        )}
+                        <span className="inline-flex items-center gap-1 uppercase tracking-wider text-[var(--accent-strong)] transition-transform group-hover:translate-x-1">
+                          <span>Explore</span>
+                          <ArrowUpRight className="h-3.5 w-3.5" aria-hidden />
+                        </span>
+                      </div>
+                    </article>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </div>
+        </section>
+
+        {/* 7. EVENT CATEGORIES — counts derived from real data */}
+        {categoryStats.length > 0 && (
+          <section className="border-t-2 border-dashed border-[var(--border-soft)] bg-[var(--surface-page)] py-16 md:py-20">
+            <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+              <div className="mb-12 flex flex-col justify-between gap-4 border-b-2 border-[var(--border-soft)] pb-6 md:flex-row md:items-end">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-[0.22em] text-[var(--accent-strong)]">Browse by interest</p>
+                  <h2 className="font-display mt-3 text-3xl font-bold uppercase tracking-tight text-[var(--text-primary)] sm:text-5xl">
+                    Event <span className="text-[var(--accent-primary)]">categories</span>
+                  </h2>
+                </div>
+                <p className="max-w-sm text-xs text-[var(--text-secondary)] sm:text-sm">
+                  Pick a discipline to filter the events and clubs on this page.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {categoryStats.map((category) => (
+                  <button
+                    key={category.name}
+                    type="button"
+                    onClick={() => {
+                      setActiveCategory(category.name);
+                      scrollToEvents();
+                    }}
+                    className="group cursor-pointer rounded-3xl border-2 border-[var(--border-strong)] bg-[var(--surface-card)] p-5 text-left shadow-brutal-xs transition-transform duration-200 hover:[@media(hover:hover)_and_(prefers-reduced-motion:no-preference)]:-translate-y-1"
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <h3 className="font-display text-xl font-bold uppercase tracking-tight text-[var(--text-primary)] transition-colors group-hover:text-[var(--accent-primary)]">
+                        {category.name}
+                      </h3>
+                      <span className="shrink-0 rounded-full border-2 border-[var(--border-strong)] px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-[var(--text-primary)]">
+                        {category.eventCount > 0 ? `${category.eventCount} events` : ''}
+                        {category.eventCount > 0 && category.clubCount > 0 ? ' · ' : ''}
+                        {category.clubCount > 0 ? `${category.clubCount} clubs` : ''}
                       </span>
                     </div>
+
+                    <div className="mt-4 flex items-center justify-between border-t border-[var(--border-soft)] pt-3 text-[11px] font-bold uppercase tracking-wider text-[var(--accent-strong)]">
+                      <span>Filter events</span>
+                      <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-1" aria-hidden />
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* 8. WHY JOIN */}
+        <section className="bg-[var(--surface-page)] py-16 md:py-20">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+            <div className="mb-12 max-w-3xl">
+              <p className="text-xs font-bold uppercase tracking-[0.22em] text-[var(--accent-strong)]">Student community</p>
+              <h2 className="font-display mt-3 text-3xl font-bold uppercase tracking-tight text-[var(--text-primary)] sm:text-5xl">
+                Campus is <span className="text-[var(--accent-primary)]">better together.</span>
+              </h2>
+            </div>
+
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+              {benefits.map((item) => (
+                <div
+                  key={item.num}
+                  className="flex flex-col justify-between rounded-3xl border-2 border-[var(--border-strong)] bg-[var(--surface-card)] p-6 shadow-brutal-sm sm:p-7"
+                >
+                  <div>
+                    <div className="mb-4 flex items-center justify-between">
+                      <span aria-hidden className="font-display text-3xl font-black text-[var(--accent-primary)]">
+                        {item.num}
+                      </span>
+                      <span className="rounded-full border-2 border-[var(--border-soft)] bg-[var(--surface-tile)] px-2.5 py-0.5 text-[11px] font-semibold text-[var(--text-secondary)]">
+                        {item.highlight}
+                      </span>
+                    </div>
+
+                    <h3 className="font-display text-xl font-bold uppercase tracking-tight text-[var(--text-primary)]">{item.title}</h3>
+
+                    <p className="mt-2 text-sm leading-relaxed text-[var(--text-secondary)]">{item.description}</p>
+                  </div>
+
+                  <div className="mt-5 flex items-center gap-2 border-t border-[var(--border-soft)] pt-3 text-xs font-semibold text-[var(--text-secondary)]">
+                    <CheckCircle2 className="h-4 w-4 text-[var(--accent-strong)]" aria-hidden />
+                    <span>Open to all enrolled students at {collegeDisplay}</span>
                   </div>
                 </div>
               ))}
             </div>
-          )}
-        </div>
-      </section>
-
-      {/* 4. EVENT CATEGORIES SECTION */}
-      <section
-        className={`py-16 md:py-20 relative overflow-hidden transition-colors duration-300 ${
-          isDark ? 'bg-[#0F1117]' : 'bg-white'
-        }`}
-      >
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-          <div
-            className={`flex flex-col md:flex-row md:items-end justify-between mb-12 pb-6 border-b gap-4 ${
-              isDark ? 'border-white/10' : 'border-slate-200'
-            }`}
-          >
-            <div>
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/10 text-cyan-600 dark:text-[#00F0FF] text-xs font-bold uppercase tracking-wider mb-2.5">
-                <Layers className="w-3.5 h-3.5" />
-                <span>Browse By Interest</span>
-              </div>
-              <h2
-                className={`font-['Syne',sans-serif] text-3xl sm:text-5xl font-extrabold uppercase tracking-tight ${
-                  isDark ? 'text-white' : 'text-[#0F172A]'
-                }`}
-              >
-                EVENT <span className="text-[#00F0FF]">CATEGORIES</span>
-              </h2>
-            </div>
-            <p className={`text-xs sm:text-sm max-w-sm ${isDark ? 'text-gray-400' : 'text-slate-500'}`}>
-              Click on any discipline to immediately filter campus events and clubs.
-            </p>
           </div>
+        </section>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {categoryList.map((cat) => (
-              <div
-                key={cat.code}
-                onClick={() => {
-                  setActiveCategory(cat.name);
-                  const el = document.getElementById('upcoming-events');
-                  if (el) el.scrollIntoView({ behavior: 'smooth' });
-                }}
-                className={`group relative rounded-2xl p-5 border transition-all duration-300 cursor-pointer ${
-                  isDark
-                    ? 'border-white/10 bg-[#12141C] hover:bg-[#161924] hover:border-cyan-500/50'
-                    : 'border-slate-200 bg-[#FAF9F5] hover:bg-white hover:border-cyan-400 shadow-2xs hover:shadow-md'
-                }`}
-              >
-                <div className="flex items-start justify-between mb-2">
-                  <span
-                    className={`font-['Syne',sans-serif] text-xs font-black px-2 py-0.5 rounded-md ${
-                      isDark ? 'bg-white/10 text-gray-300' : 'bg-slate-200 text-slate-700'
-                    }`}
-                  >
-                    {cat.code}
-                  </span>
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-cyan-600 dark:text-cyan-400">
-                    {cat.eventsCount}
-                  </span>
-                </div>
-
-                <h3
-                  className={`font-['Syne',sans-serif] text-xl font-bold uppercase tracking-tight group-hover:text-cyan-600 dark:group-hover:text-[#00F0FF] transition-colors mb-1 ${
-                    isDark ? 'text-white' : 'text-[#0F172A]'
-                  }`}
-                >
-                  {cat.name}
-                </h3>
-
-                <p className={`text-xs line-clamp-2 leading-relaxed ${isDark ? 'text-gray-400' : 'text-slate-600'}`}>
-                  {cat.description}
-                </p>
-
-                <div className="mt-3 flex items-center justify-between text-[11px] font-bold text-cyan-600 dark:text-[#00F0FF]">
-                  <span>Filter Events</span>
-                  <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* 5. WHY JOIN SECTION */}
-      <section
-        className={`py-16 md:py-20 relative overflow-hidden transition-colors duration-300 ${
-          isDark ? 'bg-[#0B0C10]' : 'bg-[#FAF9F5]'
-        }`}
-      >
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-          <div className="max-w-3xl mb-12">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/10 text-cyan-600 dark:text-[#00F0FF] text-xs font-bold uppercase tracking-wider mb-2.5">
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>Student Community</span>
+        {/* 9. FINAL CTA */}
+        <section className="border-t-2 border-dashed border-[var(--border-soft)] bg-[var(--surface-page)] py-16 text-center md:py-24">
+          <div className="mx-auto max-w-4xl space-y-4 px-4 sm:px-6 lg:px-8">
+            <div className="inline-flex items-center gap-2 rounded-full border-2 border-[var(--border-strong)] bg-[var(--surface-card)] px-3.5 py-1.5 text-xs font-bold uppercase tracking-widest text-[var(--text-primary)]">
+              <Sparkles className="h-3.5 w-3.5 text-[var(--accent-strong)]" aria-hidden />
+              <span>Never miss a beat</span>
             </div>
 
-            <h2
-              className={`font-['Syne',sans-serif] text-3xl sm:text-5xl font-extrabold uppercase tracking-tight leading-[0.96] ${
-                isDark ? 'text-white' : 'text-[#0F172A]'
-              }`}
-            >
-              CAMPUS IS <br />
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#00F0FF] via-cyan-400 to-pink-500">
-                BETTER TOGETHER.
-              </span>
+            <h2 className="font-campus text-4xl uppercase tracking-tight text-[var(--text-primary)] sm:text-6xl">
+              Your campus. Your events.
             </h2>
-          </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {benefits.map((item) => (
-              <div
-                key={item.num}
-                className={`p-6 sm:p-7 rounded-2xl border transition-all duration-300 flex flex-col justify-between ${
-                  isDark
-                    ? 'bg-[#12141C] border-white/10 hover:border-cyan-500/40'
-                    : 'bg-white border-slate-200 hover:border-cyan-400 shadow-xs'
-                }`}
+            <p className="mx-auto max-w-lg text-sm text-[var(--text-secondary)] sm:text-base">
+              Discover student clubs, reserve your spot at upcoming events, and make campus life truly memorable.
+            </p>
+
+            <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+              <button
+                type="button"
+                onClick={scrollToEvents}
+                className="inline-flex min-h-14 cursor-pointer items-center gap-2 rounded-2xl bg-[var(--accent-strong)] px-8 py-3 text-base font-bold text-white transition-transform hover:-translate-y-0.5"
               >
-                <div>
-                  <div className="flex items-center justify-between mb-4">
-                    <span className="font-['Syne',sans-serif] text-3xl font-black text-cyan-500 opacity-60">
-                      {item.num}
-                    </span>
-                    <span
-                      className={`px-2.5 py-0.5 rounded-full border text-[11px] font-semibold ${
-                        isDark ? 'bg-white/5 border-white/10 text-gray-300' : 'bg-slate-50 border-slate-200 text-slate-700'
-                      }`}
-                    >
-                      {item.highlight}
-                    </span>
-                  </div>
-
-                  <h3
-                    className={`font-['Syne',sans-serif] text-xl font-bold uppercase tracking-tight mb-2 ${
-                      isDark ? 'text-white' : 'text-[#0F172A]'
-                    }`}
-                  >
-                    {item.title}
-                  </h3>
-
-                  <p
-                    className={`text-xs sm:text-sm leading-relaxed font-normal ${
-                      isDark ? 'text-gray-300' : 'text-slate-600'
-                    }`}
-                  >
-                    {item.description}
-                  </p>
-                </div>
-
-                <div
-                  className={`mt-5 pt-3 border-t flex items-center gap-2 text-xs font-semibold text-cyan-600 dark:text-cyan-400 ${
-                    isDark ? 'border-white/5' : 'border-slate-100'
-                  }`}
-                >
-                  <CheckCircle2 className="w-4 h-4" />
-                  <span>Open to all enrolled students at {collegeDisplay}</span>
-                </div>
-              </div>
-            ))}
+                <span>Find an event now</span>
+                <ArrowRight className="h-4 w-4" aria-hidden />
+              </button>
+              <Link
+                href={`/college/${slug}/clubs`}
+                className="inline-flex min-h-14 items-center gap-2 rounded-2xl border-2 border-[var(--border-strong)] bg-[var(--surface-card)] px-7 py-3 text-base font-bold text-[var(--text-primary)] transition-transform hover:-translate-y-0.5"
+              >
+                <span>Explore all clubs</span>
+              </Link>
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* 6. FINAL CTA BANNER */}
-      <section
-        className={`py-16 md:py-20 border-t relative overflow-hidden text-center transition-colors duration-300 ${
-          isDark ? 'bg-[#0F1117] border-white/10 text-white' : 'bg-white border-slate-200 text-[#0F172A]'
-        }`}
-      >
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 space-y-4">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-cyan-500/10 text-cyan-600 dark:text-[#00F0FF] text-xs font-bold uppercase tracking-widest border border-cyan-500/20">
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>Never Miss A Beat</span>
-          </div>
+        {/* 10. EVENT MODAL & GALLERY LIGHTBOX */}
+        {selectedEvent && (
+          <EventModal
+            event={selectedEvent}
+            collegeSlug={slug}
+            onClose={() => setSelectedEvent(null)}
+            onOpenGallery={(ev) => {
+              setSelectedEvent(null);
+              setActiveGalleryEvent(ev);
+            }}
+          />
+        )}
 
-          <h2
-            className={`font-['Syne',sans-serif] text-3xl sm:text-5xl font-black uppercase tracking-tight ${
-              isDark ? 'text-white' : 'text-[#0F172A]'
-            }`}
-          >
-            YOUR CAMPUS. YOUR EVENTS.
-          </h2>
-
-          <p
-            className={`text-sm sm:text-base font-normal max-w-lg mx-auto ${
-              isDark ? 'text-gray-300' : 'text-slate-600'
-            }`}
-          >
-            Discover student clubs, reserve your spot at upcoming events, and make campus life truly memorable.
-          </p>
-
-          <div className="pt-2 flex flex-wrap items-center justify-center gap-3">
-            <a
-              href="#upcoming-events"
-              className="inline-flex items-center gap-2 px-7 py-3 rounded-full bg-[#00F0FF] text-black font-extrabold text-xs uppercase tracking-wider shadow-lg shadow-cyan-500/25 hover:bg-[#38f2ff] hover:scale-105 transition-all cursor-pointer"
-            >
-              <span>FIND AN EVENT NOW</span>
-              <ArrowRight className="w-4 h-4" />
-            </a>
-            <Link
-              href={`/college/${slug}/clubs`}
-              className={`inline-flex items-center gap-2 px-6 py-3 rounded-full border text-xs font-extrabold uppercase tracking-wider transition-all ${
-                isDark
-                  ? 'bg-white/5 border-white/15 text-white hover:bg-white/10'
-                  : 'bg-slate-100 border-slate-300 text-slate-800 hover:bg-slate-200'
-              }`}
-            >
-              <span>EXPLORE ALL CLUBS</span>
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      {/* 7. EVENT MODAL & GALLERY LIGHTBOX */}
-      {selectedEvent && (
-        <EventModal
-          event={selectedEvent}
-          collegeSlug={slug}
-          onClose={() => setSelectedEvent(null)}
-          onOpenGallery={(ev) => {
-            setSelectedEvent(null);
-            setActiveGalleryEvent(ev);
-          }}
-        />
-      )}
-
-      {activeGalleryEvent && (
-        <GalleryLightbox event={activeGalleryEvent} onClose={() => setActiveGalleryEvent(null)} />
-      )}
+        {activeGalleryEvent && (
+          <GalleryLightbox event={activeGalleryEvent} onClose={() => setActiveGalleryEvent(null)} />
+        )}
+      </div>
     </PublicLayout>
   );
 }

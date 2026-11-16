@@ -1,5 +1,12 @@
 import assert from 'node:assert';
 import { resolveHost, normalizeHost } from '@/lib/routing/hostResolver';
+import { resolveCollegeRouting } from '@/lib/routing/collegePath';
+import { isRealCollegeSlug } from '@/lib/colleges/realColleges';
+import {
+  isCollegeHost,
+  isCollegeDarkBlockedSurface,
+  buildThemeBootScript,
+} from '@/lib/routing/themeSurface';
 import { makeQueryClient, getQueryClient, clearAllQueryCache } from '@/lib/query/queryClient';
 import { queryKeys } from '@/lib/api/queryKeys';
 import { apiClient, getApiBaseUrl } from '@/lib/api/axios';
@@ -152,6 +159,238 @@ async function runAllTests() {
     });
     assert.strictEqual(res.type, 'COLLEGE');
     assert.strictEqual(res.slug, 'lbrce');
+  });
+
+  // ----------------------------------------------------------------------------
+  // SUITE 1B: College Path Routing Decisions (middleware behavior, pure helper)
+  // ----------------------------------------------------------------------------
+  console.log('\n--- SUITE 1B: College Path Routing Decisions ---');
+
+  const publicPlain = resolveHost('localhost:3000', { isProduction: false });
+  const collegeSubdomain = resolveHost('lbrce.localhost:3000', { isProduction: false });
+
+  await test('1B.1: Plain-host /college/<slug> routes by path slug without rewrite', () => {
+    const decision = resolveCollegeRouting('/college/lbrce', publicPlain);
+    assert.strictEqual(decision.hostType, 'COLLEGE');
+    assert.strictEqual(decision.tenantSlug, 'lbrce');
+    assert.strictEqual(decision.rewritePath, undefined);
+    assert.strictEqual(decision.status, undefined);
+
+    const withSubPath = resolveCollegeRouting('/college/lbrce/clubs/abc', publicPlain);
+    assert.strictEqual(withSubPath.tenantSlug, 'lbrce');
+    assert.strictEqual(withSubPath.rewritePath, undefined);
+  });
+
+  await test('1B.2: College subdomain root rewrites to /college/<slug>', () => {
+    const decision = resolveCollegeRouting('/', collegeSubdomain);
+    assert.strictEqual(decision.hostType, 'COLLEGE');
+    assert.strictEqual(decision.tenantSlug, 'lbrce');
+    assert.strictEqual(decision.rewritePath, '/college/lbrce');
+  });
+
+  await test('1B.3: Mismatched path slug on a subdomain loses to the subdomain slug', () => {
+    const decision = resolveCollegeRouting('/college/northwood', collegeSubdomain);
+    assert.strictEqual(decision.tenantSlug, 'lbrce');
+    assert.strictEqual(decision.rewritePath, '/college/lbrce');
+
+    // Sub-paths are preserved during the rewrite.
+    const withSubPath = resolveCollegeRouting('/college/northwood/clubs/abc', collegeSubdomain);
+    assert.strictEqual(withSubPath.tenantSlug, 'lbrce');
+    assert.strictEqual(withSubPath.rewritePath, '/college/lbrce/clubs/abc');
+
+    // A matching path slug needs no rewrite at all.
+    const matching = resolveCollegeRouting('/college/lbrce/clubs', collegeSubdomain);
+    assert.strictEqual(matching.tenantSlug, 'lbrce');
+    assert.strictEqual(matching.rewritePath, undefined);
+  });
+
+  await test('1B.4: Reserved slugs stay blocked on both host styles', () => {
+    // Reserved subdomain: hostResolver rejects it outright.
+    const apiSubdomain = resolveHost('api.localhost', { isProduction: false });
+    assert.strictEqual(apiSubdomain.type, 'INVALID');
+    const wwwSubdomain = resolveHost('www.localhost', { isProduction: false });
+    assert.strictEqual(wwwSubdomain.type, 'PUBLIC');
+
+    // Reserved path slug on a plain host: rejected with 400.
+    const decision = resolveCollegeRouting('/college/demo', publicPlain);
+    assert.strictEqual(decision.status, 400);
+    const decisionAdmin = resolveCollegeRouting('/college/admin', publicPlain);
+    assert.strictEqual(decisionAdmin.status, 400);
+  });
+
+  await test('1B.5: /api and /admin are never rewritten, on any host', () => {
+    const apiOnSubdomain = resolveCollegeRouting('/api/clubs', collegeSubdomain);
+    assert.strictEqual(apiOnSubdomain.hostType, 'PUBLIC');
+    assert.strictEqual(apiOnSubdomain.rewritePath, undefined);
+
+    const adminPath = resolveCollegeRouting('/admin', collegeSubdomain);
+    assert.strictEqual(adminPath.hostType, 'PLATFORM_ADMIN');
+    assert.strictEqual(adminPath.rewritePath, undefined);
+  });
+
+  await test('1B.6: Unknown slugs pass middleware but are rejected by the real-college gate', () => {
+    // Middleware passes the slug through; the page layer decides existence.
+    const decision = resolveCollegeRouting('/college/notacollege', publicPlain);
+    assert.strictEqual(decision.tenantSlug, 'notacollege');
+    assert.strictEqual(decision.status, undefined);
+    assert.strictEqual(isRealCollegeSlug('notacollege'), false);
+  });
+
+  await test('1B.7: Demo slugs never render the real college page', () => {
+    const decision = resolveCollegeRouting('/college/northwood', publicPlain);
+    assert.strictEqual(decision.tenantSlug, 'northwood');
+    assert.strictEqual(decision.status, undefined);
+    assert.strictEqual(isRealCollegeSlug('northwood'), false);
+    assert.strictEqual(isRealCollegeSlug('lbrce'), true);
+  });
+
+  // ----------------------------------------------------------------------------
+  // SUITE 1C: Theme Surface Decision (never dark on college public paths)
+  // ----------------------------------------------------------------------------
+  console.log('\n--- SUITE 1C: Theme Surface Decision (never dark on college paths) ---');
+
+  await test('1C.1: /college/** paths are always dark-blocked on a plain host', () => {
+    assert.strictEqual(isCollegeDarkBlockedSurface('/college/lbrce', 'localhost:3000'), true);
+    assert.strictEqual(isCollegeDarkBlockedSurface('/college/lbrce/clubs', 'localhost'), true);
+    assert.strictEqual(isCollegeDarkBlockedSurface('/college/lbrce/clubs/abc', 'localhost:3000'), true);
+    assert.strictEqual(isCollegeDarkBlockedSurface('/college/lbrce/login', 'localhost:3000'), true);
+  });
+
+  await test('1C.2: Every path on a college subdomain is dark-blocked (dev)', () => {
+    assert.strictEqual(isCollegeDarkBlockedSurface('/', 'lbrce.localhost:3000', { isProduction: false }), true);
+    assert.strictEqual(isCollegeDarkBlockedSurface('/clubs', 'lbrce.localhost', { isProduction: false }), true);
+    assert.strictEqual(
+      isCollegeDarkBlockedSurface('/events/ev-1', 'lbrce.localhost:3000', { isProduction: false }),
+      true
+    );
+    assert.strictEqual(
+      isCollegeDarkBlockedSurface('/', 'lbrce.4thepeople.in', { isProduction: true }),
+      true
+    );
+  });
+
+  await test('1C.3: Reserved slugs (www/api/admin/...) never count as a college host', () => {
+    assert.strictEqual(isCollegeHost('www.localhost', { isProduction: false }), false);
+    assert.strictEqual(isCollegeHost('api.localhost', { isProduction: false }), false);
+    assert.strictEqual(isCollegeHost('admin.4thepeople.in', { isProduction: true }), false);
+    assert.strictEqual(isCollegeDarkBlockedSurface('/', 'www.localhost:3000', { isProduction: false }), false);
+    assert.strictEqual(isCollegeDarkBlockedSurface('/', 'api.localhost', { isProduction: false }), false);
+  });
+
+  await test('1C.4: Nested subdomains and evil suffixes are not college hosts', () => {
+    assert.strictEqual(isCollegeHost('attacker.lbrce.localhost', { isProduction: false }), false);
+    assert.strictEqual(isCollegeHost('lbrce.4thepeople.in.evil.com', { isProduction: true }), false);
+    assert.strictEqual(isCollegeDarkBlockedSurface('/', 'attacker.lbrce.localhost', { isProduction: false }), false);
+  });
+
+  await test('1C.5: *.localhost subdomains are ignored in production', () => {
+    assert.strictEqual(isCollegeHost('lbrce.localhost', { isProduction: true }), false);
+    assert.strictEqual(
+      isCollegeDarkBlockedSurface('/', 'lbrce.localhost', { isProduction: true }),
+      false
+    );
+  });
+
+  await test('1C.6: Dashboard segments keep their own theme toggle (not blocked)', () => {
+    assert.strictEqual(isCollegeDarkBlockedSurface('/college/lbrce/student', 'localhost:3000'), false);
+    assert.strictEqual(isCollegeDarkBlockedSurface('/college/lbrce/student/x', 'localhost:3000'), false);
+    assert.strictEqual(isCollegeDarkBlockedSurface('/college/lbrce/manager', 'localhost:3000'), false);
+    assert.strictEqual(isCollegeDarkBlockedSurface('/college/lbrce/admin/settings', 'localhost:3000'), false);
+    // Top-level dashboard routes as served from a college subdomain root.
+    assert.strictEqual(
+      isCollegeDarkBlockedSurface('/student', 'lbrce.localhost:3000', { isProduction: false }),
+      false
+    );
+    assert.strictEqual(
+      isCollegeDarkBlockedSurface('/manager', 'lbrce.localhost:3000', { isProduction: false }),
+      false
+    );
+    // But the same segment on a non-college host is not a dashboard surface.
+    assert.strictEqual(isCollegeDarkBlockedSurface('/student', 'localhost:3000'), false);
+  });
+
+  await test('1C.7: Marketing surfaces stay dark-capable', () => {
+    assert.strictEqual(isCollegeDarkBlockedSurface('/', 'localhost:3000'), false);
+    assert.strictEqual(isCollegeDarkBlockedSurface('/directory', 'localhost:3000'), false);
+    assert.strictEqual(isCollegeDarkBlockedSurface('/', '4thepeople.in', { isProduction: true }), false);
+  });
+
+  await test('1C.8: Boot script applies dark off-campus and light on campus (pre-hydration)', () => {
+    const runBoot = (
+      script: string,
+      opts: { pathname: string; hostname: string; theme: string | null }
+    ) => {
+      const classes = new Set<string>(['light']);
+      const style: Record<string, string> = {};
+      const doc = {
+        documentElement: {
+          classList: {
+            remove: (...names: string[]) => names.forEach((n) => classes.delete(n)),
+            add: (...names: string[]) => names.forEach((n) => classes.add(n)),
+          },
+          style,
+        },
+      };
+      const storage = new Map<string, string>();
+      if (opts.theme !== null) storage.set('yuva_theme', opts.theme);
+      const localStorageStub = { getItem: (k: string) => (storage.has(k) ? storage.get(k)! : null) };
+      const boot = new Function('location', 'localStorage', 'document', script) as (
+        location: { pathname: string; hostname: string },
+        localStorage: { getItem: (k: string) => string | null },
+        document: unknown
+      ) => void;
+      boot({ pathname: opts.pathname, hostname: opts.hostname }, localStorageStub, doc);
+      return { isDark: classes.has('dark'), colorScheme: style.colorScheme };
+    };
+
+    const devScript = buildThemeBootScript(false);
+    const prodScript = buildThemeBootScript(true);
+
+    // Dark preference on a college path: light must win, before hydration.
+    const campus = runBoot(devScript, {
+      pathname: '/college/lbrce',
+      hostname: 'localhost:3000',
+      theme: 'dark',
+    });
+    assert.strictEqual(campus.isDark, false, 'College path must never boot dark');
+    assert.strictEqual(campus.colorScheme, 'light');
+
+    // Same on the subdomain host.
+    const subdomain = runBoot(devScript, {
+      pathname: '/',
+      hostname: 'lbrce.localhost',
+      theme: 'dark',
+    });
+    assert.strictEqual(subdomain.isDark, false);
+
+    // Dashboard keeps dark.
+    const dashboard = runBoot(devScript, {
+      pathname: '/college/lbrce/student',
+      hostname: 'localhost:3000',
+      theme: 'dark',
+    });
+    assert.strictEqual(dashboard.isDark, true);
+    assert.strictEqual(dashboard.colorScheme, 'dark');
+
+    // Marketing keeps dark.
+    const marketing = runBoot(devScript, {
+      pathname: '/',
+      hostname: 'localhost:3000',
+      theme: 'dark',
+    });
+    assert.strictEqual(marketing.isDark, true);
+
+    // In production, a *.localhost subdomain is untrusted: dark stays (no college surface).
+    const prodLocalhost = runBoot(prodScript, {
+      pathname: '/',
+      hostname: 'lbrce.localhost',
+      theme: 'dark',
+    });
+    assert.strictEqual(prodLocalhost.isDark, true);
+
+    // No preference: light everywhere.
+    const noPref = runBoot(devScript, { pathname: '/college/lbrce', hostname: 'localhost', theme: null });
+    assert.strictEqual(noPref.isDark, false);
   });
 
   // ----------------------------------------------------------------------------

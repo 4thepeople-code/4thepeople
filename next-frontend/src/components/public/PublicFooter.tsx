@@ -4,6 +4,7 @@ import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useTheme } from '@/context/ThemeContext';
+import BrandLogo from '@/components/BrandLogo';
 
 export interface PublicFooterProps {
   collegeSlug?: string;
@@ -25,6 +26,80 @@ export function PublicFooter({ collegeSlug, collegeName }: PublicFooterProps) {
   const clubsHref = getPath('/clubs');
   const loginHref = getPath('/login');
 
+  /* ================================================================== */
+  /* Campus chrome (college pages) — single light theme                  */
+  /* ================================================================== */
+  if (collegeSlug) {
+    const footerLink =
+      'inline-flex min-h-11 items-center text-xs font-semibold text-[var(--text-secondary)] transition-colors hover:text-[var(--accent-strong)]';
+    const footerHeading =
+      'font-display text-xs font-bold uppercase tracking-widest text-[var(--text-primary)]';
+
+    return (
+      <footer className="mt-auto border-t-2 border-dashed border-[var(--border-soft)] bg-[var(--surface-page)] py-12">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 gap-10 pb-10 md:grid-cols-12">
+            {/* Brand Info */}
+            <div className="space-y-4 md:col-span-6">
+              <div className="flex flex-wrap items-center gap-3">
+                <BrandLogo size="md" className="text-[var(--text-primary)]" />
+                {collegeName && (
+                  <span className="inline-flex items-center rounded-lg border border-[var(--border-soft)] bg-[var(--surface-card)] px-3 py-1 font-display text-xs font-bold uppercase tracking-wide text-[var(--text-secondary)]">
+                    {collegeName}
+                  </span>
+                )}
+              </div>
+              <p className="max-w-sm text-sm leading-relaxed text-[var(--text-secondary)]">
+                Discover campus clubs, manage vibrant events, and empower student leadership with 4 THE PEOPLE.
+              </p>
+            </div>
+
+            {/* Nav Links */}
+            <div className="space-y-2 md:col-span-3">
+              <h4 className={footerHeading}>Navigation</h4>
+              <ul className="space-y-1">
+                <li>
+                  <Link href={homeHref} className={footerLink}>
+                    Home
+                  </Link>
+                </li>
+                <li>
+                  <Link href={clubsHref} className={footerLink}>
+                    Clubs Directory
+                  </Link>
+                </li>
+              </ul>
+            </div>
+
+            {/* Portals Link */}
+            <div className="space-y-2 md:col-span-3">
+              <h4 className={footerHeading}>Manager Access</h4>
+              <ul className="space-y-1">
+                <li>
+                  <Link href={loginHref} className={footerLink}>
+                    Manager Portal Login
+                  </Link>
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          {/* Copyright Bottom Bar */}
+          <div className="flex flex-col items-center justify-between gap-4 border-t-2 border-dashed border-[var(--border-soft)] pt-6 text-xs text-[var(--text-muted)] sm:flex-row">
+            <p>© {new Date().getFullYear()} 4 THE PEOPLE. All rights reserved.</p>
+            <div className="flex items-center gap-6">
+              <span className="cursor-pointer hover:underline">Privacy Policy</span>
+              <span className="cursor-pointer hover:underline">Terms of Service</span>
+            </div>
+          </div>
+        </div>
+      </footer>
+    );
+  }
+
+  /* ================================================================== */
+  /* Marketing chrome (e.g. /directory) — original theme-aware look      */
+  /* ================================================================== */
   return (
     <footer
       className={`mt-auto py-16 border-t relative transition-colors duration-300 ${
@@ -127,4 +202,3 @@ export function PublicFooter({ collegeSlug, collegeName }: PublicFooterProps) {
 }
 
 export default PublicFooter;
-

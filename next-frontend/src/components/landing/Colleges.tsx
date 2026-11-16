@@ -2,6 +2,7 @@ import Link from "next/link";
 import { colleges } from "@/lib/landing/data";
 
 const DEMO_DESCRIPTIONS: Record<string, string> = {
+  lbrce: "The live LBRCE portal walked end to end — public, student and staff views, no login.",
   northwood: "Robotics, music, dance and debate clubs share one calendar.",
   crestview: "Poetry slams, synth nights and generative art jams.",
   bellavista: "Game jams, synth builds and street-dance fusion.",
@@ -10,6 +11,22 @@ const DEMO_DESCRIPTIONS: Record<string, string> = {
 
 const liveColleges = colleges.filter((c) => c.status === "live");
 const demoColleges = colleges.filter((c) => c.status === "demo");
+
+// The LBRCE demo walkthrough appears alongside the fictional demo colleges.
+const demoCards = [
+  {
+    slug: "lbrce",
+    name: "LBRCE",
+    shortName: "LBRCE",
+    homepageUrl: "/demo/lbrce",
+  },
+  ...demoColleges.map((c) => ({
+    slug: c.slug,
+    name: c.name,
+    shortName: c.shortName,
+    homepageUrl: c.homepageUrl,
+  })),
+];
 
 export default function Colleges() {
   return (
@@ -51,7 +68,7 @@ export default function Colleges() {
             </span>
           </div>
           <Link
-            href="/demo/lbrce"
+            href="/college/lbrce"
             className="mt-4 lg:mt-0 inline-flex items-center gap-1.5 text-sm font-semibold text-[var(--primary)] transition-colors hover:text-[var(--primary-strong)]"
           >
             Visit LBRCE →
@@ -64,7 +81,7 @@ export default function Colleges() {
             Try a demo
           </h3>
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-            {demoColleges.map((c) => (
+            {demoCards.map((c) => (
               <article
                 key={c.slug}
                 className="rounded-3xl border border-[var(--line)] bg-[var(--surface)] p-6 shadow-sm h-full flex flex-col transition-colors hover:border-[var(--primary)]"
@@ -81,7 +98,7 @@ export default function Colleges() {
                   </span>
                 </div>
                 <p className="mt-4 flex-1 text-sm leading-relaxed text-[var(--ink-soft)]">
-                  {DEMO_DESCRIPTIONS[c.slug] || c.tagline}
+                  {DEMO_DESCRIPTIONS[c.slug]}
                 </p>
                 <Link
                   href={c.homepageUrl}
