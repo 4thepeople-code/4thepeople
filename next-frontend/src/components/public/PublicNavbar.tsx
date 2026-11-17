@@ -323,7 +323,7 @@ export function PublicNavbar({ collegeSlug, collegeName }: PublicNavbarProps) {
             </Link>
 
             <a
-              href={eventsHref}
+              href={`${homeHref}#upcoming-events`}
               onClick={scrollToEvents}
               className={`transition-colors ${
                 isDark ? 'text-gray-300 hover:text-[#00F0FF]' : 'text-slate-600 hover:text-cyan-600'
@@ -493,7 +493,7 @@ export function PublicNavbar({ collegeSlug, collegeName }: PublicNavbarProps) {
               Home
             </Link>
             <a
-              href={eventsHref}
+              href={`${homeHref}#upcoming-events`}
               onClick={(e) => {
                 setMobileMenuOpen(false);
                 scrollToEvents(e);
