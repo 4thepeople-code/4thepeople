@@ -608,6 +608,10 @@ export const collegeAdmin = {
     formEmail: 'Email',
     formEmailPlaceholder: 'e.g. priya@college.edu',
     submit: 'Send invite',
+    submitting: 'Sending invite…',
+    errName: 'Enter the full name the manager will use on their account.',
+    errEmailRequired: 'Enter the email address the invite should go to.',
+    errEmailInvalid: "That email address doesn't look complete — check it and try again.",
     errFieldsRequired:
       "Enter a name and an email — the invite is sent to the email, so double-check it.",
     errSend:

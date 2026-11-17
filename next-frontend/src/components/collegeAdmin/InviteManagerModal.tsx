@@ -36,16 +36,25 @@ export default function InviteManagerModal({
   const { toast } = useToast();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [nameError, setNameError] = useState<string | null>(null);
+  const [emailError, setEmailError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const createManagerMutation = useCreateManagerMutation(slug);
   const inviteToClubMutation = useInviteManagerToClubMutation(slug);
   const isSubmitting = createManagerMutation.isPending || inviteToClubMutation.isPending;
 
+  // Strict-enough shape check: something@something.tld. The server remains the
+  // authority; this only gates the button and gives an inline message.
+  const emailIsValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+  const formIsValid = Boolean(name.trim()) && emailIsValid;
+
   const handleClose = () => {
     if (isSubmitting) return;
     setName('');
     setEmail('');
+    setNameError(null);
+    setEmailError(null);
     setError(null);
     onClose();
   };
@@ -54,10 +63,20 @@ export default function InviteManagerModal({
     event.preventDefault();
     setError(null);
 
-    if (!name.trim() || !email.trim()) {
-      setError(t.errFieldsRequired);
-      return;
+    // Inline validation: each field reports its own problem below its input.
+    let invalid = false;
+    if (!name.trim()) {
+      setNameError(t.errName);
+      invalid = true;
     }
+    if (!email.trim()) {
+      setEmailError(t.errEmailRequired);
+      invalid = true;
+    } else if (!emailIsValid) {
+      setEmailError(t.errEmailInvalid);
+      invalid = true;
+    }
+    if (invalid) return;
 
     try {
       if (clubId) {
@@ -73,6 +92,8 @@ export default function InviteManagerModal({
       }
       setName('');
       setEmail('');
+      setNameError(null);
+      setEmailError(null);
       onSuccess?.();
       onClose();
       toast(t.toastSent, { variant: 'success' });
@@ -91,25 +112,35 @@ export default function InviteManagerModal({
       description={t.description}
       size="md"
     >
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-4" noValidate>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label={t.formName} htmlFor="invite-manager-name" required>
+          <Field label={t.formName} htmlFor="invite-manager-name" required error={nameError ?? undefined}>
             <Input
               id="invite-manager-name"
               placeholder={t.formNamePlaceholder}
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              onChange={(e) => {
+                setName(e.target.value);
+                if (nameError) setNameError(null);
+              }}
               disabled={isSubmitting}
+              aria-invalid={nameError ? true : undefined}
+              autoComplete="name"
             />
           </Field>
-          <Field label={t.formEmail} htmlFor="invite-manager-email" required>
+          <Field label={t.formEmail} htmlFor="invite-manager-email" required error={emailError ?? undefined}>
             <Input
               id="invite-manager-email"
               type="email"
               placeholder={t.formEmailPlaceholder}
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                if (emailError) setEmailError(null);
+              }}
               disabled={isSubmitting}
+              aria-invalid={emailError ? true : undefined}
+              autoComplete="email"
             />
           </Field>
         </div>
@@ -131,7 +162,8 @@ export default function InviteManagerModal({
             type="submit"
             size="sm"
             loading={isSubmitting}
-            loadingLabel={t.submit}
+            loadingLabel={t.submitting}
+            disabled={!formIsValid && !isSubmitting}
           >
             {t.submit}
           </DashboardButton>
