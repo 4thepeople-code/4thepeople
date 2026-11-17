@@ -615,7 +615,7 @@ export function CollegeHomePageClient({ slug }: CollegeHomePageClientProps) {
             ) : filteredEvents.length === 0 ? (
               <div className="rounded-3xl border-2 border-[var(--border-strong)] bg-[var(--surface-page)] p-10 text-center shadow-brutal-xs">
                 <Calendar className="mx-auto mb-3 h-10 w-10 text-[var(--accent-strong)]" aria-hidden />
-                {events.length === 0 ? (
+                {events.length <= 1 ? (
                   <>
                     <p className="font-display text-xl font-bold uppercase tracking-tight text-[var(--text-primary)]">
                       No upcoming events are scheduled yet
