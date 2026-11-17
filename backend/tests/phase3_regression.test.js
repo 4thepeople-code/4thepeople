@@ -171,6 +171,50 @@ async function runRegressionTests() {
     assert.ok(result.html.includes('10 minutes'), 'HTML must include expiry');
   });
 
+  test('12. createEventBody validates visibility enum (defaults COLLEGE, accepts PUBLIC, rejects invalid)', () => {
+    const { createEventBody } = require('../validators/schemas');
+    const basePayload = {
+      title: 'Tech Fest',
+      description: 'A great symposium for campus tech enthusiasts.',
+      location: 'Auditorium A',
+      startAt: new Date(Date.now() + 86400000).toISOString(),
+    };
+
+    // Default when omitted
+    const defaultRes = createEventBody.safeParse(basePayload);
+    assert.strictEqual(defaultRes.success, true);
+    assert.strictEqual(defaultRes.data.visibility, 'COLLEGE');
+
+    // Explicit COLLEGE
+    const collegeRes = createEventBody.safeParse({ ...basePayload, visibility: 'COLLEGE' });
+    assert.strictEqual(collegeRes.success, true);
+    assert.strictEqual(collegeRes.data.visibility, 'COLLEGE');
+
+    // Explicit PUBLIC
+    const publicRes = createEventBody.safeParse({ ...basePayload, visibility: 'PUBLIC' });
+    assert.strictEqual(publicRes.success, true);
+    assert.strictEqual(publicRes.data.visibility, 'PUBLIC');
+
+    // Invalid enum value rejected
+    const invalidRes = createEventBody.safeParse({ ...basePayload, visibility: 'INVALID_VISIBILITY' });
+    assert.strictEqual(invalidRes.success, false);
+  });
+
+  test('13. updateEventBody validates visibility enum (accepts COLLEGE/PUBLIC, rejects invalid)', () => {
+    const { updateEventBody } = require('../validators/schemas');
+
+    const collegeRes = updateEventBody.safeParse({ visibility: 'COLLEGE' });
+    assert.strictEqual(collegeRes.success, true);
+    assert.strictEqual(collegeRes.data.visibility, 'COLLEGE');
+
+    const publicRes = updateEventBody.safeParse({ visibility: 'PUBLIC' });
+    assert.strictEqual(publicRes.success, true);
+    assert.strictEqual(publicRes.data.visibility, 'PUBLIC');
+
+    const invalidRes = updateEventBody.safeParse({ visibility: 'COLLEGE_RESTRICTED' });
+    assert.strictEqual(invalidRes.success, false);
+  });
+
   // ─── Summary ─────────────────────────────────────────────────────────────
   console.log(`\n${'='.repeat(70)}`);
   console.log(`Phase 3D Regression Results: ${passed} passed, ${failed} failed`);

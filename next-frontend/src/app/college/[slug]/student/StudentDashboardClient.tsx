@@ -35,6 +35,7 @@ import {
   Copy,
   Check,
   ExternalLink,
+  Globe,
 } from 'lucide-react';
 import type { EventRegistration } from '@/types/models';
 
@@ -584,9 +585,22 @@ export function StudentDashboardClient({ slug, initialTab = 'registrations' }: S
                     >
                       <div className="space-y-3">
                         <div className="flex items-start justify-between gap-2">
-                          <span className="px-2.5 py-0.5 rounded-full bg-cyan-500/15 text-[10px] font-bold uppercase tracking-wider text-[#00F0FF]">
-                            {ev.category || 'EVENT'}
-                          </span>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="px-2.5 py-0.5 rounded-full bg-cyan-500/15 text-[10px] font-bold uppercase tracking-wider text-[#00F0FF]">
+                              {ev.category || 'EVENT'}
+                            </span>
+                            {ev.visibility === 'PUBLIC' ? (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-[10px] font-bold uppercase tracking-wider text-emerald-400">
+                                <Globe className="w-2.5 h-2.5" />
+                                <span>Public Event</span>
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-slate-500/15 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                                <Building2 className="w-2.5 h-2.5" />
+                                <span>College Only</span>
+                              </span>
+                            )}
+                          </div>
                           {isRegistered && (
                             <span className="px-2 py-0.5 rounded-full bg-emerald-500/15 text-[10px] font-bold uppercase tracking-wider text-emerald-400 inline-flex items-center gap-1">
                               <CheckCircle2 className="w-3 h-3" />

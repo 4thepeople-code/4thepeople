@@ -30,9 +30,9 @@ router.patch('/clubs/:clubId', validate({ params: clubParams, body: updateClubBo
 
 // Event routes
 router.get('/clubs/:clubId/events', validate({ params: clubParams }), requireAdminOrClubManager('clubId'), listManagedClubEvents);
-router.post('/clubs/:clubId/events', validate({ params: clubParams, body: createEventBody }), authenticateToken, requireClubManager('clubId'), createEvent);
-router.patch('/clubs/:clubId/events/:eventId', validate({ params: clubEventParams, body: updateEventBody }), authenticateToken, requireClubManager('clubId'), updateEvent);
-router.patch('/clubs/:clubId/events/:eventId/cancel', validate({ params: clubEventParams }), authenticateToken, requireClubManager('clubId'), cancelEvent);
+router.post('/clubs/:clubId/events', validate({ params: clubParams, body: createEventBody }), authenticateToken, requireAdminOrClubManager('clubId'), createEvent);
+router.patch('/clubs/:clubId/events/:eventId', validate({ params: clubEventParams, body: updateEventBody }), authenticateToken, requireAdminOrClubManager('clubId'), updateEvent);
+router.patch('/clubs/:clubId/events/:eventId/cancel', validate({ params: clubEventParams }), authenticateToken, requireAdminOrClubManager('clubId'), cancelEvent);
 router.get('/clubs/:clubId/events/:eventId/registrations', validate({ params: clubEventParams, query: attendeeQuery }), requireAdminOrClubManager('clubId'), getEventAttendees);
 
 module.exports = router;

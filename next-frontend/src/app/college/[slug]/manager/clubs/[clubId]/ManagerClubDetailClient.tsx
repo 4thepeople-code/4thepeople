@@ -20,7 +20,7 @@ import ManagerLayout from '@/components/manager/ManagerLayout';
 import { ClubHeader } from '@/components/manager/ClubHeader';
 import { Modal } from '@/components/common/Modal';
 import { DateTimePicker } from '@/components/common/DateTimePicker';
-import type { Event as ModelEvent } from '@/types/models';
+import type { Event as ModelEvent, EventVisibility } from '@/types/models';
 import {
   ArrowLeft,
   Building2,
@@ -40,6 +40,7 @@ import {
   UserCheck,
   Image as ImageIcon,
   ExternalLink,
+  Globe,
 } from 'lucide-react';
 
 export interface ManagerClubDetailClientProps {
@@ -137,6 +138,7 @@ export function ManagerClubDetailClient({ slug, clubId }: ManagerClubDetailClien
   const [eventStartAt, setEventStartAt] = useState('');
   const [eventEndAt, setEventEndAt] = useState('');
   const [eventUrl, setEventUrl] = useState('');
+  const [eventVisibility, setEventVisibility] = useState<EventVisibility>('COLLEGE');
   const [eventError, setEventError] = useState('');
 
   // Toast State
@@ -293,6 +295,7 @@ export function ManagerClubDetailClient({ slug, clubId }: ManagerClubDetailClien
           registrationUrl: eventUrl.trim() || undefined,
           startAt: new Date(eventStartAt).toISOString(),
           endAt: eventEndAt ? new Date(eventEndAt).toISOString() : undefined,
+          visibility: eventVisibility,
         },
       });
 
@@ -303,6 +306,7 @@ export function ManagerClubDetailClient({ slug, clubId }: ManagerClubDetailClien
       setEventStartAt('');
       setEventEndAt('');
       setEventUrl('');
+      setEventVisibility('COLLEGE');
       showToast('Event created successfully!');
       void refetchEvents();
       void refetchClub();
@@ -951,6 +955,21 @@ export function ManagerClubDetailClient({ slug, clubId }: ManagerClubDetailClien
                           </div>
                         )}
 
+                        {/* Event Visibility Badge */}
+                        <div className="absolute top-3 left-3">
+                          {evt.visibility === 'PUBLIC' ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider rounded-full border shadow-sm bg-emerald-500/20 text-emerald-300 border-emerald-500/40 backdrop-blur-md">
+                              <Globe className="w-3 h-3" />
+                              <span>Public Event</span>
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider rounded-full border shadow-sm bg-slate-900/80 text-slate-300 border-white/20 backdrop-blur-md">
+                              <Building2 className="w-3 h-3" />
+                              <span>College Only</span>
+                            </span>
+                          )}
+                        </div>
+
                         {/* Event Status Badge */}
                         <div className="absolute top-3 right-3">
                           <span
@@ -1112,6 +1131,124 @@ export function ManagerClubDetailClient({ slug, clubId }: ManagerClubDetailClien
                   }`}
                   required
                 />
+              </div>
+
+              {/* Event Visibility Selector */}
+              <div className="md:col-span-2 pt-2 border-t border-slate-800/80">
+                <label
+                  className={`block text-xs font-semibold uppercase tracking-wider mb-2 ${
+                    isDark ? 'text-slate-300' : 'text-slate-700'
+                  }`}
+                >
+                  Event Visibility *
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* Option 1: College Only */}
+                  <div
+                    onClick={() => setEventVisibility('COLLEGE')}
+                    className={`p-3.5 rounded-xl border-2 cursor-pointer transition-all flex flex-col justify-between ${
+                      eventVisibility === 'COLLEGE'
+                        ? isDark
+                          ? 'border-purple-500 bg-purple-500/10'
+                          : 'border-purple-600 bg-purple-50'
+                        : isDark
+                        ? 'border-slate-800 bg-slate-950/60 hover:border-slate-700'
+                        : 'border-slate-200 bg-slate-50 hover:border-slate-300'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div className="flex items-center gap-2">
+                        <Building2
+                          className={`w-4 h-4 ${
+                            eventVisibility === 'COLLEGE'
+                              ? isDark ? 'text-purple-400' : 'text-purple-600'
+                              : 'text-slate-400'
+                          }`}
+                        />
+                        <span
+                          className={`text-xs font-bold ${
+                            eventVisibility === 'COLLEGE'
+                              ? isDark ? 'text-white' : 'text-slate-900'
+                              : isDark ? 'text-slate-300' : 'text-slate-700'
+                          }`}
+                        >
+                          College Only
+                        </span>
+                      </div>
+                      <span
+                        className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                          eventVisibility === 'COLLEGE'
+                            ? isDark ? 'border-purple-500' : 'border-purple-600'
+                            : 'border-slate-500'
+                        }`}
+                      >
+                        {eventVisibility === 'COLLEGE' && (
+                          <span
+                            className={`w-2 h-2 rounded-full ${
+                              isDark ? 'bg-purple-500' : 'bg-purple-600'
+                            }`}
+                          />
+                        )}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-400 leading-relaxed">
+                      Only students belonging to this college can register. External guest and cross-college registrations are unavailable.
+                    </p>
+                  </div>
+
+                  {/* Option 2: Public Event */}
+                  <div
+                    onClick={() => setEventVisibility('PUBLIC')}
+                    className={`p-3.5 rounded-xl border-2 cursor-pointer transition-all flex flex-col justify-between ${
+                      eventVisibility === 'PUBLIC'
+                        ? isDark
+                          ? 'border-emerald-500 bg-emerald-500/10'
+                          : 'border-emerald-600 bg-emerald-50'
+                        : isDark
+                        ? 'border-slate-800 bg-slate-950/60 hover:border-slate-700'
+                        : 'border-slate-200 bg-slate-50 hover:border-slate-300'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div className="flex items-center gap-2">
+                        <Globe
+                          className={`w-4 h-4 ${
+                            eventVisibility === 'PUBLIC'
+                              ? isDark ? 'text-emerald-400' : 'text-emerald-600'
+                              : 'text-slate-400'
+                          }`}
+                        />
+                        <span
+                          className={`text-xs font-bold ${
+                            eventVisibility === 'PUBLIC'
+                              ? isDark ? 'text-white' : 'text-slate-900'
+                              : isDark ? 'text-slate-300' : 'text-slate-700'
+                          }`}
+                        >
+                          Public Event
+                        </span>
+                      </div>
+                      <span
+                        className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                          eventVisibility === 'PUBLIC'
+                            ? isDark ? 'border-emerald-500' : 'border-emerald-600'
+                            : 'border-slate-500'
+                        }`}
+                      >
+                        {eventVisibility === 'PUBLIC' && (
+                          <span
+                            className={`w-2 h-2 rounded-full ${
+                              isDark ? 'bg-emerald-500' : 'bg-emerald-600'
+                            }`}
+                          />
+                        )}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-400 leading-relaxed">
+                      Students from other colleges and external participants (via email OTP) can discover and register.
+                    </p>
+                  </div>
+                </div>
               </div>
 
               <div className="md:col-span-2 pt-2 border-t border-slate-800/80 grid grid-cols-1 md:grid-cols-2 gap-4">

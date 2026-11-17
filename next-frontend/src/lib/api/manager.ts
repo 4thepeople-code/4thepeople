@@ -4,6 +4,7 @@ import { queryKeys } from './queryKeys';
 import type {
   Club,
   Event,
+  EventVisibility,
   User,
   EventCertificate,
   CertificateBatch,
@@ -26,6 +27,7 @@ export interface CreateEventInput {
   registrationUrl?: string | null;
   registrationMode?: 'INTERNAL' | 'EXTERNAL' | 'NONE';
   capacity?: number | null;
+  visibility?: EventVisibility;
   customFormDefinition?: { fields: unknown[] } | null;
   registrationDeadline?: string | null;
 }

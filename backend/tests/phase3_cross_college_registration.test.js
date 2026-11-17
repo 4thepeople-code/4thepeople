@@ -552,6 +552,128 @@ async function runCrossCollegeTests() {
     assert.strictEqual(req.isCrossCollege, true);
   });
 
+  const { createEvent, updateEvent } = require('../controllers/eventController');
+
+  await test('16. createEvent defaults visibility to COLLEGE and supports explicit PUBLIC', async () => {
+    // 1. Create with omitted visibility
+    const req1 = {
+      collegeId: collegeA.id,
+      params: { clubId: clubA.id },
+      body: {
+        title: `Default Visibility Event ${runId}`,
+        description: 'Testing default visibility assignment',
+        location: 'Hall 1',
+        startAt: new Date(Date.now() + 86400000).toISOString(),
+      },
+    };
+    const res1 = await runMiddlewarePipeline([createEvent], req1);
+    assert.strictEqual(res1.statusCode, 201);
+    assert.strictEqual(res1.body.event.visibility, 'COLLEGE');
+
+    // 2. Create with explicit PUBLIC
+    const req2 = {
+      collegeId: collegeA.id,
+      params: { clubId: clubA.id },
+      body: {
+        title: `Explicit Public Event ${runId}`,
+        description: 'Testing explicit public visibility assignment',
+        location: 'Main Amphitheater',
+        startAt: new Date(Date.now() + 86400000).toISOString(),
+        visibility: 'PUBLIC',
+      },
+    };
+    const res2 = await runMiddlewarePipeline([createEvent], req2);
+    assert.strictEqual(res2.statusCode, 201);
+    assert.strictEqual(res2.body.event.visibility, 'PUBLIC');
+  });
+
+  await test('17. updateEvent updates visibility, preserves on partial update, and retains existing registrations', async () => {
+    // Create an event as COLLEGE
+    const eventCreated = await withTenant(collegeA.id, async (tx) => {
+      return tx.event.create({
+        data: {
+          collegeId: collegeA.id,
+          clubId: clubA.id,
+          title: `Visibility Lifecycle Event ${runId}`,
+          description: 'Lifecycle visibility testing',
+          location: 'Seminar Room',
+          startAt: new Date(Date.now() + 86400000),
+          visibility: 'COLLEGE',
+        },
+      });
+    });
+
+    // 1. Switch COLLEGE -> PUBLIC
+    const reqUpdatePub = {
+      collegeId: collegeA.id,
+      params: { clubId: clubA.id, eventId: eventCreated.id },
+      body: { visibility: 'PUBLIC' },
+    };
+    const resUpdatePub = await runMiddlewarePipeline([updateEvent], reqUpdatePub);
+    assert.strictEqual(resUpdatePub.statusCode, 200);
+    assert.strictEqual(resUpdatePub.body.event.visibility, 'PUBLIC');
+
+    // Register a student to verify registrations are not deleted on subsequent visibility change
+    const reg = await withTenant(collegeA.id, async (tx) => {
+      return tx.eventRegistration.create({
+        data: {
+          collegeId: collegeA.id,
+          eventId: eventCreated.id,
+          userId: studentA.id,
+          participantType: 'STUDENT',
+          participantName: studentA.name,
+          participantEmail: studentA.email,
+        },
+      });
+    });
+    assert.ok(reg.id, 'Registration should be created');
+
+    // 2. Partial update without visibility preserves PUBLIC
+    const reqPartial = {
+      collegeId: collegeA.id,
+      params: { clubId: clubA.id, eventId: eventCreated.id },
+      body: { description: 'Updated description without touching visibility' },
+    };
+    const resPartial = await runMiddlewarePipeline([updateEvent], reqPartial);
+    assert.strictEqual(resPartial.statusCode, 200);
+    assert.strictEqual(resPartial.body.event.visibility, 'PUBLIC');
+    assert.strictEqual(resPartial.body.event.description, 'Updated description without touching visibility');
+
+    // 3. Switch PUBLIC -> COLLEGE
+    const reqUpdateCol = {
+      collegeId: collegeA.id,
+      params: { clubId: clubA.id, eventId: eventCreated.id },
+      body: { visibility: 'COLLEGE' },
+    };
+    const resUpdateCol = await runMiddlewarePipeline([updateEvent], reqUpdateCol);
+    assert.strictEqual(resUpdateCol.statusCode, 200);
+    assert.strictEqual(resUpdateCol.body.event.visibility, 'COLLEGE');
+
+    // 4. Verify existing registration is NOT deleted
+    const regStillExists = await withTenant(collegeA.id, async (tx) => {
+      return tx.eventRegistration.findUnique({
+        where: { id: reg.id },
+      });
+    });
+    assert.ok(regStillExists, 'Existing registration must NOT be deleted when visibility changes');
+  });
+
+  await test('18. updateEvent rejects invalid visibility enum values (400)', async () => {
+    let caughtErr = null;
+    try {
+      const reqInvalid = {
+        collegeId: collegeA.id,
+        params: { clubId: clubA.id, eventId: publicEventForPipeline.id },
+        body: { visibility: 'COLLEGE_RESTRICTED' },
+      };
+      await runMiddlewarePipeline([updateEvent], reqInvalid);
+    } catch (err) {
+      caughtErr = err;
+    }
+    assert.ok(caughtErr, 'Should throw error for invalid visibility enum value');
+    assert.strictEqual(caughtErr.statusCode, 400);
+  });
+
   // ─── Summary ─────────────────────────────────────────────────────────────
   console.log(`\n${'='.repeat(70)}`);
   console.log(`Phase 3A Results: ${passed} passed, ${failed} failed`);

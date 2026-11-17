@@ -2,7 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { X, Calendar, MapPin, Clock, Building2, Image as ImageIcon } from 'lucide-react';
+import { X, Calendar, MapPin, Clock, Building2, Globe, Image as ImageIcon } from 'lucide-react';
 import { useTheme } from '@/context/ThemeContext';
 import type { Event, Club } from '@/types/models';
 
@@ -107,6 +107,17 @@ export function EventModal({ event, club, collegeSlug, onClose, onOpenGallery }:
             >
               {event.status || 'UPCOMING'}
             </span>
+            {event.visibility === 'PUBLIC' ? (
+              <span className="inline-flex items-center gap-1 px-3 py-1 text-xs font-semibold rounded-full border backdrop-blur-md shadow-md bg-emerald-500/20 text-emerald-300 border-emerald-500/40">
+                <Globe className="w-3.5 h-3.5" />
+                <span>Public Event</span>
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 px-3 py-1 text-xs font-semibold rounded-full border backdrop-blur-md shadow-md bg-slate-500/20 text-slate-300 border-slate-500/40">
+                <Building2 className="w-3.5 h-3.5" />
+                <span>College Only</span>
+              </span>
+            )}
             {clubInfo?.id && (
               <Link
                 href={clubHref}

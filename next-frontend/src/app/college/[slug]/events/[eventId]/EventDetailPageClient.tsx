@@ -349,6 +349,17 @@ export function EventDetailPageClient({ slug, eventId, clubId: propClubId }: Eve
                       <span className="px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-[10px] font-black uppercase tracking-wider">
                         REGISTRATION OPEN
                       </span>
+                      {event.visibility === 'PUBLIC' ? (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-[11px] font-black uppercase tracking-wider">
+                          <Globe className="w-3.5 h-3.5" />
+                          <span>Public Event</span>
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-500/15 border border-slate-500/30 text-slate-600 dark:text-slate-300 text-[11px] font-black uppercase tracking-wider">
+                          <Building2 className="w-3.5 h-3.5" />
+                          <span>College Only</span>
+                        </span>
+                      )}
                       {club?.name && (
                         <Link
                           href={`/college/${slug}/clubs/${clubId}`}

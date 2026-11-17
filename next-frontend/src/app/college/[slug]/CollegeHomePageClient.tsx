@@ -16,6 +16,7 @@ import {
   Clock,
   MapPin,
   Sparkles,
+  Globe,
 } from 'lucide-react';
 import { useUpcomingEvents } from '@/lib/api/events';
 import { useClubs } from '@/lib/api/clubs';
@@ -574,6 +575,17 @@ export function CollegeHomePageClient({ slug }: CollegeHomePageClientProps) {
                       </div>
 
                       <div className="absolute top-2.5 right-2.5 flex items-center gap-1.5">
+                        {event.visibility === 'PUBLIC' ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-950/80 backdrop-blur-md border border-emerald-500/40 text-[10px] font-bold uppercase tracking-wider text-emerald-400">
+                            <Globe className="w-2.5 h-2.5" />
+                            <span>Public Event</span>
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-900/80 backdrop-blur-md border border-white/20 text-[10px] font-bold uppercase tracking-wider text-slate-300">
+                            <Building2 className="w-2.5 h-2.5" />
+                            <span>College Only</span>
+                          </span>
+                        )}
                         <span className="px-2 py-0.5 rounded-full bg-black/70 backdrop-blur-md border border-white/20 text-[10px] font-bold uppercase tracking-wider text-[#00F0FF]">
                           {event.category || 'EVENT'}
                         </span>

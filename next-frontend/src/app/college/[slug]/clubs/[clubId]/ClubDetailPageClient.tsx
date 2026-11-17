@@ -10,7 +10,7 @@ import GalleryLightbox from '@/components/public/GalleryLightbox';
 import { useTheme } from '@/context/ThemeContext';
 import { getCloudinaryUrl, CLOUDINARY_TRANSFORMS } from '@/lib/utils/cloudinary';
 import { getClubCoverImage } from '@/lib/utils/clubCovers';
-import { ArrowLeft, AlertCircle } from 'lucide-react';
+import { ArrowLeft, AlertCircle, Globe, Building2 } from 'lucide-react';
 import type { Event } from '@/types/models';
 
 export interface ClubDetailPageClientProps {
@@ -259,12 +259,24 @@ export function ClubDetailPageClient({ slug, clubId }: ClubDetailPageClientProps
                     </div>
 
                     <div
-                      className={`pt-3 border-t flex items-center justify-between text-xs font-bold text-[#00F0FF] ${
+                      className={`pt-3 border-t flex items-center justify-between text-xs font-bold ${
                         isDark ? 'border-white/5' : 'border-slate-100'
                       }`}
                     >
-                      <span>RSVP Open</span>
-                      <span className="group-hover:translate-x-1 transition-transform">View Details →</span>
+                      <div className="flex items-center gap-1.5">
+                        {evt.visibility === 'PUBLIC' ? (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-extrabold uppercase tracking-wider text-emerald-400">
+                            <Globe className="w-3 h-3" />
+                            <span>Public Event</span>
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
+                            <Building2 className="w-3 h-3" />
+                            <span>College Only</span>
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-[#00F0FF] group-hover:translate-x-1 transition-transform">View Details →</span>
                     </div>
                   </div>
                 );

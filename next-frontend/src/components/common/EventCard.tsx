@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { getCloudinaryUrl, CLOUDINARY_TRANSFORMS } from '@/lib/utils/cloudinary';
-import { Sparkles } from 'lucide-react';
+import { Sparkles, Globe, Building2 } from 'lucide-react';
 import type { Event } from '@/types/models';
 
 const formatDate = (dateStr?: string) => {
@@ -75,6 +75,25 @@ export function EventCard({ event, onClick, badgeText }: EventCardProps) {
           <span className="text-[10px] leading-[12px] font-bold text-cyan-600 dark:text-[#00F0FF] tracking-wide text-center uppercase min-w-[22px]">
             {badge}
           </span>
+        </div>
+
+        {/* Visibility Badge */}
+        <div className="absolute top-[10px] right-[10px] px-[8px] py-[4px] bg-white/95 dark:bg-black/85 backdrop-blur-md rounded-[5px] flex items-center justify-center gap-1.5 shadow-sm z-10 border border-slate-200/50 dark:border-white/10">
+          {event.visibility === 'PUBLIC' ? (
+            <>
+              <Globe className="w-3 h-3 text-emerald-500" />
+              <span className="text-[10px] leading-[12px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wide">
+                Public Event
+              </span>
+            </>
+          ) : (
+            <>
+              <Building2 className="w-3 h-3 text-slate-500 dark:text-slate-400" />
+              <span className="text-[10px] leading-[12px] font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wide">
+                College Only
+              </span>
+            </>
+          )}
         </div>
       </div>
 

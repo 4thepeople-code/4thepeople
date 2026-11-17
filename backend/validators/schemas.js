@@ -78,6 +78,7 @@ const createEventBody = z.object({
   endAt: z.coerce.date().nullable().optional(),
   registrationUrl: z.string().trim().nullable().optional(),
   capacity: z.number().int().positive('Capacity must be a positive integer').nullable().optional(),
+  visibility: z.enum(['COLLEGE', 'PUBLIC']).default('COLLEGE').optional(),
 }).refine((value) => !value.endAt || value.endAt > value.startAt, {
   message: 'endAt must be after startAt', path: ['endAt'],
 });
@@ -90,6 +91,7 @@ const updateEventBody = z.object({
   status: z.enum(['UPCOMING', 'ONGOING', 'COMPLETED', 'CANCELLED']).optional(),
   registrationUrl: z.string().trim().nullable().optional(),
   capacity: z.number().int().positive('Capacity must be a positive integer').nullable().optional(),
+  visibility: z.enum(['COLLEGE', 'PUBLIC']).optional(),
 }).refine((value) => Object.keys(value).length > 0, 'At least one event field is required');
 
 const attendeeQuery = z.object({

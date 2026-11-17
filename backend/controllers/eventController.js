@@ -81,6 +81,7 @@ const serializeEvent = (event, gallery = null) => {
     capacity: event.capacity ?? null,
     registeredCount: event.registeredCount ?? 0,
     status: event.status, // Computed from events_with_status view
+    visibility: event.visibility || 'COLLEGE',
     coverImage,
     gallery: formattedGallery,
     registrationUrl: event.registrationUrl || null,
@@ -122,6 +123,14 @@ exports.createEvent = asyncHandler(async (req, res) => {
     capacity = body.capacity;
   }
 
+  let visibility = 'COLLEGE';
+  if (body.visibility !== undefined && body.visibility !== null) {
+    if (!['COLLEGE', 'PUBLIC'].includes(body.visibility)) {
+      throw new AppError('visibility must be COLLEGE or PUBLIC', 400);
+    }
+    visibility = body.visibility;
+  }
+
   const eventWithStatus = await withTenant(req.collegeId, async (tx) => {
     await ensureClubExists(tx, req.collegeId, clubId);
 
@@ -135,6 +144,7 @@ exports.createEvent = asyncHandler(async (req, res) => {
         startAt,
         endAt,
         capacity,
+        visibility,
         registrationUrl: body.registrationUrl ? body.registrationUrl.trim() : null,
         registrationMode: ['INTERNAL', 'EXTERNAL', 'NONE'].includes(body.registrationMode)
           ? body.registrationMode
@@ -177,7 +187,7 @@ exports.updateEvent = asyncHandler(async (req, res) => {
 
   const allowedFields = [
     'title', 'description', 'location', 'startAt', 'endAt', 'status',
-    'registrationUrl', 'capacity', 'registrationMode', 'customFormDefinition', 'registrationDeadline'
+    'registrationUrl', 'capacity', 'registrationMode', 'customFormDefinition', 'registrationDeadline', 'visibility'
   ];
   const fields = Object.keys(body);
   if (!fields.length) throw new AppError('At least one event field is required', 400);
@@ -188,6 +198,12 @@ exports.updateEvent = asyncHandler(async (req, res) => {
   ['title', 'description', 'location'].forEach((field) => {
     if (body[field] !== undefined) data[field] = requiredText(body[field], field);
   });
+  if (body.visibility !== undefined) {
+    if (!['COLLEGE', 'PUBLIC'].includes(body.visibility)) {
+      throw new AppError('visibility must be COLLEGE or PUBLIC', 400);
+    }
+    data.visibility = body.visibility;
+  }
   if (body.registrationUrl !== undefined) {
     data.registrationUrl = body.registrationUrl ? body.registrationUrl.trim() : null;
   }

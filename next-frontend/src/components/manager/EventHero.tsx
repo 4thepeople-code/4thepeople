@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Calendar, Clock, MapPin } from 'lucide-react';
+import { Calendar, Clock, MapPin, Globe, Building2 } from 'lucide-react';
 import type { Event } from '@/types/models';
 
 export interface EventHeroProps {
@@ -84,6 +84,17 @@ export function EventHero({ event, children, className = '' }: EventHeroProps) {
             >
               {status}
             </span>
+            {event.visibility === 'PUBLIC' ? (
+              <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border bg-emerald-500/20 text-emerald-300 border-emerald-500/40">
+                <Globe className="w-3 h-3" />
+                <span>Public Event</span>
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border bg-slate-500/20 text-slate-300 border-slate-500/40">
+                <Building2 className="w-3 h-3" />
+                <span>College Only</span>
+              </span>
+            )}
           </div>
 
           {children && <div className="flex items-center gap-2">{children}</div>}

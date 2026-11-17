@@ -23,6 +23,7 @@ import { EventHero } from '@/components/manager/EventHero';
 import { EventCertificatesSection } from '@/components/manager/certificates/EventCertificatesSection';
 import { Modal } from '@/components/common/Modal';
 import { DateTimePicker } from '@/components/common/DateTimePicker';
+import type { EventVisibility } from '@/types/models';
 import {
   ArrowLeft,
   Calendar,
@@ -43,6 +44,8 @@ import {
   ChevronRight,
   Download,
   Filter,
+  Globe,
+  Building2,
 } from 'lucide-react';
 
 export interface ManagerEventDetailClientProps {
@@ -123,6 +126,8 @@ export function ManagerEventDetailClient({
   const [customStartAt, setCustomStartAt] = useState<string | null>(null);
   const [customEndAt, setCustomEndAt] = useState<string | null>(null);
   const [customRegistrationUrl, setCustomRegistrationUrl] = useState<string | null>(null);
+  const [customVisibility, setCustomVisibility] = useState<EventVisibility | null>(null);
+  const [isVisibilityConfirmOpen, setIsVisibilityConfirmOpen] = useState(false);
   const [formError, setFormError] = useState('');
 
   const title = customTitle ?? (event?.title || '');
@@ -136,6 +141,8 @@ export function ManagerEventDetailClient({
       (event as unknown as { url?: string })?.url ||
       (event as unknown as { externalUrl?: string })?.externalUrl ||
       '');
+  const currentVisibility: EventVisibility = event?.visibility || 'COLLEGE';
+  const visibility: EventVisibility = customVisibility ?? currentVisibility;
 
   // Cover Image State
   const [coverUploading, setCoverUploading] = useState(false);
@@ -191,6 +198,16 @@ export function ManagerEventDetailClient({
       }
     }
 
+    // Check if visibility changed relative to the loaded event
+    if (customVisibility !== null && customVisibility !== currentVisibility) {
+      setIsVisibilityConfirmOpen(true);
+      return;
+    }
+
+    await doSaveEvent();
+  };
+
+  const doSaveEvent = async () => {
     try {
       await updateEventMutation.mutateAsync({
         clubId,
@@ -202,6 +219,7 @@ export function ManagerEventDetailClient({
           registrationUrl: registrationUrl.trim() || undefined,
           startAt: new Date(startAt).toISOString(),
           endAt: endAt ? new Date(endAt).toISOString() : null,
+          visibility,
         },
       });
 
@@ -212,6 +230,8 @@ export function ManagerEventDetailClient({
       setCustomStartAt(null);
       setCustomEndAt(null);
       setCustomRegistrationUrl(null);
+      setCustomVisibility(null);
+      setIsVisibilityConfirmOpen(false);
       queryClient.invalidateQueries({
         queryKey: queryKeys.tenant(slug).events.detail(clubId, eventId),
       });
@@ -554,6 +574,119 @@ export function ManagerEventDetailClient({
                       }`}
                       required
                     />
+                  </div>
+
+                  {/* Event Visibility Selector */}
+                  <div
+                    className={`md:col-span-2 pt-2 border-t ${
+                      isDark ? 'border-white/10' : 'border-[#E8E6DF]'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <label
+                        className={`block text-xs font-extrabold uppercase tracking-wider ${
+                          isDark ? 'text-slate-300' : 'text-[#0F172A]'
+                        }`}
+                      >
+                        Event Visibility *
+                      </label>
+                      <div className="flex items-center gap-1.5 text-[11px] font-bold">
+                        <span className="text-slate-400">Current Setting:</span>
+                        {currentVisibility === 'PUBLIC' ? (
+                          <span className="text-emerald-400 uppercase">Public Event</span>
+                        ) : (
+                          <span className="text-slate-300 uppercase">College Only</span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {/* College Only Option */}
+                      <div
+                        onClick={() => setCustomVisibility('COLLEGE')}
+                        className={`p-3.5 rounded-2xl border-2 cursor-pointer transition-all flex flex-col justify-between ${
+                          visibility === 'COLLEGE'
+                            ? 'border-[#FF5733] bg-[#FF5733]/5 dark:bg-[#FF5733]/10'
+                            : isDark
+                            ? 'border-slate-800 bg-slate-900/60 hover:border-slate-700'
+                            : 'border-[#E2E0D5] bg-[#FAF9F5] hover:border-[#E8E6DF]'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between mb-1.5">
+                          <div className="flex items-center gap-2">
+                            <Building2
+                              className={`w-4 h-4 ${
+                                visibility === 'COLLEGE' ? 'text-[#FF5733]' : 'text-slate-400'
+                              }`}
+                            />
+                            <span
+                              className={`text-xs font-bold ${
+                                visibility === 'COLLEGE'
+                                  ? isDark ? 'text-white' : 'text-[#0F172A]'
+                                  : isDark ? 'text-slate-300' : 'text-slate-700'
+                              }`}
+                            >
+                              College Only
+                            </span>
+                          </div>
+                          <span
+                            className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                              visibility === 'COLLEGE' ? 'border-[#FF5733]' : 'border-slate-500'
+                            }`}
+                          >
+                            {visibility === 'COLLEGE' && (
+                              <span className="w-2 h-2 rounded-full bg-[#FF5733]" />
+                            )}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-400 leading-relaxed">
+                          Only students belonging to this college can register. External guest and cross-college registrations are unavailable.
+                        </p>
+                      </div>
+
+                      {/* Public Event Option */}
+                      <div
+                        onClick={() => setCustomVisibility('PUBLIC')}
+                        className={`p-3.5 rounded-2xl border-2 cursor-pointer transition-all flex flex-col justify-between ${
+                          visibility === 'PUBLIC'
+                            ? 'border-emerald-500 bg-emerald-500/5 dark:bg-emerald-500/10'
+                            : isDark
+                            ? 'border-slate-800 bg-slate-900/60 hover:border-slate-700'
+                            : 'border-[#E2E0D5] bg-[#FAF9F5] hover:border-[#E8E6DF]'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between mb-1.5">
+                          <div className="flex items-center gap-2">
+                            <Globe
+                              className={`w-4 h-4 ${
+                                visibility === 'PUBLIC' ? 'text-emerald-500' : 'text-slate-400'
+                              }`}
+                            />
+                            <span
+                              className={`text-xs font-bold ${
+                                visibility === 'PUBLIC'
+                                  ? isDark ? 'text-white' : 'text-[#0F172A]'
+                                  : isDark ? 'text-slate-300' : 'text-slate-700'
+                              }`}
+                            >
+                              Public Event
+                            </span>
+                          </div>
+                          <span
+                            className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                              visibility === 'PUBLIC' ? 'border-emerald-500' : 'border-slate-500'
+                            }`}
+                          >
+                            {visibility === 'PUBLIC' && (
+                              <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                            )}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-400 leading-relaxed">
+                          Platform-wide discovery. Students from other colleges and external guests (via email OTP) can discover and register.
+                        </p>
+                      </div>
+                    </div>
                   </div>
 
                   {/* Date Pickers */}
@@ -1102,6 +1235,82 @@ export function ManagerEventDetailClient({
                   <Loader2 className="w-4 h-4 animate-spin" />
                 ) : (
                   <span>Delete Permanently</span>
+                )}
+              </button>
+            </div>
+          </div>
+        </Modal>
+
+        {/* Modal: Confirm Visibility Change */}
+        <Modal
+          isOpen={isVisibilityConfirmOpen}
+          onClose={() => !updateEventMutation.isPending && setIsVisibilityConfirmOpen(false)}
+          title={
+            visibility === 'PUBLIC'
+              ? 'Make Event Public?'
+              : 'Restrict Event to College Only?'
+          }
+        >
+          <div className="space-y-4">
+            <div
+              className={`p-4 rounded-2xl flex items-start gap-3 text-xs border ${
+                visibility === 'PUBLIC'
+                  ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+                  : 'bg-amber-500/10 border-amber-500/30 text-amber-300'
+              }`}
+            >
+              <AlertTriangle
+                className={`w-5 h-5 shrink-0 mt-0.5 ${
+                  visibility === 'PUBLIC' ? 'text-emerald-400' : 'text-amber-400'
+                }`}
+              />
+              <div className="space-y-2">
+                <p className="font-bold text-sm">
+                  {visibility === 'PUBLIC'
+                    ? 'Confirm Visibility Change: College Only → Public Event'
+                    : 'Confirm Visibility Change: Public Event → College Only'}
+                </p>
+                {visibility === 'PUBLIC' ? (
+                  <p className="leading-relaxed">
+                    You are changing <strong>&quot;{event?.title}&quot;</strong> to a{' '}
+                    <strong>Public Event</strong>. Students from other partner colleges and external participants (via email OTP) will become eligible to discover and register for this event.
+                  </p>
+                ) : (
+                  <p className="leading-relaxed">
+                    You are changing <strong>&quot;{event?.title}&quot;</strong> to{' '}
+                    <strong>College Only</strong>. New cross-college student registrations and external guest registrations will no longer be accepted. Existing registrations will remain intact and will not be deleted.
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                disabled={updateEventMutation.isPending}
+                onClick={() => setIsVisibilityConfirmOpen(false)}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium rounded-xl transition cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={updateEventMutation.isPending}
+                onClick={doSaveEvent}
+                className={`inline-flex items-center gap-2 px-5 py-2 text-white text-sm font-semibold rounded-xl shadow-md transition disabled:opacity-50 cursor-pointer ${
+                  visibility === 'PUBLIC'
+                    ? 'bg-emerald-600 hover:bg-emerald-500'
+                    : 'bg-amber-600 hover:bg-amber-500'
+                }`}
+              >
+                {updateEventMutation.isPending ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <span>
+                    {visibility === 'PUBLIC'
+                      ? 'Yes, Make Public'
+                      : 'Yes, Restrict to College'}
+                  </span>
                 )}
               </button>
             </div>
