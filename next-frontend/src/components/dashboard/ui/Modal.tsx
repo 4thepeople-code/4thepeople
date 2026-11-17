@@ -29,9 +29,9 @@ const sizes = {
 
 /**
  * The one dialog for the dashboards. Closes on Esc and overlay click, locks
- * body scroll, moves focus into the dialog and restores it on close. Forms
- * render their own buttons inside `children` (verb-specific labels from
- * lib/copy.ts — never a bare "OK").
+ * body scroll, moves focus into the dialog, traps Tab inside and restores
+ * focus to the trigger on close. Forms render their own buttons inside
+ * `children` (verb-specific labels from lib/copy.ts — never a bare "OK").
  */
 export default function Modal({ open, onClose, title, description, size = 'md', flush = false, children }: ModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -44,7 +44,32 @@ export default function Modal({ open, onClose, title, description, size = 'md', 
     dialogRef.current?.focus();
 
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
+      if (event.key === 'Escape') {
+        onClose();
+        return;
+      }
+      if (event.key === 'Tab') {
+        // Focus trap: Tab / Shift+Tab cycle inside the panel instead of
+        // reaching the page behind the dialog.
+        const panel = dialogRef.current;
+        if (!panel) return;
+        const focusables = panel.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        );
+        if (focusables.length === 0) return;
+        const first = focusables[0];
+        const last = focusables[focusables.length - 1];
+        const active = document.activeElement;
+        if (event.shiftKey) {
+          if (active === first || !(active instanceof HTMLElement) || !panel.contains(active)) {
+            event.preventDefault();
+            last.focus();
+          }
+        } else if (active === last || !(active instanceof HTMLElement) || !panel.contains(active)) {
+          event.preventDefault();
+          first.focus();
+        }
+      }
     };
     document.addEventListener('keydown', onKey);
     return () => {

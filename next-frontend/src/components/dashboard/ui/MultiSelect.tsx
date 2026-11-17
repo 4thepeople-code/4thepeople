@@ -46,7 +46,11 @@ export default function MultiSelect({
   const containerRef = useRef<HTMLDivElement>(null);
   const t = collegeAdmin.multiSelect;
 
-  // Close on outside click or Esc.
+  // Close on outside click or Esc. Esc is handled in the CAPTURE phase and
+  // stops propagation: nested inside a dialog, the dialog's own Esc listener
+  // (bubble phase on document, registered when the dialog opened) must not
+  // also fire — the first Esc closes only the menu, the second closes the
+  // dialog.
   useEffect(() => {
     if (!isOpen) return;
     const onPointerDown = (event: MouseEvent | TouchEvent) => {
@@ -55,13 +59,16 @@ export default function MultiSelect({
       }
     };
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setIsOpen(false);
+      if (event.key === 'Escape') {
+        event.stopPropagation();
+        setIsOpen(false);
+      }
     };
     document.addEventListener('mousedown', onPointerDown);
-    document.addEventListener('keydown', onKey);
+    document.addEventListener('keydown', onKey, true);
     return () => {
       document.removeEventListener('mousedown', onPointerDown);
-      document.removeEventListener('keydown', onKey);
+      document.removeEventListener('keydown', onKey, true);
     };
   }, [isOpen]);
 
