@@ -38,7 +38,9 @@ export default function CampusPageHero({
       {coverUrl && (
         <>
           <img src={coverUrl} alt="" aria-hidden className="absolute inset-0 h-full w-full object-cover" />
-          <div aria-hidden className="absolute inset-0 bg-[var(--surface-inverse)]/70" />
+          {/* Light cream veil (not the dark inverse surface): keeps the hero in the
+              single light campus theme so its dark text stays readable. */}
+          <div aria-hidden className="absolute inset-0 bg-[var(--surface-tile)]/85" />
         </>
       )}
       <div aria-hidden className="absolute -right-16 top-0 h-72 w-72 rounded-full border-[14px] border-[var(--border-strong)]/15" />
@@ -46,7 +48,7 @@ export default function CampusPageHero({
       <div className="relative mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8 lg:py-20">
         <Link
           href={backHref}
-          className="inline-flex min-h-11 items-center text-sm font-bold uppercase tracking-wider text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)] motion-reduce:transition-none"
+          className="inline-flex min-h-11 items-center rounded-full border-2 border-[var(--border-strong)] bg-[var(--surface-card)] px-4 text-xs font-bold uppercase tracking-wider text-[var(--text-primary)] shadow-brutal-xs transition-transform hover:-translate-y-0.5 motion-reduce:transition-none focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-tile)]"
         >
           <span aria-hidden className="mr-1.5">
             ←
