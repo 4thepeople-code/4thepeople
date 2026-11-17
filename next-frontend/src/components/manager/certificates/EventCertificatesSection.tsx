@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useTheme } from '@/context/ThemeContext';
 import {
   useEventCertificatesQuery,
   useEligibleStudentsQuery,
@@ -11,6 +10,10 @@ import { BulkUploadModal } from './BulkUploadModal';
 import { TemplateGenerationModal } from './TemplateGenerationModal';
 import { RevokeCertificateModal } from './RevokeCertificateModal';
 import { ReissueCertificateModal } from './ReissueCertificateModal';
+import DashboardButton from '@/components/dashboard/ui/DashboardButton';
+import EmptyState from '@/components/dashboard/ui/EmptyState';
+import { SkeletonCard } from '@/components/dashboard/ui/Skeleton';
+import { actions, managerCertificates } from '@/lib/copy';
 import {
   Award,
   Upload,
@@ -25,7 +28,7 @@ import {
   Check,
   ChevronLeft,
   ChevronRight,
-  Loader2,
+  AlertCircle,
 } from 'lucide-react';
 import type { EventCertificate } from '@/types/models';
 
@@ -36,13 +39,13 @@ interface EventCertificatesSectionProps {
   eventTitle?: string;
 }
 
+const t = managerCertificates.section;
+
 export function EventCertificatesSection({
   slug,
   eventId,
   eventTitle,
 }: EventCertificatesSectionProps) {
-  const { isDark } = useTheme();
-
   // Search & Filter State
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'ISSUED' | 'REVOKED'>('ALL');
@@ -60,6 +63,7 @@ export function EventCertificatesSection({
   const {
     data: certsData,
     isLoading: certsLoading,
+    isError: certsError,
     refetch: refetchCerts,
   } = useEventCertificatesQuery(slug, eventId, page, statusFilter, searchQuery);
 
@@ -79,101 +83,180 @@ export function EventCertificatesSection({
     refetchEligible();
   };
 
+  const methodLabel = (source: EventCertificate['source']) =>
+    source === 'INDIVIDUAL_UPLOAD' ? t.methodIndividual : source === 'BULK_UPLOAD' ? t.methodBulk : t.methodGenerated;
+
+  const statusChip = (cert: EventCertificate) =>
+    cert.status === 'ISSUED' ? (
+      <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-[10px] font-bold text-emerald-700">
+        <CheckCircle2 aria-hidden="true" className="h-3 w-3" /> {t.statusIssued}
+      </span>
+    ) : (
+      <span
+        className="inline-flex cursor-help items-center gap-1 rounded-full border border-rose-200 bg-rose-50 px-2.5 py-0.5 text-[10px] font-bold text-rose-700"
+        title={cert.revocationReason || t.revokedReasonFallback}
+      >
+        <Ban aria-hidden="true" className="h-3 w-3" /> {t.statusRevoked}
+      </span>
+    );
+
+  const coverage =
+    eligibleStudents.length > 0
+      ? Math.round(
+          (eligibleStudents.filter((s) => s.hasActiveCertificate).length / eligibleStudents.length) * 100,
+        )
+      : 0;
+
+  const statTile = (label: string, value: React.ReactNode, unit: string, valueClass = 'text-[var(--ink)]') => (
+    <div className="rounded-2xl border border-[var(--line)] bg-[var(--bg)] p-4">
+      <span className="block text-[10px] font-bold uppercase tracking-wider text-[var(--ink-soft)]">{label}</span>
+      <div className="mt-1 flex items-baseline gap-2">
+        <span className={`text-2xl font-black ${valueClass}`}>{value}</span>
+        <span className="text-xs text-[var(--ink-soft)]">{unit}</span>
+      </div>
+    </div>
+  );
+
+  // One row's action buttons — shared by the table and the stacked mobile cards.
+  const certActions = (cert: EventCertificate) => {
+    const isIssued = cert.status === 'ISSUED';
+    const downloadUrl = `/api/manager/events/${eventId}/certificates/${cert.id}/download?college=${slug}`;
+    return (
+      <div className="inline-flex items-center justify-end gap-1.5">
+        <a
+          href={downloadUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="grid h-9 w-9 place-items-center rounded-lg border border-[var(--line)] text-[var(--ink-soft)] transition-colors hover:border-[var(--primary)] hover:text-[var(--primary)] motion-reduce:transition-none focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-[var(--primary)]"
+          title={t.viewPdf}
+          aria-label={`${t.viewPdf} — ${cert.user?.name || ''}`}
+        >
+          <Download aria-hidden="true" className="h-3.5 w-3.5" />
+        </a>
+
+        <button
+          type="button"
+          onClick={() => setReissuingCert(cert)}
+          className="grid h-9 w-9 place-items-center rounded-lg border border-[var(--line)] text-[var(--ink-soft)] transition-colors hover:border-[var(--primary)] hover:text-[var(--primary)] motion-reduce:transition-none focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-[var(--primary)]"
+          title={t.reissueAction}
+          aria-label={`${t.reissueAction} — ${cert.user?.name || ''}`}
+        >
+          <RefreshCw aria-hidden="true" className="h-3.5 w-3.5" />
+        </button>
+
+        {isIssued && (
+          <button
+            type="button"
+            onClick={() => setRevokingCert(cert)}
+            className="grid h-9 w-9 place-items-center rounded-lg border border-[var(--line)] text-[var(--ink-soft)] transition-colors hover:border-[var(--secondary)] hover:bg-[var(--secondary-soft)] hover:text-[var(--secondary)] motion-reduce:transition-none focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-[var(--primary)]"
+            title={t.revokeAction}
+            aria-label={`${t.revokeAction} — ${cert.user?.name || ''}`}
+          >
+            <Ban aria-hidden="true" className="h-3.5 w-3.5" />
+          </button>
+        )}
+      </div>
+    );
+  };
+
+  const certNumberCell = (cert: EventCertificate) => (
+    <div className="inline-flex items-center gap-1.5">
+      <span className="font-mono text-xs font-medium text-[var(--ink)]">{cert.certificateNumber}</span>
+      <button
+        type="button"
+        onClick={() => handleCopyNumber(cert.certificateNumber)}
+        className="grid h-7 w-7 place-items-center rounded-md text-[var(--ink-soft)] transition-colors hover:bg-[var(--primary-soft)] hover:text-[var(--ink)] motion-reduce:transition-none focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-[var(--primary)]"
+        title={t.copyNumber}
+        aria-label={`${t.copyNumber} ${cert.certificateNumber}`}
+      >
+        {copiedCertId === cert.certificateNumber ? (
+          <Check aria-hidden="true" className="h-3.5 w-3.5 text-emerald-600" />
+        ) : (
+          <Copy aria-hidden="true" className="h-3.5 w-3.5" />
+        )}
+      </button>
+      {copiedCertId === cert.certificateNumber && (
+        <span role="status" className="text-[10px] font-bold text-emerald-700">
+          {t.copied}
+        </span>
+      )}
+    </div>
+  );
+
+  const recipientCell = (cert: EventCertificate) => (
+    <div className="flex items-center gap-3">
+      {cert.user?.avatar?.url ? (
+        <img
+          src={cert.user.avatar.url}
+          alt=""
+          className="h-8 w-8 shrink-0 rounded-full border border-[var(--line)] object-cover"
+        />
+      ) : (
+        <div
+          aria-hidden="true"
+          className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[var(--primary-soft)] text-xs font-bold uppercase text-[var(--primary)]"
+        >
+          {(cert.user?.name || 'S').slice(0, 2)}
+        </div>
+      )}
+      <div className="min-w-0">
+        <div className="truncate text-xs font-bold text-[var(--ink)]">{cert.user?.name || t.fallbackStudent}</div>
+        <div className="truncate text-[11px] text-[var(--ink-soft)]">
+          {cert.user?.rollNumber || t.noRoll} • {cert.user?.email || t.noEmail}
+        </div>
+      </div>
+    </div>
+  );
+
+  const issuedAtCell = (cert: EventCertificate) =>
+    new Date(cert.issuedAt).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    });
+
   return (
-    <div
-      className={`rounded-3xl p-6 sm:p-8 border shadow-xl space-y-6 transition-all ${
-        isDark ? 'bg-slate-900/60 border-white/10' : 'bg-white border-[#E8E6DF]'
-      }`}
-    >
+    <div className="space-y-6 rounded-3xl border border-[var(--line)] bg-[var(--surface)] p-6 shadow-sm sm:p-8">
       {/* Section Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
         <div>
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400">
-              <Award className="w-4 h-4" />
-            </div>
-            <h2 className="text-lg font-black uppercase tracking-wider text-slate-100">
-              Event Certificates
-            </h2>
+            <span
+              aria-hidden="true"
+              className="grid h-8 w-8 place-items-center rounded-xl border border-[var(--primary)]/20 bg-[var(--primary-soft)] text-[var(--primary)]"
+            >
+              <Award className="h-4 w-4" />
+            </span>
+            <h2 className="font-display text-lg font-bold tracking-tight text-[var(--ink)]">{t.title}</h2>
           </div>
-          <p className="text-xs text-slate-400 mt-1">
-            Issue, auto-generate, and audit official participation certificates for registered attendees.
-          </p>
+          <p className="mt-1 text-xs text-[var(--ink-soft)]">{t.description}</p>
         </div>
 
         {/* Issuance Action Buttons */}
         <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setIsIndividualModalOpen(true)}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-xl border border-white/10 transition cursor-pointer"
-          >
-            <Upload className="w-3.5 h-3.5 text-cyan-400" />
-            <span>Individual PDF</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setIsBulkModalOpen(true)}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-xl border border-white/10 transition cursor-pointer"
-          >
-            <Archive className="w-3.5 h-3.5 text-amber-400" />
-            <span>Bulk ZIP</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setIsTemplateModalOpen(true)}
-            className="inline-flex items-center gap-1.5 px-4 py-2 bg-cyan-500 hover:bg-cyan-400 text-slate-950 text-xs font-bold rounded-xl shadow-md transition cursor-pointer"
-          >
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>Auto-Generate</span>
-          </button>
+          <DashboardButton variant="secondary" size="sm" leftIcon={<Upload aria-hidden="true" className="h-3.5 w-3.5" />} onClick={() => setIsIndividualModalOpen(true)}>
+            {t.actionIndividual}
+          </DashboardButton>
+          <DashboardButton variant="secondary" size="sm" leftIcon={<Archive aria-hidden="true" className="h-3.5 w-3.5" />} onClick={() => setIsBulkModalOpen(true)}>
+            {t.actionBulk}
+          </DashboardButton>
+          <DashboardButton variant="primary" size="sm" leftIcon={<Sparkles aria-hidden="true" className="h-3.5 w-3.5" />} onClick={() => setIsTemplateModalOpen(true)}>
+            {t.actionGenerate}
+          </DashboardButton>
         </div>
       </div>
 
       {/* Overview Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <div className="p-4 rounded-2xl bg-white/5 border border-white/10">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-            Certificates Issued
-          </span>
-          <div className="flex items-baseline gap-2 mt-1">
-            <span className="text-2xl font-black text-white">{pagination.total}</span>
-            <span className="text-xs text-slate-400">total records</span>
-          </div>
-        </div>
-
-        <div className="p-4 rounded-2xl bg-white/5 border border-white/10">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-            Eligible Registered Students
-          </span>
-          <div className="flex items-baseline gap-2 mt-1">
-            <span className="text-2xl font-black text-cyan-400">{eligibleStudents.length}</span>
-            <span className="text-xs text-slate-400">attendees</span>
-          </div>
-        </div>
-
-        <div className="p-4 rounded-2xl bg-white/5 border border-white/10">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-            Coverage
-          </span>
-          <div className="flex items-baseline gap-2 mt-1">
-            <span className="text-2xl font-black text-emerald-400">
-              {eligibleStudents.length > 0
-                ? Math.round((eligibleStudents.filter((s) => s.hasActiveCertificate).length / eligibleStudents.length) * 100)
-                : 0}
-              %
-            </span>
-            <span className="text-xs text-slate-400">students awarded</span>
-          </div>
-        </div>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        {statTile(t.statIssued, pagination.total, t.statIssuedUnit)}
+        {statTile(t.statEligible, eligibleStudents.length, t.statEligibleUnit, 'text-[var(--primary)]')}
+        {statTile(t.statCoverage, `${coverage}%`, t.statCoverageUnit, 'text-emerald-700')}
       </div>
 
       {/* Filter and Search Bar */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2">
+      <div className="flex flex-col items-stretch justify-between gap-3 pt-2 sm:flex-row sm:items-center">
         {/* Status Tabs */}
-        <div className="inline-flex p-1 rounded-xl bg-white/5 border border-white/10 self-start">
+        <div className="inline-flex self-start rounded-xl border border-[var(--line)] bg-[var(--bg)] p-1" role="group" aria-label={t.tableStatus}>
           {(['ALL', 'ISSUED', 'REVOKED'] as const).map((tab) => (
             <button
               key={tab}
@@ -182,225 +265,148 @@ export function EventCertificatesSection({
                 setStatusFilter(tab);
                 setPage(1);
               }}
-              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition ${
+              aria-pressed={statusFilter === tab}
+              className={`min-h-8 rounded-lg px-3 py-1.5 text-xs font-bold transition-colors motion-reduce:transition-none focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-[var(--primary)] ${
                 statusFilter === tab
-                  ? 'bg-cyan-500 text-slate-950 shadow-sm'
-                  : 'text-slate-400 hover:text-white'
+                  ? 'bg-[var(--primary)] text-[var(--on-primary)]'
+                  : 'text-[var(--ink-soft)] hover:text-[var(--ink)]'
               }`}
             >
-              {tab === 'ALL' ? 'All' : tab === 'ISSUED' ? 'Issued' : 'Revoked'}
+              {tab === 'ALL' ? t.filterAll : tab === 'ISSUED' ? t.filterIssued : t.filterRevoked}
             </button>
           ))}
         </div>
 
         {/* Search Input */}
         <div className="relative w-full sm:w-72">
-          <Search className="w-3.5 h-3.5 absolute left-3 top-3 text-slate-400" />
+          <label htmlFor="certificates-search" className="sr-only">
+            {t.searchLabel}
+          </label>
+          <Search aria-hidden="true" className="absolute left-3 top-2.5 h-4 w-4 text-[var(--ink-soft)]" />
           <input
+            id="certificates-search"
             type="text"
-            placeholder="Search by student, roll #, or cert #..."
+            placeholder={t.searchPlaceholder}
             value={searchQuery}
             onChange={(e) => {
               setSearchQuery(e.target.value);
               setPage(1);
             }}
-            className={`w-full pl-9 pr-3 py-2 text-xs rounded-xl border outline-none transition ${
-              isDark
-                ? 'bg-black/30 border-white/10 text-white placeholder-slate-500 focus:border-cyan-500'
-                : 'bg-white border-slate-200 text-slate-900 placeholder-slate-400 focus:border-cyan-500'
-            }`}
+            className="w-full rounded-xl border border-[var(--line)] bg-[var(--bg)] py-2 pl-9 pr-3 text-xs text-[var(--ink)] placeholder:text-[var(--ink-soft)] transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-[var(--primary)] motion-reduce:transition-none"
           />
         </div>
       </div>
 
-      {/* Certificates Table */}
+      {/* Certificates: five states */}
       {certsLoading ? (
-        <div className="py-12 flex flex-col items-center justify-center text-xs text-slate-400">
-          <Loader2 className="w-6 h-6 animate-spin mb-2 text-cyan-400" />
-          <span>Loading event certificates...</span>
+        /* Loading state */
+        <div className="space-y-3" role="status" aria-label={t.loadingLabel}>
+          <SkeletonCard />
+          <SkeletonCard />
+        </div>
+      ) : certsError ? (
+        /* Error state with retry */
+        <div className="flex flex-col items-start justify-between gap-4 rounded-2xl border border-[var(--line)] bg-[var(--bg)] p-6 sm:flex-row sm:items-center">
+          <p className="flex items-center gap-2 text-sm font-medium text-[var(--ink-soft)]">
+            <AlertCircle aria-hidden="true" className="h-4 w-4 shrink-0 text-[var(--secondary)]" />
+            {t.errLoad}
+          </p>
+          <DashboardButton variant="primary" size="sm" onClick={handleRefresh} leftIcon={<RefreshCw aria-hidden="true" className="h-3.5 w-3.5" />}>
+            {actions.retry}
+          </DashboardButton>
         </div>
       ) : certificates.length === 0 ? (
-        <div className="py-12 text-center text-slate-400 text-xs font-medium space-y-2 border border-dashed border-white/10 rounded-2xl">
-          <Award className="w-8 h-8 mx-auto text-slate-600 mb-1" />
-          <div>No certificates found matching your criteria.</div>
-          <p className="text-[11px] text-slate-500">
-            Use the actions above to issue certificates individually, upload in bulk, or auto-generate from a template.
-          </p>
-        </div>
+        /* Empty state */
+        pagination.total === 0 && statusFilter === 'ALL' && !searchQuery.trim() ? (
+          <EmptyState
+            icon={Award}
+            title={t.emptyTitle}
+            description={t.emptyDescription}
+            actionLabel={t.actionGenerate}
+            onAction={() => setIsTemplateModalOpen(true)}
+          />
+        ) : (
+          <EmptyState icon={Search} title={t.emptyFilteredTitle} description={t.emptyFilteredDescription} />
+        )
       ) : (
+        /* Success state: table on sm+, stacked cards below sm */
         <div className="space-y-4">
-          <div className="overflow-x-auto">
+          {/* Stacked cards (mobile) */}
+          <ul className="space-y-3 sm:hidden">
+            {certificates.map((cert) => (
+              <li key={cert.id} className="space-y-3 rounded-2xl border border-[var(--line)] bg-[var(--bg)] p-4">
+                {recipientCell(cert)}
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  {certNumberCell(cert)}
+                  {statusChip(cert)}
+                </div>
+                <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-[var(--ink-soft)]">
+                  <span className="rounded-full border border-[var(--line)] px-2 py-0.5 text-[10px] font-semibold">
+                    {methodLabel(cert.source)}
+                  </span>
+                  <span>{issuedAtCell(cert)}</span>
+                </div>
+                <div className="flex justify-end border-t border-dashed border-[var(--line)] pt-3">{certActions(cert)}</div>
+              </li>
+            ))}
+          </ul>
+
+          {/* Table (sm+) */}
+          <div className="hidden overflow-x-auto sm:block">
             <table className="w-full text-left text-xs">
               <thead>
-                <tr
-                  className={`border-b text-[10px] font-black uppercase tracking-wider ${
-                    isDark ? 'border-white/10 text-slate-400' : 'border-[#E8E6DF] text-[#64748B]'
-                  }`}
-                >
-                  <th className="py-3 px-4">Student Recipient</th>
-                  <th className="py-3 px-4">Certificate Number</th>
-                  <th className="py-3 px-4">Method</th>
-                  <th className="py-3 px-4">Status</th>
-                  <th className="py-3 px-4">Issued At</th>
-                  <th className="py-3 px-4 text-right">Actions</th>
+                <tr className="border-b border-[var(--line)] text-[10px] font-bold uppercase tracking-wider text-[var(--ink-soft)]">
+                  <th className="px-4 py-3">{t.tableRecipient}</th>
+                  <th className="px-4 py-3">{t.tableNumber}</th>
+                  <th className="px-4 py-3">{t.tableMethod}</th>
+                  <th className="px-4 py-3">{t.tableStatus}</th>
+                  <th className="px-4 py-3">{t.tableIssuedAt}</th>
+                  <th className="px-4 py-3 text-right">{t.tableActions}</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-white/5">
-                {certificates.map((cert) => {
-                  const isIssued = cert.status === 'ISSUED';
-                  const downloadUrl = `/api/manager/events/${eventId}/certificates/${cert.id}/download?college=${slug}`;
-
-                  return (
-                    <tr
-                      key={cert.id}
-                      className={`transition-colors ${
-                        isDark ? 'hover:bg-white/5 text-slate-200' : 'hover:bg-slate-50 text-slate-900'
-                      }`}
-                    >
-                      {/* Recipient */}
-                      <td className="py-3 px-4">
-                        <div className="flex items-center gap-3">
-                          {cert.user?.avatar?.url ? (
-                            <img
-                              src={cert.user.avatar.url}
-                              alt={cert.user.name || 'User'}
-                              className="w-8 h-8 rounded-full object-cover border border-white/10"
-                            />
-                          ) : (
-                            <div className="w-8 h-8 rounded-full bg-cyan-500/20 text-cyan-400 flex items-center justify-center font-bold text-xs uppercase">
-                              {(cert.user?.name || 'S').slice(0, 2)}
-                            </div>
-                          )}
-                          <div>
-                            <div className="font-bold text-slate-200">{cert.user?.name || 'Student'}</div>
-                            <div className="text-[11px] text-slate-400">
-                              {cert.user?.rollNumber || 'No Roll #'} • {cert.user?.email || '—'}
-                            </div>
-                          </div>
-                        </div>
-                      </td>
-
-                      {/* Certificate Number */}
-                      <td className="py-3 px-4 font-mono font-medium text-slate-300">
-                        <div className="inline-flex items-center gap-1.5">
-                          <span>{cert.certificateNumber}</span>
-                          <button
-                            type="button"
-                            onClick={() => handleCopyNumber(cert.certificateNumber)}
-                            className="p-1 rounded-md hover:bg-white/10 text-slate-400 hover:text-white transition"
-                            title="Copy Certificate Number"
-                          >
-                            {copiedCertId === cert.certificateNumber ? (
-                              <Check className="w-3.5 h-3.5 text-emerald-400" />
-                            ) : (
-                              <Copy className="w-3.5 h-3.5" />
-                            )}
-                          </button>
-                        </div>
-                      </td>
-
-                      {/* Source Method */}
-                      <td className="py-3 px-4">
-                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-white/5 text-slate-400 border border-white/10">
-                          {cert.source === 'INDIVIDUAL_UPLOAD'
-                            ? 'Single Upload'
-                            : cert.source === 'BULK_UPLOAD'
-                            ? 'Bulk ZIP'
-                            : 'Generated'}
-                        </span>
-                      </td>
-
-                      {/* Status */}
-                      <td className="py-3 px-4">
-                        {isIssued ? (
-                          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20">
-                            <CheckCircle2 className="w-3 h-3" /> Issued
-                          </span>
-                        ) : (
-                          <span
-                            className="inline-flex items-center gap-1 text-[10px] font-bold text-rose-400 bg-rose-500/10 px-2.5 py-0.5 rounded-full border border-rose-500/20 cursor-help"
-                            title={cert.revocationReason || 'Revoked by administrator'}
-                          >
-                            <Ban className="w-3 h-3" /> Revoked
-                          </span>
-                        )}
-                      </td>
-
-                      {/* Issued Date */}
-                      <td className="py-3 px-4 text-slate-400 text-[11px]">
-                        {new Date(cert.issuedAt).toLocaleDateString('en-US', {
-                          month: 'short',
-                          day: 'numeric',
-                          year: 'numeric',
-                        })}
-                      </td>
-
-                      {/* Action Menu */}
-                      <td className="py-3 px-4 text-right">
-                        <div className="inline-flex items-center justify-end gap-1.5">
-                          {/* Download / View Button */}
-                          <a
-                            href={downloadUrl}
-                            target="_blank"
-                            rel="noopener"
-                            className="p-1.5 rounded-lg border border-white/10 text-slate-300 hover:text-cyan-400 hover:border-cyan-500/30 hover:bg-white/5 transition"
-                            title="View / Download PDF"
-                          >
-                            <Download className="w-3.5 h-3.5" />
-                          </a>
-
-                          {/* Reissue Button */}
-                          <button
-                            type="button"
-                            onClick={() => setReissuingCert(cert)}
-                            className="p-1.5 rounded-lg border border-white/10 text-slate-300 hover:text-cyan-400 hover:border-cyan-500/30 hover:bg-white/5 transition"
-                            title="Reissue Certificate"
-                          >
-                            <RefreshCw className="w-3.5 h-3.5" />
-                          </button>
-
-                          {/* Revoke Button (only active if currently ISSUED) */}
-                          {isIssued && (
-                            <button
-                              type="button"
-                              onClick={() => setRevokingCert(cert)}
-                              className="p-1.5 rounded-lg border border-white/10 text-slate-400 hover:text-rose-400 hover:border-rose-500/30 hover:bg-rose-500/10 transition"
-                              title="Revoke Certificate"
-                            >
-                              <Ban className="w-3.5 h-3.5" />
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
+              <tbody className="divide-y divide-[var(--line)]">
+                {certificates.map((cert) => (
+                  <tr key={cert.id} className="transition-colors hover:bg-[var(--primary-soft)]/30 motion-reduce:transition-none">
+                    <td className="px-4 py-3">{recipientCell(cert)}</td>
+                    <td className="px-4 py-3">{certNumberCell(cert)}</td>
+                    <td className="px-4 py-3">
+                      <span className="rounded-full border border-[var(--line)] bg-[var(--bg)] px-2 py-0.5 text-[10px] font-semibold text-[var(--ink-soft)]">
+                        {methodLabel(cert.source)}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">{statusChip(cert)}</td>
+                    <td className="px-4 py-3 text-[11px] text-[var(--ink-soft)]">{issuedAtCell(cert)}</td>
+                    <td className="px-4 py-3 text-right">{certActions(cert)}</td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
 
-          {/* Pagination */}
+          {/* Pagination (disabled state at the bounds) */}
           {pagination.totalPages > 1 && (
-            <div className="flex items-center justify-between pt-3 border-t border-white/10">
-              <span className="text-xs text-slate-400">
-                Page {page} of {pagination.totalPages} ({pagination.total} total)
+            <div className="flex items-center justify-between border-t border-[var(--line)] pt-3">
+              <span className="text-xs text-[var(--ink-soft)]">
+                {t.paginationInfo(page, pagination.totalPages, pagination.total)}
               </span>
               <div className="flex items-center gap-2">
                 <button
                   type="button"
                   disabled={page <= 1}
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  className="p-2 rounded-xl border border-white/10 text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-white/5"
+                  aria-label={t.prevPage}
+                  className="grid h-9 w-9 place-items-center rounded-xl border border-[var(--line)] text-[var(--ink)] transition-colors hover:bg-[var(--primary-soft)] disabled:cursor-not-allowed disabled:opacity-40 motion-reduce:transition-none focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-[var(--primary)]"
                 >
-                  <ChevronLeft className="w-4 h-4" />
+                  <ChevronLeft aria-hidden="true" className="h-4 w-4" />
                 </button>
                 <button
                   type="button"
                   disabled={page >= pagination.totalPages}
                   onClick={() => setPage((p) => p + 1)}
-                  className="p-2 rounded-xl border border-white/10 text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-white/5"
+                  aria-label={t.nextPage}
+                  className="grid h-9 w-9 place-items-center rounded-xl border border-[var(--line)] text-[var(--ink)] transition-colors hover:bg-[var(--primary-soft)] disabled:cursor-not-allowed disabled:opacity-40 motion-reduce:transition-none focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-[var(--primary)]"
                 >
-                  <ChevronRight className="w-4 h-4" />
+                  <ChevronRight aria-hidden="true" className="h-4 w-4" />
                 </button>
               </div>
             </div>
@@ -410,7 +416,7 @@ export function EventCertificatesSection({
 
       {/* Modals */}
       <IndividualUploadModal
-        isOpen={isIndividualModalOpen}
+        open={isIndividualModalOpen}
         onClose={() => setIsIndividualModalOpen(false)}
         slug={slug}
         eventId={eventId}
@@ -419,7 +425,7 @@ export function EventCertificatesSection({
       />
 
       <BulkUploadModal
-        isOpen={isBulkModalOpen}
+        open={isBulkModalOpen}
         onClose={() => setIsBulkModalOpen(false)}
         slug={slug}
         eventId={eventId}
@@ -427,7 +433,7 @@ export function EventCertificatesSection({
       />
 
       <TemplateGenerationModal
-        isOpen={isTemplateModalOpen}
+        open={isTemplateModalOpen}
         onClose={() => setIsTemplateModalOpen(false)}
         slug={slug}
         eventId={eventId}
@@ -436,7 +442,7 @@ export function EventCertificatesSection({
       />
 
       <RevokeCertificateModal
-        isOpen={Boolean(revokingCert)}
+        open={Boolean(revokingCert)}
         onClose={() => setRevokingCert(null)}
         slug={slug}
         eventId={eventId}
@@ -445,7 +451,7 @@ export function EventCertificatesSection({
       />
 
       <ReissueCertificateModal
-        isOpen={Boolean(reissuingCert)}
+        open={Boolean(reissuingCert)}
         onClose={() => setReissuingCert(null)}
         slug={slug}
         eventId={eventId}

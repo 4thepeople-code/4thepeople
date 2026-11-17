@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import { useTheme } from '@/context/ThemeContext';
-import { Modal } from '@/components/common/Modal';
+import Modal from '@/components/dashboard/ui/Modal';
+import DashboardButton from '@/components/dashboard/ui/DashboardButton';
+import { actions, managerCertificates } from '@/lib/copy';
 import {
   useEligibleStudentsQuery,
   useIssueIndividualCertificateMutation,
@@ -12,7 +13,6 @@ import {
   Search,
   CheckCircle2,
   AlertCircle,
-  Loader2,
   FileText,
   UserCheck,
   X,
@@ -20,7 +20,7 @@ import {
 import type { EligibleStudentItem } from '@/types/models';
 
 interface IndividualUploadModalProps {
-  isOpen: boolean;
+  open: boolean;
   onClose: () => void;
   slug: string;
   eventId: string;
@@ -28,21 +28,21 @@ interface IndividualUploadModalProps {
   onSuccess?: () => void;
 }
 
+const t = managerCertificates.individual;
+
 export function IndividualUploadModal({
-  isOpen,
+  open,
   onClose,
   slug,
   eventId,
   eventTitle,
   onSuccess,
 }: IndividualUploadModalProps) {
-  const { isDark } = useTheme();
-
   // Queries & Mutations
   const { data: students = [], isLoading: studentsLoading } = useEligibleStudentsQuery(
     slug,
     eventId,
-    isOpen
+    open
   );
   const issueMutation = useIssueIndividualCertificateMutation(slug, eventId);
 
@@ -70,12 +70,12 @@ export function IndividualUploadModal({
     if (!file) return;
 
     if (!file.name.toLowerCase().endsWith('.pdf') && file.type !== 'application/pdf') {
-      setFormError('Only valid PDF documents (.pdf) are accepted.');
+      setFormError(t.errPdfType);
       return;
     }
 
     if (file.size > 10 * 1024 * 1024) {
-      setFormError('PDF file size must not exceed 10 MB.');
+      setFormError(t.errPdfSize);
       return;
     }
 
@@ -85,7 +85,7 @@ export function IndividualUploadModal({
   const handleSelectStudent = (student: EligibleStudentItem) => {
     setFormError(null);
     if (student.hasActiveCertificate) {
-      setFormError(`Student '${student.user.name}' already has an active certificate. Reissue or revoke first.`);
+      setFormError(t.alreadyIssuedError(student.user.name || t.fallbackStudent));
       return;
     }
     setSelectedStudent(student);
@@ -96,17 +96,17 @@ export function IndividualUploadModal({
     setFormError(null);
 
     if (!selectedStudent) {
-      setFormError('Please select a registered student.');
+      setFormError(t.errNoStudent);
       return;
     }
 
     if (selectedStudent.hasActiveCertificate) {
-      setFormError('Selected student already has an active certificate.');
+      setFormError(t.alreadyIssuedError(selectedStudent.user.name || t.fallbackStudent));
       return;
     }
 
     if (!selectedFile) {
-      setFormError('Please select a PDF certificate file to upload.');
+      setFormError(t.errNoFile);
       return;
     }
 
@@ -125,122 +125,122 @@ export function IndividualUploadModal({
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
         (err as Error).message ||
-        'Failed to issue certificate';
+        t.errSubmit;
       setFormError(msg);
     }
   };
 
   return (
     <Modal
-      isOpen={isOpen}
+      open={open}
       onClose={() => !issueMutation.isPending && onClose()}
-      title="Issue Individual Certificate"
-      maxWidth="max-w-2xl"
+      title={t.title}
+      size="lg"
     >
       <form onSubmit={handleSubmit} className="space-y-5">
         {eventTitle && (
-          <p className="text-xs text-slate-400">
-            Issuing credential for: <strong className="text-slate-200">{eventTitle}</strong>
+          <p className="text-xs text-[var(--ink-soft)]">
+            {t.contextLine(eventTitle)}
           </p>
         )}
 
         {formError && (
-          <div className="p-3.5 bg-rose-500/10 border border-rose-500/20 rounded-2xl flex items-start gap-3 text-rose-300 text-xs font-medium">
-            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+          <div className="flex items-start gap-3 rounded-2xl border border-rose-200 bg-rose-50 p-3.5 text-xs font-medium text-rose-700">
+            <AlertCircle aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" />
             <span>{formError}</span>
           </div>
         )}
 
         {/* Step 1: Select Student */}
         <div className="space-y-2">
-          <label className="block text-xs font-bold uppercase tracking-wider text-slate-400">
-            1. Select Registered Student <span className="text-rose-400">*</span>
-          </label>
+          <span className="block text-xs font-bold uppercase tracking-wider text-[var(--ink-soft)]">
+            {t.stepStudent} <span aria-hidden="true" className="text-[var(--secondary)]">*</span>
+          </span>
 
           {selectedStudent ? (
-            <div
-              className={`p-3.5 rounded-2xl border flex items-center justify-between ${
-                isDark ? 'bg-white/5 border-white/10' : 'bg-slate-50 border-slate-200'
-              }`}
-            >
+            <div className="flex items-center justify-between rounded-2xl border border-[var(--line)] bg-[var(--bg)] p-3.5">
               <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-full bg-cyan-500/20 text-cyan-400 flex items-center justify-center font-bold text-xs uppercase">
+                <div
+                  aria-hidden="true"
+                  className="grid h-9 w-9 place-items-center rounded-full bg-[var(--primary-soft)] text-xs font-bold uppercase text-[var(--primary)]"
+                >
                   {(selectedStudent.user.name || 'S').slice(0, 2)}
                 </div>
                 <div>
-                  <div className="font-bold text-sm">{selectedStudent.user.name}</div>
-                  <div className="text-xs text-slate-400">
-                    Roll: {selectedStudent.user.rollNumber || 'N/A'} • {selectedStudent.user.email}
+                  <div className="text-sm font-bold text-[var(--ink)]">{selectedStudent.user.name}</div>
+                  <div className="text-xs text-[var(--ink-soft)]">
+                    {t.rollLabel} {selectedStudent.user.rollNumber || 'N/A'} • {selectedStudent.user.email}
                   </div>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setSelectedStudent(null)}
-                className="p-1.5 rounded-xl hover:bg-white/10 text-slate-400 hover:text-white transition"
+                aria-label={actions.close}
+                className="grid h-9 w-9 place-items-center rounded-xl text-[var(--ink-soft)] transition-colors hover:bg-[var(--primary-soft)] hover:text-[var(--ink)] motion-reduce:transition-none focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-[var(--primary)]"
               >
-                <X className="w-4 h-4" />
+                <X aria-hidden="true" className="h-4 w-4" />
               </button>
             </div>
           ) : (
             <div className="space-y-2">
               <div className="relative">
-                <Search className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
+                <label htmlFor="individual-student-search" className="sr-only">
+                  {t.searchPlaceholder}
+                </label>
+                <Search aria-hidden="true" className="absolute left-3 top-2.5 h-4 w-4 text-[var(--ink-soft)]" />
                 <input
+                  id="individual-student-search"
                   type="text"
-                  placeholder="Search registered attendees by name, roll number, or email..."
+                  placeholder={t.searchPlaceholder}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className={`w-full pl-9 pr-3 py-2 text-xs rounded-xl border outline-none transition ${
-                    isDark
-                      ? 'bg-black/30 border-white/10 text-white focus:border-cyan-500'
-                      : 'bg-white border-slate-200 text-slate-900 focus:border-cyan-500'
-                  }`}
+                  className="w-full rounded-xl border border-[var(--line)] bg-[var(--bg)] py-2 pl-9 pr-3 text-xs text-[var(--ink)] placeholder:text-[var(--ink-soft)] transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-[var(--primary)] motion-reduce:transition-none"
                 />
               </div>
 
               {studentsLoading ? (
-                <div className="py-6 flex items-center justify-center text-xs text-slate-400">
-                  <Loader2 className="w-4 h-4 animate-spin mr-2" /> Loading registered attendees...
+                <div className="flex items-center justify-center py-6 text-xs text-[var(--ink-soft)]" role="status" aria-label={t.loadingStudents}>
+                  <span aria-hidden="true" className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current/30 border-t-current motion-reduce:animate-none" />
+                  {t.loadingStudents}…
                 </div>
               ) : filteredStudents.length === 0 ? (
-                <div className="py-6 text-center text-xs text-slate-400">
-                  {students.length === 0
-                    ? 'No students have registered for this event yet.'
-                    : 'No matching attendees found.'}
+                <div className="py-6 text-center text-xs text-[var(--ink-soft)]">
+                  {students.length === 0 ? t.noStudents : t.noMatches}
                 </div>
               ) : (
-                <div className="max-h-48 overflow-y-auto space-y-1 pr-1 divide-y divide-white/5 border border-white/10 rounded-2xl p-1">
+                <ul className="max-h-48 space-y-1 divide-y divide-[var(--line)] overflow-y-auto rounded-2xl border border-[var(--line)] p-1">
                   {filteredStudents.map((item) => (
-                    <div
-                      key={item.registrationId}
-                      onClick={() => !item.hasActiveCertificate && handleSelectStudent(item)}
-                      className={`p-2.5 rounded-xl flex items-center justify-between text-xs transition cursor-pointer ${
-                        item.hasActiveCertificate
-                          ? 'opacity-50 cursor-not-allowed bg-white/5'
-                          : isDark
-                          ? 'hover:bg-white/10 text-slate-200'
-                          : 'hover:bg-slate-100 text-slate-900'
-                      }`}
-                    >
-                      <div>
-                        <div className="font-bold">{item.user.name}</div>
-                        <div className="text-[11px] text-slate-400">
-                          {item.user.rollNumber || 'No Roll #'} • {item.user.email}
-                        </div>
-                      </div>
-                      {item.hasActiveCertificate ? (
-                        <span className="text-[10px] font-semibold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
-                          Active Cert Issued
+                    <li key={item.registrationId}>
+                      <button
+                        type="button"
+                        onClick={() => !item.hasActiveCertificate && handleSelectStudent(item)}
+                        disabled={item.hasActiveCertificate}
+                        className={`flex min-h-11 w-full items-center justify-between gap-2 rounded-xl p-2.5 text-left text-xs transition-colors duration-150 motion-reduce:transition-none focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-[var(--primary)] ${
+                          item.hasActiveCertificate
+                            ? 'cursor-not-allowed bg-[var(--bg)] text-[var(--ink-soft)] opacity-60'
+                            : 'cursor-pointer text-[var(--ink)] hover:bg-[var(--primary-soft)]/60'
+                        }`}
+                      >
+                        <span className="min-w-0">
+                          <span className="block truncate font-bold">{item.user.name}</span>
+                          <span className="block truncate text-[11px] text-[var(--ink-soft)]">
+                            {item.user.rollNumber || t.noRoll} • {item.user.email}
+                          </span>
                         </span>
-                      ) : (
-                        <span className="text-[11px] font-medium text-cyan-400 flex items-center gap-1">
-                          <UserCheck className="w-3.5 h-3.5" /> Select
-                        </span>
-                      )}
-                    </div>
+                        {item.hasActiveCertificate ? (
+                          <span className="shrink-0 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
+                            {t.alreadyIssued}
+                          </span>
+                        ) : (
+                          <span className="flex shrink-0 items-center gap-1 text-[11px] font-medium text-[var(--primary)]">
+                            <UserCheck aria-hidden="true" className="h-3.5 w-3.5" /> {t.select}
+                          </span>
+                        )}
+                      </button>
+                    </li>
                   ))}
-                </div>
+                </ul>
               )}
             </div>
           )}
@@ -248,44 +248,39 @@ export function IndividualUploadModal({
 
         {/* Step 2: Upload PDF Document */}
         <div className="space-y-2">
-          <label className="block text-xs font-bold uppercase tracking-wider text-slate-400">
-            2. Upload Certificate PDF <span className="text-rose-400">*</span>
-          </label>
+          <span className="block text-xs font-bold uppercase tracking-wider text-[var(--ink-soft)]">
+            {t.stepFile} <span aria-hidden="true" className="text-[var(--secondary)]">*</span>
+          </span>
 
-          <div
-            className={`border-2 border-dashed rounded-2xl p-5 text-center transition ${
-              isDark
-                ? 'border-white/10 hover:border-cyan-500/50 bg-black/20'
-                : 'border-slate-200 hover:border-cyan-500/50 bg-slate-50'
-            }`}
-          >
+          <div className="rounded-2xl border-2 border-dashed border-[var(--line)] bg-[var(--bg)] p-5 text-center transition-colors hover:border-[var(--primary)]/50 motion-reduce:transition-none">
             {selectedFile ? (
               <div className="flex items-center justify-center gap-3">
-                <FileText className="w-8 h-8 text-cyan-400 shrink-0" />
+                <FileText aria-hidden="true" className="h-8 w-8 shrink-0 text-[var(--primary)]" />
                 <div className="text-left">
-                  <div className="font-bold text-xs text-slate-200 truncate max-w-xs">
+                  <div className="max-w-xs truncate text-xs font-bold text-[var(--ink)]">
                     {selectedFile.name}
                   </div>
-                  <div className="text-[11px] text-slate-400">
+                  <div className="text-[11px] text-[var(--ink-soft)]">
                     {(selectedFile.size / 1024).toFixed(1)} KB • application/pdf
                   </div>
                 </div>
                 <button
                   type="button"
                   onClick={() => setSelectedFile(null)}
-                  className="p-1.5 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white transition ml-2"
+                  aria-label={actions.close}
+                  className="ml-2 grid h-9 w-9 place-items-center rounded-lg text-[var(--ink-soft)] transition-colors hover:bg-[var(--primary-soft)] hover:text-[var(--ink)] motion-reduce:transition-none focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-[var(--primary)]"
                 >
-                  <X className="w-4 h-4" />
+                  <X aria-hidden="true" className="h-4 w-4" />
                 </button>
               </div>
             ) : (
-              <label className="cursor-pointer block">
-                <Upload className="w-8 h-8 mx-auto text-slate-400 mb-2" />
-                <span className="text-xs font-semibold text-cyan-400 hover:underline">
-                  Click to choose PDF file
+              <label className="block cursor-pointer rounded-xl focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-[var(--primary)]">
+                <Upload aria-hidden="true" className="mx-auto mb-2 h-8 w-8 text-[var(--ink-soft)]" />
+                <span className="text-xs font-semibold text-[var(--primary)] hover:underline">
+                  {t.dropEmpty}
                 </span>
-                <span className="text-xs text-slate-400 block mt-1">
-                  or drag and drop certificate document (Max 10 MB)
+                <span className="mt-1 block text-xs text-[var(--ink-soft)]">
+                  {t.dropHint}
                 </span>
                 <input
                   type="file"
@@ -299,32 +294,21 @@ export function IndividualUploadModal({
         </div>
 
         {/* Action Buttons */}
-        <div className="flex items-center justify-end gap-3 pt-3 border-t border-white/10">
-          <button
-            type="button"
-            disabled={issueMutation.isPending}
-            onClick={onClose}
-            className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl transition cursor-pointer"
-          >
-            Cancel
-          </button>
-          <button
+        <div className="flex items-center justify-end gap-3 border-t border-[var(--line)] pt-3">
+          <DashboardButton variant="secondary" size="sm" disabled={issueMutation.isPending} onClick={onClose}>
+            {actions.cancel}
+          </DashboardButton>
+          <DashboardButton
+            variant="primary"
+            size="sm"
             type="submit"
-            disabled={!selectedStudent || !selectedFile || issueMutation.isPending}
-            className="inline-flex items-center gap-2 px-5 py-2 bg-cyan-500 hover:bg-cyan-400 text-slate-950 text-xs font-bold rounded-xl shadow-md transition disabled:opacity-50 cursor-pointer"
+            disabled={!selectedStudent || !selectedFile}
+            loading={issueMutation.isPending}
+            loadingLabel={t.submitting}
           >
-            {issueMutation.isPending ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                <span>Issuing Certificate...</span>
-              </>
-            ) : (
-              <>
-                <CheckCircle2 className="w-4 h-4" />
-                <span>Issue Certificate</span>
-              </>
-            )}
-          </button>
+            <CheckCircle2 aria-hidden="true" className="h-4 w-4" />
+            {t.submit}
+          </DashboardButton>
         </div>
       </form>
     </Modal>

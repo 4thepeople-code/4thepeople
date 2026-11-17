@@ -9,14 +9,22 @@ export interface ModalProps {
   onClose: () => void;
   title: string;
   description?: string;
-  size?: 'sm' | 'md' | 'lg';
+  size?: keyof typeof sizes;
   children: ReactNode;
+  /**
+   * No panel padding/scroll — children manage their own layout (multi-step
+   * wizards with pinned footers). The panel becomes a flex column capped at
+   * 90vh; give the child `flex min-h-0 flex-1 flex-col`.
+   */
+  flush?: boolean;
 }
 
 const sizes = {
   sm: 'max-w-sm',
   md: 'max-w-lg',
   lg: 'max-w-2xl',
+  xl: 'max-w-5xl',
+  '2xl': 'max-w-7xl',
 } as const;
 
 /**
@@ -25,7 +33,7 @@ const sizes = {
  * render their own buttons inside `children` (verb-specific labels from
  * lib/copy.ts — never a bare "OK").
  */
-export default function Modal({ open, onClose, title, description, size = 'md', children }: ModalProps) {
+export default function Modal({ open, onClose, title, description, size = 'md', flush = false, children }: ModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const previouslyFocused = useRef<HTMLElement | null>(null);
 
@@ -62,9 +70,11 @@ export default function Modal({ open, onClose, title, description, size = 'md', 
         aria-modal="true"
         aria-label={title}
         tabIndex={-1}
-        className={`overlay-scope animate-dashboard-toast-in relative w-full ${sizes[size]} max-h-[90vh] overflow-y-auto rounded-3xl border border-[var(--line)] bg-[var(--surface)] p-6 shadow-xl outline-hidden`}
+        className={`overlay-scope animate-dashboard-toast-in relative flex w-full flex-col ${sizes[size]} ${
+          flush ? 'max-h-[90vh] overflow-hidden' : 'max-h-[90vh] overflow-y-auto p-6'
+        } rounded-3xl border border-[var(--line)] bg-[var(--surface)] shadow-xl outline-hidden`}
       >
-        <div className="mb-4 flex items-start justify-between gap-4">
+        <div className={`flex items-start justify-between gap-4 ${flush ? 'shrink-0 border-b border-[var(--line)] px-6 py-4' : 'mb-4'}`}>
           <div className="min-w-0">
             <h2 className="font-display text-lg font-bold text-[var(--ink)]">{title}</h2>
             {description && <p className="mt-1 text-sm text-[var(--ink-soft)]">{description}</p>}

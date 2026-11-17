@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useTheme } from '@/context/ThemeContext';
-import { Modal } from '@/components/common/Modal';
+import Modal from '@/components/dashboard/ui/Modal';
+import DashboardButton from '@/components/dashboard/ui/DashboardButton';
+import { actions, managerCertificates } from '@/lib/copy';
 import { useUploadBulkCertificatesMutation } from '@/lib/api/manager';
 import {
   Archive,
@@ -10,28 +11,28 @@ import {
   CheckCircle2,
   AlertTriangle,
   AlertCircle,
-  Loader2,
-  X,
   FileSpreadsheet,
+  X,
 } from 'lucide-react';
 import type { CertificateBatch } from '@/types/models';
 
 interface BulkUploadModalProps {
-  isOpen: boolean;
+  open: boolean;
   onClose: () => void;
   slug: string;
   eventId: string;
   onSuccess?: () => void;
 }
 
+const t = managerCertificates.bulk;
+
 export function BulkUploadModal({
-  isOpen,
+  open,
   onClose,
   slug,
   eventId,
   onSuccess,
 }: BulkUploadModalProps) {
-  const { isDark } = useTheme();
   const bulkMutation = useUploadBulkCertificatesMutation(slug, eventId);
 
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -56,12 +57,12 @@ export function BulkUploadModal({
     if (!file) return;
 
     if (!file.name.toLowerCase().endsWith('.zip')) {
-      setFormError('Only ZIP archives (.zip) are accepted.');
+      setFormError(t.errZipType);
       return;
     }
 
     if (file.size > 25 * 1024 * 1024) {
-      setFormError('Archive file size must not exceed 25 MB.');
+      setFormError(t.errZipSize);
       return;
     }
 
@@ -73,7 +74,7 @@ export function BulkUploadModal({
     setFormError(null);
 
     if (!selectedFile) {
-      setFormError('Please select a ZIP archive file.');
+      setFormError(t.errNoFile);
       return;
     }
 
@@ -84,7 +85,7 @@ export function BulkUploadModal({
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
         (err as Error).message ||
-        'Bulk upload failed';
+        t.errSubmit;
       setFormError(msg);
     }
   };
@@ -97,15 +98,15 @@ export function BulkUploadModal({
 
   return (
     <Modal
-      isOpen={isOpen}
+      open={open}
       onClose={() => !bulkMutation.isPending && onClose()}
-      title="Bulk Certificates Upload"
-      maxWidth="max-w-2xl"
+      title={t.title}
+      size="lg"
     >
       <div className="space-y-5">
         {formError && (
-          <div className="p-3.5 bg-rose-500/10 border border-rose-500/20 rounded-2xl flex items-start gap-3 text-rose-300 text-xs font-medium">
-            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+          <div className="flex items-start gap-3 rounded-2xl border border-rose-200 bg-rose-50 p-3.5 text-xs font-medium text-rose-700">
+            <AlertCircle aria-hidden="true" className="h-4 w-4 shrink-0" />
             <span>{formError}</span>
           </div>
         )}
@@ -114,121 +115,105 @@ export function BulkUploadModal({
         {batchResult ? (
           <div className="space-y-4">
             <div
-              className={`p-4 rounded-2xl border ${
+              className={`rounded-2xl border p-4 ${
                 batchResult.status === 'COMPLETED'
-                  ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-300'
+                  ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
                   : batchResult.status === 'COMPLETED_WITH_ERRORS'
-                  ? 'bg-amber-500/10 border-amber-500/20 text-amber-300'
-                  : 'bg-rose-500/10 border-rose-500/20 text-rose-300'
+                  ? 'border-amber-200 bg-amber-50 text-amber-800'
+                  : 'border-rose-200 bg-rose-50 text-rose-800'
               }`}
             >
-              <div className="flex items-center gap-2 font-bold text-sm mb-1">
+              <div className="mb-1 flex items-center gap-2 text-sm font-bold">
                 {batchResult.status === 'COMPLETED' ? (
-                  <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                  <CheckCircle2 aria-hidden="true" className="h-5 w-5 text-emerald-600" />
                 ) : batchResult.status === 'COMPLETED_WITH_ERRORS' ? (
-                  <AlertTriangle className="w-5 h-5 text-amber-400" />
+                  <AlertTriangle aria-hidden="true" className="h-5 w-5 text-amber-600" />
                 ) : (
-                  <AlertCircle className="w-5 h-5 text-rose-400" />
+                  <AlertCircle aria-hidden="true" className="h-5 w-5 text-rose-600" />
                 )}
                 <span>
                   {batchResult.status === 'COMPLETED'
-                    ? 'All Certificates Issued Successfully!'
+                    ? t.resultComplete
                     : batchResult.status === 'COMPLETED_WITH_ERRORS'
-                    ? 'Batch Processed with Some Errors'
-                    : 'Batch Upload Failed'}
+                    ? t.resultPartial
+                    : t.resultFailed}
                 </span>
               </div>
               <p className="text-xs opacity-90">
-                Processed {batchResult.totalCount} entries: {batchResult.successCount} issued,{' '}
-                {batchResult.failedCount} failed, {batchResult.skippedCount} skipped.
+                {t.resultSummary(batchResult.totalCount, batchResult.successCount, batchResult.failedCount, batchResult.skippedCount)}
               </p>
             </div>
 
             {/* Metrics Grid */}
             <div className="grid grid-cols-3 gap-3">
-              <div className="p-3 rounded-2xl bg-white/5 border border-white/10 text-center">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-                  Total Records
+              <div className="rounded-2xl border border-[var(--line)] bg-[var(--bg)] p-3 text-center">
+                <span className="block text-[10px] font-bold uppercase tracking-wider text-[var(--ink-soft)]">
+                  {t.statTotal}
                 </span>
-                <span className="text-xl font-black text-white">{batchResult.totalCount}</span>
+                <span className="text-xl font-black text-[var(--ink)]">{batchResult.totalCount}</span>
               </div>
-              <div className="p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-center">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-400 block">
-                  Issued
+              <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-center">
+                <span className="block text-[10px] font-bold uppercase tracking-wider text-emerald-700">
+                  {t.statIssued}
                 </span>
-                <span className="text-xl font-black text-emerald-300">{batchResult.successCount}</span>
+                <span className="text-xl font-black text-emerald-700">{batchResult.successCount}</span>
               </div>
-              <div className="p-3 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-center">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-rose-400 block">
-                  Failed
+              <div className="rounded-2xl border border-rose-200 bg-rose-50 p-3 text-center">
+                <span className="block text-[10px] font-bold uppercase tracking-wider text-rose-700">
+                  {t.statFailed}
                 </span>
-                <span className="text-xl font-black text-rose-300">{batchResult.failedCount}</span>
+                <span className="text-xl font-black text-rose-700">{batchResult.failedCount}</span>
               </div>
             </div>
 
-            {/* Error Breakdown Table */}
+            {/* Error Breakdown */}
             {batchResult.errorDetails && batchResult.errorDetails.length > 0 && (
               <div className="space-y-2">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                  Issues & Failure Details ({batchResult.errorDetails.length})
+                <h4 className="text-xs font-bold uppercase tracking-wider text-[var(--ink-soft)]">
+                  {t.issuesTitle(batchResult.errorDetails.length)}
                 </h4>
-                <div className="max-h-48 overflow-y-auto divide-y divide-white/5 border border-white/10 rounded-2xl p-2 text-xs">
+                <ul className="max-h-48 divide-y divide-[var(--line)] overflow-y-auto rounded-2xl border border-[var(--line)] p-2 text-xs">
                   {batchResult.errorDetails.map((err, idx) => (
-                    <div key={idx} className="py-2 px-2 flex items-start justify-between gap-3">
+                    <li key={idx} className="flex items-start justify-between gap-3 px-2 py-2">
                       <div>
-                        <div className="font-semibold text-slate-200">
+                        <div className="font-semibold text-[var(--ink)]">
                           {err.rollNumber || 'N/A'} • {err.filename || 'N/A'}
                         </div>
-                        <div className="text-[11px] text-rose-400 mt-0.5">{err.reason}</div>
+                        <div className="mt-0.5 text-[11px] text-rose-700">{err.reason}</div>
                       </div>
-                    </div>
+                    </li>
                   ))}
-                </div>
+                </ul>
               </div>
             )}
 
-            <div className="flex items-center justify-end gap-3 pt-3 border-t border-white/10">
-              <button
-                type="button"
-                onClick={handleReset}
-                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl transition"
-              >
-                Upload Another Batch
-              </button>
-              <button
-                type="button"
-                onClick={onClose}
-                className="px-5 py-2 bg-cyan-500 hover:bg-cyan-400 text-slate-950 text-xs font-bold rounded-xl transition"
-              >
-                Done
-              </button>
+            <div className="flex items-center justify-end gap-3 border-t border-[var(--line)] pt-3">
+              <DashboardButton variant="secondary" size="sm" onClick={handleReset}>
+                {t.uploadAnother}
+              </DashboardButton>
+              <DashboardButton variant="primary" size="sm" onClick={onClose}>
+                {t.done}
+              </DashboardButton>
             </div>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-5">
             {/* Structure Instructions */}
-            <div
-              className={`p-4 rounded-2xl border text-xs space-y-2 ${
-                isDark ? 'bg-white/5 border-white/10 text-slate-300' : 'bg-slate-50 border-slate-200 text-slate-700'
-              }`}
-            >
+            <div className="space-y-2 rounded-2xl border border-[var(--line)] bg-[var(--bg)] p-4 text-xs text-[var(--ink-soft)]">
               <div className="flex items-center justify-between">
-                <span className="font-bold text-slate-200 flex items-center gap-1.5">
-                  <Archive className="w-4 h-4 text-cyan-400" /> Archive Requirements
+                <span className="flex items-center gap-1.5 font-bold text-[var(--ink)]">
+                  <Archive aria-hidden="true" className="h-4 w-4 text-[var(--primary)]" /> {t.archiveTitle}
                 </span>
                 <button
                   type="button"
                   onClick={handleDownloadSampleCsv}
-                  className="inline-flex items-center gap-1 text-[11px] font-semibold text-cyan-400 hover:underline"
+                  className="inline-flex min-h-8 items-center gap-1 text-[11px] font-semibold text-[var(--primary)] hover:underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-[var(--primary)]"
                 >
-                  <FileSpreadsheet className="w-3.5 h-3.5" /> Download Sample CSV
+                  <FileSpreadsheet aria-hidden="true" className="h-3.5 w-3.5" /> {t.sampleCsv}
                 </button>
               </div>
-              <p className="text-[11px] text-slate-400">
-                Your ZIP archive must contain a root or folder-level <strong>manifest.csv</strong> with columns{' '}
-                <code className="text-cyan-400">rollNumber,filename</code> and the corresponding PDF certificate files.
-              </p>
-              <pre className="p-2.5 rounded-xl bg-black/40 text-[10px] text-slate-400 font-mono overflow-x-auto">
+              <p className="text-[11px]">{t.archiveHint}</p>
+              <pre className="overflow-x-auto rounded-xl bg-[var(--primary-soft)]/60 p-2.5 font-mono text-[10px] text-[var(--ink)]">
 {`certificates.zip
 ├── manifest.csv
 └── certificates/
@@ -239,44 +224,39 @@ export function BulkUploadModal({
 
             {/* Archive Uploader */}
             <div className="space-y-2">
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-400">
-                Upload ZIP Archive <span className="text-rose-400">*</span>
-              </label>
+              <span className="block text-xs font-bold uppercase tracking-wider text-[var(--ink-soft)]">
+                {t.zipLabel} <span aria-hidden="true" className="text-[var(--secondary)]">*</span>
+              </span>
 
-              <div
-                className={`border-2 border-dashed rounded-2xl p-6 text-center transition ${
-                  isDark
-                    ? 'border-white/10 hover:border-cyan-500/50 bg-black/20'
-                    : 'border-slate-200 hover:border-cyan-500/50 bg-slate-50'
-                }`}
-              >
+              <div className="rounded-2xl border-2 border-dashed border-[var(--line)] bg-[var(--bg)] p-6 text-center transition-colors hover:border-[var(--primary)]/50 motion-reduce:transition-none">
                 {selectedFile ? (
                   <div className="flex items-center justify-center gap-3">
-                    <Archive className="w-8 h-8 text-cyan-400 shrink-0" />
+                    <Archive aria-hidden="true" className="h-8 w-8 shrink-0 text-[var(--primary)]" />
                     <div className="text-left">
-                      <div className="font-bold text-xs text-slate-200 truncate max-w-xs">
+                      <div className="max-w-xs truncate text-xs font-bold text-[var(--ink)]">
                         {selectedFile.name}
                       </div>
-                      <div className="text-[11px] text-slate-400">
+                      <div className="text-[11px] text-[var(--ink-soft)]">
                         {(selectedFile.size / (1024 * 1024)).toFixed(2)} MB • application/zip
                       </div>
                     </div>
                     <button
                       type="button"
                       onClick={() => setSelectedFile(null)}
-                      className="p-1.5 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white transition ml-2"
+                      aria-label={actions.close}
+                      className="ml-2 grid h-9 w-9 place-items-center rounded-lg text-[var(--ink-soft)] transition-colors hover:bg-[var(--primary-soft)] hover:text-[var(--ink)] motion-reduce:transition-none focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-[var(--primary)]"
                     >
-                      <X className="w-4 h-4" />
+                      <X aria-hidden="true" className="h-4 w-4" />
                     </button>
                   </div>
                 ) : (
-                  <label className="cursor-pointer block">
-                    <Upload className="w-8 h-8 mx-auto text-slate-400 mb-2" />
-                    <span className="text-xs font-semibold text-cyan-400 hover:underline">
-                      Click to choose ZIP file
+                  <label className="block cursor-pointer rounded-xl focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-[var(--primary)]">
+                    <Upload aria-hidden="true" className="mx-auto mb-2 h-8 w-8 text-[var(--ink-soft)]" />
+                    <span className="text-xs font-semibold text-[var(--primary)] hover:underline">
+                      {t.dropEmpty}
                     </span>
-                    <span className="text-xs text-slate-400 block mt-1">
-                      or drag and drop archive (Max 25 MB)
+                    <span className="mt-1 block text-xs text-[var(--ink-soft)]">
+                      {t.dropHint}
                     </span>
                     <input
                       type="file"
@@ -290,32 +270,21 @@ export function BulkUploadModal({
             </div>
 
             {/* Action Buttons */}
-            <div className="flex items-center justify-end gap-3 pt-3 border-t border-white/10">
-              <button
-                type="button"
-                disabled={bulkMutation.isPending}
-                onClick={onClose}
-                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl transition cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
+            <div className="flex items-center justify-end gap-3 border-t border-[var(--line)] pt-3">
+              <DashboardButton variant="secondary" size="sm" disabled={bulkMutation.isPending} onClick={onClose}>
+                {actions.cancel}
+              </DashboardButton>
+              <DashboardButton
+                variant="primary"
+                size="sm"
                 type="submit"
-                disabled={!selectedFile || bulkMutation.isPending}
-                className="inline-flex items-center gap-2 px-5 py-2 bg-cyan-500 hover:bg-cyan-400 text-slate-950 text-xs font-bold rounded-xl shadow-md transition disabled:opacity-50 cursor-pointer"
+                disabled={!selectedFile}
+                loading={bulkMutation.isPending}
+                loadingLabel={t.submitting}
               >
-                {bulkMutation.isPending ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>Processing Archive...</span>
-                  </>
-                ) : (
-                  <>
-                    <Upload className="w-4 h-4" />
-                    <span>Upload & Process ZIP</span>
-                  </>
-                )}
-              </button>
+                <Upload aria-hidden="true" className="h-4 w-4" />
+                {t.submit}
+              </DashboardButton>
             </div>
           </form>
         )}

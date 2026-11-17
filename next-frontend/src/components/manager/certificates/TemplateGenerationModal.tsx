@@ -1,7 +1,9 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Modal } from '@/components/common/Modal';
+import Modal from '@/components/dashboard/ui/Modal';
+import DashboardButton from '@/components/dashboard/ui/DashboardButton';
+import { managerCertificates } from '@/lib/copy';
 import {
   saveCertificateTemplateApi,
   useGenerateCertificatesMutation,
@@ -13,7 +15,6 @@ import {
   Upload,
   CheckCircle2,
   AlertCircle,
-  Loader2,
   Check,
   ChevronRight,
   ArrowLeft,
@@ -26,13 +27,15 @@ import type {
 import VisualCertificateEditor from './VisualCertificateEditor';
 
 interface TemplateGenerationModalProps {
-  isOpen: boolean;
+  open: boolean;
   onClose: () => void;
   slug: string;
   eventId: string;
   eventTitle?: string;
   onSuccess?: () => void;
 }
+
+const t = managerCertificates.template;
 
 const DEFAULT_NORMALIZED_CONFIG: PlaceholderConfigItem[] = [
   {
@@ -98,7 +101,7 @@ const DEFAULT_NORMALIZED_CONFIG: PlaceholderConfigItem[] = [
 ];
 
 export function TemplateGenerationModal({
-  isOpen,
+  open,
   onClose,
   slug,
   eventId,
@@ -106,8 +109,8 @@ export function TemplateGenerationModal({
   onSuccess,
 }: TemplateGenerationModalProps) {
   // Queries & Mutations
-  const { data: students = [] } = useEligibleStudentsQuery(slug, eventId, isOpen);
-  const { data: predefinedTemplates = [], isLoading: predefinedLoading } = usePredefinedTemplatesQuery(slug, eventId, isOpen);
+  const { data: students = [] } = useEligibleStudentsQuery(slug, eventId, open);
+  const { data: predefinedTemplates = [], isLoading: predefinedLoading } = usePredefinedTemplatesQuery(slug, eventId, open);
   const generateMutation = useGenerateCertificatesMutation(slug, eventId);
 
   // Modal Flow Step: 'select_template' -> 'editor' -> 'target' -> 'result'
@@ -148,13 +151,13 @@ export function TemplateGenerationModal({
 
   // Reset state on modal open
   useEffect(() => {
-    if (isOpen) {
+    if (open) {
       setStep('select_template');
       setFormError(null);
       setBatchResult(null);
       setSelectedStudentIds([]);
     }
-  }, [isOpen]);
+  }, [open]);
 
   // Handle custom file selection (PDF, PNG, JPG)
   const handleCustomFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -165,12 +168,12 @@ export function TemplateGenerationModal({
     const lower = file.name.toLowerCase();
     const isAllowed = lower.endsWith('.pdf') || lower.endsWith('.png') || lower.endsWith('.jpg') || lower.endsWith('.jpeg');
     if (!isAllowed) {
-      setFormError('Please select a valid PDF, PNG, or JPEG template file (up to 15MB).');
+      setFormError(t.errFileType);
       return;
     }
 
     if (file.size > 15 * 1024 * 1024) {
-      setFormError('File size exceeds the 15MB maximum limit.');
+      setFormError(t.errFileSize);
       return;
     }
 
@@ -194,11 +197,11 @@ export function TemplateGenerationModal({
   const handleSaveAndProceedToTarget = async () => {
     setFormError(null);
     if (templateSource === 'custom' && !templateFile && !savedTemplateId) {
-      setFormError('Please upload a template file or select a predefined template.');
+      setFormError(t.errNoTemplate);
       return;
     }
     if (templateSource === 'predefined' && !selectedPredefined) {
-      setFormError('Please choose a predefined certificate template.');
+      setFormError(t.errNoPredefined);
       return;
     }
 
@@ -215,7 +218,7 @@ export function TemplateGenerationModal({
       const msg =
         (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
         (err as Error).message ||
-        'Failed to save certificate template configuration.';
+        t.errSave;
       setFormError(msg);
     } finally {
       setSaveLoading(false);
@@ -226,7 +229,7 @@ export function TemplateGenerationModal({
   const handleGenerate = async () => {
     setFormError(null);
     if (!savedTemplateId) {
-      setFormError('Template configuration is missing. Please save again.');
+      setFormError(t.errMissingTemplate);
       return;
     }
 
@@ -243,117 +246,95 @@ export function TemplateGenerationModal({
       const msg =
         (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
         (err as Error).message ||
-        'Failed to generate certificates.';
+        t.errGenerate;
       setFormError(msg);
     }
   };
 
+  const stepPill = (index: number, label: string, active: boolean, done: boolean) => (
+    <span
+      className={`flex items-center gap-1.5 ${
+        active ? 'font-semibold text-[var(--primary)]' : 'text-[var(--ink-soft)]'
+      }`}
+    >
+      <span
+        aria-hidden="true"
+        className={`flex h-5 w-5 items-center justify-center rounded-full text-[11px] ${
+          active
+            ? 'bg-[var(--primary)] text-[var(--on-primary)]'
+            : done
+            ? 'bg-[var(--primary)]/15 text-[var(--primary)]'
+            : 'bg-[var(--primary-soft)] text-[var(--ink-soft)]'
+        }`}
+      >
+        {done ? <Check className="h-3 w-3 stroke-[3]" /> : index}
+      </span>
+      <span>{label}</span>
+    </span>
+  );
+
   return (
     <Modal
-      isOpen={isOpen}
+      open={open}
       onClose={onClose}
-      title="Automated Certificate Generation (Method C)"
-      maxWidth={step === 'editor' ? 'max-w-7xl' : 'max-w-4xl'}
+      title={t.title}
+      size={step === 'editor' ? '2xl' : 'xl'}
+      flush
     >
-      <div className="flex flex-col h-full max-h-[88vh] font-sans">
+      <div className="flex min-h-0 flex-1 flex-col">
         {/* Step Indicator Header */}
-        <div className="flex items-center justify-between px-6 py-3 border-b border-[#E7E5E4] dark:border-[#2D3139] bg-[#FAF9F7] dark:bg-[#1A1D24]">
-          <div className="flex items-center gap-2 sm:gap-4 text-xs font-medium">
-            <span
-              className={`flex items-center gap-1.5 ${
-                step === 'select_template'
-                  ? 'text-[#B08D57] font-semibold'
-                  : 'text-[#6B6966] dark:text-[#A8A5A0]'
-              }`}
-            >
-              <span className="w-5 h-5 rounded-full flex items-center justify-center bg-[#B08D57] text-white text-[11px]">
-                1
-              </span>
-              <span>Select Design</span>
-            </span>
-            <ChevronRight className="w-3.5 h-3.5 text-[#A8A5A0]" />
-
-            <span
-              className={`flex items-center gap-1.5 ${
-                step === 'editor'
-                  ? 'text-[#B08D57] font-semibold'
-                  : 'text-[#6B6966] dark:text-[#A8A5A0]'
-              }`}
-            >
-              <span
-                className={`w-5 h-5 rounded-full flex items-center justify-center text-[11px] ${
-                  step === 'editor'
-                    ? 'bg-[#B08D57] text-white'
-                    : 'bg-[#E7E5E4] dark:bg-[#2D3139] text-[#6B6966]'
-                }`}
-              >
-                2
-              </span>
-              <span>Visual Editor & Preview</span>
-            </span>
-            <ChevronRight className="w-3.5 h-3.5 text-[#A8A5A0]" />
-
-            <span
-              className={`flex items-center gap-1.5 ${
-                step === 'target' || step === 'result'
-                  ? 'text-[#B08D57] font-semibold'
-                  : 'text-[#6B6966] dark:text-[#A8A5A0]'
-              }`}
-            >
-              <span
-                className={`w-5 h-5 rounded-full flex items-center justify-center text-[11px] ${
-                  step === 'target' || step === 'result'
-                    ? 'bg-[#B08D57] text-white'
-                    : 'bg-[#E7E5E4] dark:bg-[#2D3139] text-[#6B6966]'
-                }`}
-              >
-                3
-              </span>
-              <span>Issue & Generate</span>
-            </span>
+        <div className="flex shrink-0 items-center justify-between border-b border-[var(--line)] bg-[var(--bg)] px-6 py-3">
+          <div className="flex items-center gap-2 text-xs font-medium sm:gap-4">
+            {stepPill(1, t.stepSelect, step === 'select_template', step !== 'select_template')}
+            <ChevronRight aria-hidden="true" className="h-3.5 w-3.5 text-[var(--ink-soft)]" />
+            {stepPill(2, t.stepEditor, step === 'editor', step === 'target' || step === 'result')}
+            <ChevronRight aria-hidden="true" className="h-3.5 w-3.5 text-[var(--ink-soft)]" />
+            {stepPill(3, t.stepIssue, step === 'target' || step === 'result', step === 'result')}
           </div>
 
-          <div className="text-[11px] font-mono text-[#6B6966] dark:text-[#A8A5A0] hidden sm:block">
-            {eligibleCandidates.length} eligible recipients
+          <div className="hidden font-mono text-[11px] text-[var(--ink-soft)] sm:block">
+            {t.eligibleCount(eligibleCandidates.length)}
           </div>
         </div>
 
         {/* Global Error Banner */}
         {formError && (
-          <div className="mx-6 mt-4 p-3 bg-red-50 dark:bg-rose-950/40 border border-red-200 dark:border-rose-900/60 rounded-lg flex items-center gap-2 text-xs text-red-700 dark:text-rose-300">
-            <AlertCircle className="w-4 h-4 shrink-0" />
+          <div className="mx-6 mt-4 flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700">
+            <AlertCircle aria-hidden="true" className="h-4 w-4 shrink-0" />
             <span>{formError}</span>
           </div>
         )}
 
         {/* STEP 1: Select Template Design (Option A vs Option B) */}
         {step === 'select_template' && (
-          <div className="p-6 space-y-6 overflow-y-auto">
+          <div className="min-h-0 flex-1 space-y-6 overflow-y-auto p-6">
             {/* Template Source Selector Tabs */}
-            <div className="flex items-center gap-2 border-b border-[#E7E5E4] dark:border-[#2D3139] pb-3">
+            <div className="flex flex-wrap items-center gap-2 border-b border-[var(--line)] pb-3">
               <button
                 type="button"
                 onClick={() => setTemplateSource('predefined')}
-                className={`px-4 py-2 text-xs font-semibold rounded-lg transition-colors flex items-center gap-2 cursor-pointer ${
+                aria-pressed={templateSource === 'predefined'}
+                className={`flex min-h-9 cursor-pointer items-center gap-2 rounded-lg border px-4 py-2 text-xs font-semibold transition-colors motion-reduce:transition-none focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-[var(--primary)] ${
                   templateSource === 'predefined'
-                    ? 'bg-[#FAF4E8] dark:bg-amber-950/40 text-[#8A6421] dark:text-amber-300 border border-[#B08D57]'
-                    : 'bg-[#FAF9F7] dark:bg-[#1A1D24] text-[#6B6966] hover:text-[#1C1B1F] border border-transparent'
+                    ? 'border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary)]'
+                    : 'border-transparent bg-[var(--bg)] text-[var(--ink-soft)] hover:text-[var(--ink)]'
                 }`}
               >
-                <Sparkles className="w-3.5 h-3.5 text-[#B08D57]" />
-                <span>Option A: Professionally Predefined Templates</span>
+                <Sparkles aria-hidden="true" className="h-3.5 w-3.5" />
+                <span>{t.optionPredefined}</span>
               </button>
               <button
                 type="button"
                 onClick={() => setTemplateSource('custom')}
-                className={`px-4 py-2 text-xs font-semibold rounded-lg transition-colors flex items-center gap-2 cursor-pointer ${
+                aria-pressed={templateSource === 'custom'}
+                className={`flex min-h-9 cursor-pointer items-center gap-2 rounded-lg border px-4 py-2 text-xs font-semibold transition-colors motion-reduce:transition-none focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-[var(--primary)] ${
                   templateSource === 'custom'
-                    ? 'bg-[#FAF4E8] dark:bg-amber-950/40 text-[#8A6421] dark:text-amber-300 border border-[#B08D57]'
-                    : 'bg-[#FAF9F7] dark:bg-[#1A1D24] text-[#6B6966] hover:text-[#1C1B1F] border border-transparent'
+                    ? 'border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary)]'
+                    : 'border-transparent bg-[var(--bg)] text-[var(--ink-soft)] hover:text-[var(--ink)]'
                 }`}
               >
-                <Upload className="w-3.5 h-3.5 text-[#B08D57]" />
-                <span>Option B: Upload Custom Background (PDF, PNG, JPG)</span>
+                <Upload aria-hidden="true" className="h-3.5 w-3.5" />
+                <span>{t.optionCustom}</span>
               </button>
             </div>
 
@@ -361,64 +342,67 @@ export function TemplateGenerationModal({
             {templateSource === 'predefined' && (
               <div className="space-y-4">
                 <div>
-                  <h4 className="text-sm font-serif font-semibold text-[#1C1B1F] dark:text-[#F5F3EF]">
-                    Choose a Pre-Engineered Certificate Template
+                  <h4 className="text-sm font-semibold text-[var(--ink)]">
+                    {t.predefinedHeading}
                   </h4>
-                  <p className="text-xs text-[#6B6966] dark:text-[#A8A5A0]">
-                    These vector designs have pre-configured optical placeholder coordinates and typography.
+                  <p className="text-xs text-[var(--ink-soft)]">
+                    {t.predefinedHint}
                   </p>
                 </div>
 
                 {predefinedLoading ? (
-                  <div className="py-12 flex flex-col items-center justify-center space-y-2">
-                    <Loader2 className="w-6 h-6 animate-spin text-[#B08D57]" />
-                    <span className="text-xs text-[#6B6966]">Loading template gallery...</span>
+                  <div className="flex flex-col items-center justify-center space-y-2 py-12" role="status" aria-label={t.loadingTemplates}>
+                    <span aria-hidden="true" className="h-6 w-6 animate-spin rounded-full border-2 border-[var(--primary)]/30 border-t-[var(--primary)] motion-reduce:animate-none" />
+                    <span className="text-xs text-[var(--ink-soft)]">{t.loadingTemplates}…</span>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                     {predefinedTemplates.map((tpl) => {
                       const isSelected = selectedPredefined?.id === tpl.id;
                       return (
-                        <div
+                        <button
                           key={tpl.id}
+                          type="button"
                           onClick={() => handleSelectPredefined(tpl)}
-                          className={`relative rounded-xl border-2 p-4 cursor-pointer transition-all flex flex-col justify-between ${
+                          aria-pressed={isSelected}
+                          className={`relative flex cursor-pointer flex-col justify-between rounded-xl border-2 p-4 text-left transition-all motion-reduce:transition-none focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-[var(--primary)] ${
                             isSelected
-                              ? 'border-[#B08D57] bg-[#FAF4E8]/60 dark:bg-amber-950/20 shadow-md ring-2 ring-[#B08D57]/20'
-                              : 'border-[#E7E5E4] dark:border-[#2D3139] bg-white dark:bg-[#1A1D24] hover:border-[#B08D57]/60'
+                              ? 'border-[var(--primary)] bg-[var(--primary-soft)]/60 shadow-sm ring-2 ring-[var(--primary)]/20'
+                              : 'border-[var(--line)] bg-[var(--surface)] hover:border-[var(--primary)]/60'
                           }`}
                         >
                           {isSelected && (
-                            <div className="absolute top-3 right-3 w-5 h-5 rounded-full bg-[#B08D57] text-white flex items-center justify-center">
-                              <Check className="w-3 h-3 stroke-[3]" />
-                            </div>
+                            <span aria-hidden="true" className="absolute right-3 top-3 flex h-5 w-5 items-center justify-center rounded-full bg-[var(--primary)] text-[var(--on-primary)]">
+                              <Check className="h-3 w-3 stroke-[3]" />
+                            </span>
                           )}
 
                           {/* Visual Preview Swatch Card */}
-                          <div
-                            className="w-full h-28 rounded-lg mb-3 border border-black/10 flex flex-col items-center justify-center p-3 text-center relative overflow-hidden"
+                          <span
+                            aria-hidden="true"
+                            className="mb-3 flex h-28 w-full flex-col items-center justify-center overflow-hidden rounded-lg border border-black/10 p-3 text-center"
                             style={{ backgroundColor: tpl.backgroundColor || '#FAF7EE' }}
                           >
                             <span
-                              className="text-[10px] font-serif font-bold uppercase tracking-widest line-clamp-1"
+                              className="line-clamp-1 text-[10px] font-bold uppercase tracking-widest"
                               style={{ color: tpl.primaryTextColor || '#0A192F' }}
                             >
                               {tpl.name}
                             </span>
-                            <span className="text-[8px] opacity-60 mt-1 font-mono">
-                              A4 Landscape • 841 × 595 pt
+                            <span className="mt-1 font-mono text-[8px] opacity-60">
+                              {t.predefinedSize}
                             </span>
-                          </div>
+                          </span>
 
-                          <div className="space-y-1">
-                            <h5 className="text-xs font-semibold text-[#1C1B1F] dark:text-[#F5F3EF]">
+                          <span className="space-y-1">
+                            <h5 className="block text-xs font-semibold text-[var(--ink)]">
                               {tpl.name}
                             </h5>
-                            <p className="text-[11px] text-[#6B6966] dark:text-[#A8A5A0] line-clamp-2">
+                            <p className="line-clamp-2 block text-[11px] text-[var(--ink-soft)]">
                               {tpl.description}
                             </p>
-                          </div>
-                        </div>
+                          </span>
+                        </button>
                       );
                     })}
                   </div>
@@ -430,42 +414,45 @@ export function TemplateGenerationModal({
             {templateSource === 'custom' && (
               <div className="space-y-4">
                 <div>
-                  <h4 className="text-sm font-serif font-semibold text-[#1C1B1F] dark:text-[#F5F3EF]">
-                    Upload Custom Certificate Background
+                  <h4 className="text-sm font-semibold text-[var(--ink)]">
+                    {t.customHeading}
                   </h4>
-                  <p className="text-xs text-[#6B6966] dark:text-[#A8A5A0]">
-                    Upload a high-resolution PDF certificate background or image (PNG, JPG, JPEG) exported from Canva,
-                    Figma, or Photoshop (max 15MB).
+                  <p className="text-xs text-[var(--ink-soft)]">
+                    {t.customHint}
                   </p>
                 </div>
 
-                <div className="relative border-2 border-dashed border-[#D8D7DC] dark:border-[#3D424E] hover:border-[#B08D57] rounded-xl p-8 text-center transition-colors bg-[#FAF9F7] dark:bg-[#1A1D24]">
+                <div className="relative rounded-xl border-2 border-dashed border-[var(--line)] bg-[var(--bg)] p-8 text-center transition-colors hover:border-[var(--primary)] motion-reduce:transition-none">
                   <input
                     type="file"
                     accept=".pdf,image/png,image/jpeg,image/jpg"
                     onChange={handleCustomFileChange}
-                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                    className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                    aria-label={t.customHeading}
                   />
                   <div className="flex flex-col items-center justify-center space-y-2">
-                    <div className="w-12 h-12 rounded-full bg-[#FAF4E8] dark:bg-amber-950/40 text-[#B08D57] flex items-center justify-center">
-                      <Upload className="w-6 h-6" />
+                    <div
+                      aria-hidden="true"
+                      className="flex h-12 w-12 items-center justify-center rounded-full bg-[var(--primary-soft)] text-[var(--primary)]"
+                    >
+                      <Upload className="h-6 w-6" />
                     </div>
                     {templateFile ? (
                       <div className="space-y-1">
-                        <p className="text-xs font-semibold text-[#1C1B1F] dark:text-[#F5F3EF]">
-                          Selected: {templateFile.name}
+                        <p className="text-xs font-semibold text-[var(--ink)]">
+                          {t.selectedFile} {templateFile.name}
                         </p>
-                        <p className="text-[11px] text-[#6B6966]">
-                          {(templateFile.size / (1024 * 1024)).toFixed(2)} MB • Ready for visual positioning
+                        <p className="text-[11px] text-[var(--ink-soft)]">
+                          {(templateFile.size / (1024 * 1024)).toFixed(2)} MB • {t.readyForEditor}
                         </p>
                       </div>
                     ) : (
                       <div className="space-y-1">
-                        <p className="text-xs font-semibold text-[#1C1B1F] dark:text-[#F5F3EF]">
-                          Click or drag and drop your template file here
+                        <p className="text-xs font-semibold text-[var(--ink)]">
+                          {t.dropCustom}
                         </p>
-                        <p className="text-[11px] text-[#6B6966]">
-                          Supports PDF documents and high-res PNG / JPEG graphics up to 15MB
+                        <p className="text-[11px] text-[var(--ink-soft)]">
+                          {t.dropCustomHint}
                         </p>
                       </div>
                     )}
@@ -476,15 +463,16 @@ export function TemplateGenerationModal({
 
             {/* Template Display Name Input */}
             <div>
-              <label className="block text-xs font-medium text-[#6B6966] dark:text-[#A8A5A0] mb-1">
-                Certificate Title / Template Label
+              <label htmlFor="template-name" className="mb-1 block text-xs font-medium text-[var(--ink-soft)]">
+                {t.nameLabel}
               </label>
               <input
+                id="template-name"
                 type="text"
                 value={templateName}
                 onChange={(e) => setTemplateName(e.target.value)}
-                placeholder="e.g. Certificate of Achievement — Code Warz 2026"
-                className="w-full px-3 py-2 bg-white dark:bg-[#1A1D24] border border-[#D8D7DC] dark:border-[#3D424E] rounded-lg text-xs sm:text-sm text-[#1C1B1F] dark:text-[#F5F3EF] focus:outline-none focus:border-[#B08D57]"
+                placeholder={t.namePlaceholder}
+                className="w-full rounded-lg border border-[var(--line)] bg-[var(--surface)] px-3 py-2 text-xs text-[var(--ink)] placeholder:text-[var(--ink-soft)] transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-[var(--primary)] motion-reduce:transition-none sm:text-sm"
               />
             </div>
           </div>
@@ -492,7 +480,7 @@ export function TemplateGenerationModal({
 
         {/* STEP 2: Visual Certificate Editor Canvas & Real PDF Preview */}
         {step === 'editor' && (
-          <div className="flex-1 overflow-hidden">
+          <div className="min-h-0 flex-1 overflow-y-auto">
             <VisualCertificateEditor
               templateSource={templateSource}
               predefinedTemplate={selectedPredefined}
@@ -509,70 +497,73 @@ export function TemplateGenerationModal({
 
         {/* STEP 3: Target Recipients Selection */}
         {step === 'target' && (
-          <div className="p-6 space-y-5 overflow-y-auto">
+          <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-6">
             <div>
-              <h4 className="text-sm font-serif font-semibold text-[#1C1B1F] dark:text-[#F5F3EF]">
-                Select Recipient Students
+              <h4 className="text-sm font-semibold text-[var(--ink)]">
+                {t.recipientsHeading}
               </h4>
-              <p className="text-xs text-[#6B6966] dark:text-[#A8A5A0]">
-                Choose whether to generate certificates for all eligible registered students or pick specific candidates.
+              <p className="text-xs text-[var(--ink-soft)]">
+                {t.recipientsHint}
               </p>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <button
                 type="button"
                 onClick={() => setTargetMode('all')}
-                className={`p-4 rounded-xl border text-left transition-all cursor-pointer ${
+                aria-pressed={targetMode === 'all'}
+                className={`cursor-pointer rounded-xl border p-4 text-left transition-all motion-reduce:transition-none focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-[var(--primary)] ${
                   targetMode === 'all'
-                    ? 'border-[#B08D57] bg-[#FAF4E8]/60 dark:bg-amber-950/20 shadow-xs'
-                    : 'border-[#E7E5E4] dark:border-[#2D3139] bg-white dark:bg-[#1A1D24]'
+                    ? 'border-[var(--primary)] bg-[var(--primary-soft)]/60 shadow-xs'
+                    : 'border-[var(--line)] bg-[var(--surface)]'
                 }`}
               >
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-xs font-semibold text-[#1C1B1F] dark:text-[#F5F3EF]">
-                    All Eligible Students
+                <div className="mb-1 flex items-center justify-between">
+                  <span className="text-xs font-semibold text-[var(--ink)]">
+                    {t.allStudents}
                   </span>
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-[#B08D57] text-white">
+                  <span className="rounded-full bg-[var(--primary)] px-2 py-0.5 font-mono text-[10px] text-[var(--on-primary)]">
                     {eligibleCandidates.length}
                   </span>
                 </div>
-                <p className="text-[11px] text-[#6B6966]">
-                  Generate certificates for all registered attendees without an active certificate.
+                <p className="text-[11px] text-[var(--ink-soft)]">
+                  {t.allStudentsHint}
                 </p>
               </button>
 
               <button
                 type="button"
                 onClick={() => setTargetMode('custom')}
-                className={`p-4 rounded-xl border text-left transition-all cursor-pointer ${
+                aria-pressed={targetMode === 'custom'}
+                className={`cursor-pointer rounded-xl border p-4 text-left transition-all motion-reduce:transition-none focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-[var(--primary)] ${
                   targetMode === 'custom'
-                    ? 'border-[#B08D57] bg-[#FAF4E8]/60 dark:bg-amber-950/20 shadow-xs'
-                    : 'border-[#E7E5E4] dark:border-[#2D3139] bg-white dark:bg-[#1A1D24]'
+                    ? 'border-[var(--primary)] bg-[var(--primary-soft)]/60 shadow-xs'
+                    : 'border-[var(--line)] bg-[var(--surface)]'
                 }`}
               >
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-xs font-semibold text-[#1C1B1F] dark:text-[#F5F3EF]">
-                    Select Specific Students
+                <div className="mb-1 flex items-center justify-between">
+                  <span className="text-xs font-semibold text-[var(--ink)]">
+                    {t.customStudents}
                   </span>
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-[#F2F0EC] dark:bg-[#2D3139] text-[#6B6966]">
+                  <span className="rounded-full bg-[var(--primary-soft)] px-2 py-0.5 font-mono text-[10px] text-[var(--primary)]">
                     {selectedStudentIds.length}
                   </span>
                 </div>
-                <p className="text-[11px] text-[#6B6966]">
-                  Manually check off individual candidates from the attendee roster.
+                <p className="text-[11px] text-[var(--ink-soft)]">
+                  {t.customStudentsHint}
                 </p>
               </button>
             </div>
 
             {targetMode === 'custom' && (
-              <div className="border border-[#E7E5E4] dark:border-[#2D3139] rounded-xl overflow-hidden max-h-60 overflow-y-auto">
-                <table className="w-full text-xs text-left">
-                  <thead className="bg-[#FAF9F7] dark:bg-[#252830] text-[#6B6966] font-medium border-b border-[#E7E5E4]">
+              <div className="max-h-60 overflow-y-auto rounded-xl border border-[var(--line)]">
+                <table className="w-full text-left text-xs">
+                  <thead className="border-b border-[var(--line)] bg-[var(--bg)] font-medium text-[var(--ink-soft)]">
                     <tr>
-                      <th className="p-3 w-10">
+                      <th className="w-10 p-3">
                         <input
                           type="checkbox"
+                          aria-label={t.allStudents}
                           checked={
                             selectedStudentIds.length === eligibleCandidates.length && eligibleCandidates.length > 0
                           }
@@ -583,15 +574,15 @@ export function TemplateGenerationModal({
                               setSelectedStudentIds([]);
                             }
                           }}
-                          className="rounded accent-[#B08D57]"
+                          className="rounded accent-[var(--primary)]"
                         />
                       </th>
-                      <th className="p-3">Student Name</th>
-                      <th className="p-3">Roll Number</th>
-                      <th className="p-3">Email Address</th>
+                      <th className="p-3">{t.tableStudent}</th>
+                      <th className="p-3">{t.tableRoll}</th>
+                      <th className="p-3">{t.tableEmail}</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-[#F2F0EC] dark:divide-[#2D3139]">
+                  <tbody className="divide-y divide-[var(--line)]">
                     {eligibleCandidates.map((c) => {
                       const isChecked = selectedStudentIds.includes(c.user.id);
                       return (
@@ -602,19 +593,20 @@ export function TemplateGenerationModal({
                               isChecked ? prev.filter((id) => id !== c.user.id) : [...prev, c.user.id]
                             );
                           }}
-                          className="hover:bg-[#FAF9F7] dark:hover:bg-[#252830] cursor-pointer"
+                          className="cursor-pointer hover:bg-[var(--primary-soft)]/40 motion-reduce:transition-none"
                         >
                           <td className="p-3">
                             <input
                               type="checkbox"
+                              aria-label={c.user.name || t.tableStudent}
                               checked={isChecked}
                               onChange={() => {}}
-                              className="rounded accent-[#B08D57]"
+                              className="rounded accent-[var(--primary)]"
                             />
                           </td>
-                          <td className="p-3 font-medium text-[#1C1B1F] dark:text-[#F5F3EF]">{c.user.name}</td>
-                          <td className="p-3 font-mono text-[#6B6966]">{c.user.rollNumber || 'N/A'}</td>
-                          <td className="p-3 text-[#6B6966]">{c.user.email}</td>
+                          <td className="p-3 font-medium text-[var(--ink)]">{c.user.name}</td>
+                          <td className="p-3 font-mono text-[var(--ink-soft)]">{c.user.rollNumber || 'N/A'}</td>
+                          <td className="p-3 text-[var(--ink-soft)]">{c.user.email}</td>
                         </tr>
                       );
                     })}
@@ -627,116 +619,110 @@ export function TemplateGenerationModal({
 
         {/* STEP 4 (Result): Generation Summary */}
         {step === 'result' && batchResult && (
-          <div className="p-8 text-center space-y-4">
-            <div className="w-14 h-14 rounded-full bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 flex items-center justify-center mx-auto">
-              <CheckCircle2 className="w-8 h-8" />
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-8 text-center">
+            <div
+              aria-hidden="true"
+              className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 text-emerald-700"
+            >
+              <CheckCircle2 className="h-8 w-8" />
             </div>
-            <h4 className="text-xl font-serif text-[#1C1B1F] dark:text-[#F5F3EF]">
-              Certificates Generated Successfully!
+            <h4 className="font-display text-xl font-bold text-[var(--ink)]">
+              {t.resultTitle}
             </h4>
-            <p className="text-xs text-[#6B6966] dark:text-[#A8A5A0] max-w-md mx-auto">
-              All certificates have been generated with vector precision, signed, and published to student dashboards.
+            <p className="mx-auto max-w-md text-xs text-[var(--ink-soft)]">
+              {t.resultHint}
             </p>
 
-            <div className="max-w-md mx-auto p-4 bg-[#FAF9F7] dark:bg-[#1A1D24] border border-[#E7E5E4] dark:border-[#2D3139] rounded-xl grid grid-cols-3 gap-3 text-center">
+            <div className="mx-auto grid max-w-md grid-cols-3 gap-3 rounded-xl border border-[var(--line)] bg-[var(--bg)] p-4 text-center">
               <div>
-                <span className="text-[10px] uppercase tracking-wider text-[#6B6966] block">Issued</span>
-                <span className="text-lg font-bold text-emerald-600">{batchResult.successCount}</span>
+                <span className="block text-[10px] uppercase tracking-wider text-[var(--ink-soft)]">{t.resultIssued}</span>
+                <span className="text-lg font-bold text-emerald-700">{batchResult.successCount}</span>
               </div>
               <div>
-                <span className="text-[10px] uppercase tracking-wider text-[#6B6966] block">Failed</span>
-                <span className="text-lg font-bold text-rose-600">{batchResult.failedCount}</span>
+                <span className="block text-[10px] uppercase tracking-wider text-[var(--ink-soft)]">{t.resultFailed}</span>
+                <span className="text-lg font-bold text-rose-700">{batchResult.failedCount}</span>
               </div>
               <div>
-                <span className="text-[10px] uppercase tracking-wider text-[#6B6966] block">Total</span>
-                <span className="text-lg font-bold text-[#1C1B1F] dark:text-[#F5F3EF]">{batchResult.totalCount}</span>
+                <span className="block text-[10px] uppercase tracking-wider text-[var(--ink-soft)]">{t.resultTotal}</span>
+                <span className="text-lg font-bold text-[var(--ink)]">{batchResult.totalCount}</span>
               </div>
             </div>
           </div>
         )}
 
         {/* Modal Footer Controls */}
-        <div className="px-6 py-3.5 bg-white dark:bg-[#1A1D24] border-t border-[#E7E5E4] dark:border-[#2D3139] flex items-center justify-between">
+        <div className="flex shrink-0 items-center justify-between border-t border-[var(--line)] bg-[var(--surface)] px-6 py-3.5">
           {step === 'select_template' && (
             <>
-              <button
-                type="button"
-                onClick={onClose}
-                className="px-4 py-2 bg-[#F2F0EC] dark:bg-[#252830] text-[#38373A] dark:text-[#D4D1CB] text-xs font-medium rounded-lg hover:bg-[#E7E5E4] transition-colors cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
+              <DashboardButton variant="secondary" size="sm" onClick={onClose}>
+                {t.cancel}
+              </DashboardButton>
+              <DashboardButton
+                variant="primary"
+                size="sm"
                 onClick={() => setStep('editor')}
                 disabled={templateSource === 'custom' && !templateFile}
-                className="px-5 py-2 bg-[#B08D57] hover:bg-[#997847] text-white text-xs font-medium rounded-lg transition-colors flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
+                leftIcon={null}
               >
-                <span>Continue to Visual Editor</span>
-                <ChevronRight className="w-3.5 h-3.5" />
-              </button>
+                {t.continueToEditor}
+                <ChevronRight aria-hidden="true" className="h-3.5 w-3.5" />
+              </DashboardButton>
             </>
           )}
 
           {step === 'editor' && (
             <>
-              <button
-                type="button"
+              <DashboardButton
+                variant="secondary"
+                size="sm"
                 onClick={() => setStep('select_template')}
-                className="px-4 py-2 bg-[#F2F0EC] dark:bg-[#252830] text-[#38373A] dark:text-[#D4D1CB] text-xs font-medium rounded-lg hover:bg-[#E7E5E4] transition-colors flex items-center gap-1 cursor-pointer"
+                leftIcon={<ArrowLeft aria-hidden="true" className="h-3.5 w-3.5" />}
               >
-                <ArrowLeft className="w-3.5 h-3.5" />
-                <span>Change Template</span>
-              </button>
+                {t.changeTemplate}
+              </DashboardButton>
 
-              <button
-                type="button"
+              <DashboardButton
+                variant="primary"
+                size="sm"
                 onClick={() => void handleSaveAndProceedToTarget()}
-                disabled={saveLoading}
-                className="px-5 py-2 bg-[#B08D57] hover:bg-[#997847] text-white text-xs font-medium rounded-lg transition-colors flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
+                loading={saveLoading}
+                loadingLabel={t.saveAndSelect}
               >
-                {saveLoading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                <span>Save Template & Select Recipients</span>
-                <ChevronRight className="w-3.5 h-3.5" />
-              </button>
+                {t.saveAndSelect}
+                <ChevronRight aria-hidden="true" className="h-3.5 w-3.5" />
+              </DashboardButton>
             </>
           )}
 
           {step === 'target' && (
             <>
-              <button
-                type="button"
+              <DashboardButton
+                variant="secondary"
+                size="sm"
                 onClick={() => setStep('editor')}
-                className="px-4 py-2 bg-[#F2F0EC] dark:bg-[#252830] text-[#38373A] dark:text-[#D4D1CB] text-xs font-medium rounded-lg hover:bg-[#E7E5E4] transition-colors flex items-center gap-1 cursor-pointer"
+                leftIcon={<ArrowLeft aria-hidden="true" className="h-3.5 w-3.5" />}
               >
-                <ArrowLeft className="w-3.5 h-3.5" />
-                <span>Back to Editor</span>
-              </button>
+                {t.backToEditor}
+              </DashboardButton>
 
-              <button
-                type="button"
+              <DashboardButton
+                variant="primary"
+                size="sm"
                 onClick={() => void handleGenerate()}
-                disabled={generateMutation.isPending || (targetMode === 'custom' && selectedStudentIds.length === 0)}
-                className="px-6 py-2 bg-[#14532D] hover:bg-[#166534] text-white text-xs font-medium rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50 cursor-pointer"
+                disabled={targetMode === 'custom' && selectedStudentIds.length === 0}
+                loading={generateMutation.isPending}
+                loadingLabel={t.issueCount(targetMode === 'all' ? eligibleCandidates.length : selectedStudentIds.length)}
               >
-                {generateMutation.isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                <span>
-                  Issue Certificates (
-                  {targetMode === 'all' ? eligibleCandidates.length : selectedStudentIds.length} Students)
-                </span>
-              </button>
+                {t.issueCount(targetMode === 'all' ? eligibleCandidates.length : selectedStudentIds.length)}
+              </DashboardButton>
             </>
           )}
 
           {step === 'result' && (
-            <div className="w-full flex justify-end">
-              <button
-                type="button"
-                onClick={onClose}
-                className="px-5 py-2 bg-[#B08D57] hover:bg-[#997847] text-white text-xs font-medium rounded-lg transition-colors cursor-pointer"
-              >
-                Done
-              </button>
+            <div className="flex w-full justify-end">
+              <DashboardButton variant="primary" size="sm" onClick={onClose}>
+                {t.done}
+              </DashboardButton>
             </div>
           )}
         </div>

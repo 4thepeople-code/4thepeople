@@ -1,13 +1,15 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Modal } from '@/components/common/Modal';
+import Modal from '@/components/dashboard/ui/Modal';
+import DashboardButton from '@/components/dashboard/ui/DashboardButton';
+import { actions, managerCertificates } from '@/lib/copy';
 import { useRevokeCertificateMutation } from '@/lib/api/manager';
-import { AlertTriangle, AlertCircle, Loader2, Ban } from 'lucide-react';
+import { AlertTriangle, AlertCircle, Ban } from 'lucide-react';
 import type { EventCertificate } from '@/types/models';
 
 interface RevokeCertificateModalProps {
-  isOpen: boolean;
+  open: boolean;
   onClose: () => void;
   slug: string;
   eventId: string;
@@ -15,8 +17,10 @@ interface RevokeCertificateModalProps {
   onSuccess?: () => void;
 }
 
+const t = managerCertificates.revoke;
+
 export function RevokeCertificateModal({
-  isOpen,
+  open,
   onClose,
   slug,
   eventId,
@@ -34,7 +38,7 @@ export function RevokeCertificateModal({
     if (!certificate) return;
 
     if (!reason.trim() || reason.trim().length < 3) {
-      setFormError('Please provide a valid revocation reason (at least 3 characters).');
+      setFormError(t.errReason);
       return;
     }
 
@@ -49,7 +53,7 @@ export function RevokeCertificateModal({
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
         (err as Error).message ||
-        'Failed to revoke certificate';
+        t.errSubmit;
       setFormError(msg);
     }
   };
@@ -58,68 +62,56 @@ export function RevokeCertificateModal({
 
   return (
     <Modal
-      isOpen={isOpen}
+      open={open}
       onClose={() => !revokeMutation.isPending && onClose()}
-      title="Revoke Certificate"
-      maxWidth="max-w-lg"
+      title={t.title}
+      size="md"
     >
       <form onSubmit={handleSubmit} className="space-y-4">
         {formError && (
-          <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-2xl flex items-start gap-2.5 text-rose-300 text-xs font-medium">
-            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+          <div className="flex items-start gap-2.5 rounded-2xl border border-rose-200 bg-rose-50 p-3 text-xs font-medium text-rose-700">
+            <AlertCircle aria-hidden="true" className="h-4 w-4 shrink-0" />
             <span>{formError}</span>
           </div>
         )}
 
-        <div className="p-3.5 bg-amber-500/10 border border-amber-500/20 rounded-2xl text-xs text-amber-300 flex items-start gap-2.5">
-          <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+        {/* Names the object and the consequence (lib/copy.ts rules) */}
+        <div className="flex items-start gap-2.5 rounded-2xl border border-amber-200 bg-amber-50 p-3.5 text-xs text-amber-900">
+          <AlertTriangle aria-hidden="true" className="h-4 w-4 shrink-0 text-amber-600" />
           <div>
-            <span className="font-bold">Warning:</span> Revoking certificate{' '}
-            <strong className="text-amber-200">{certificate.certificateNumber}</strong> for student{' '}
-            <strong className="text-amber-200">{certificate.user?.name || 'Student'}</strong> will prevent the
-            student from viewing or downloading it.
+            <span className="font-bold">{t.warning(certificate.certificateNumber, certificate.user?.name || 'Student')}</span>
           </div>
         </div>
 
         <div>
-          <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">
-            Reason for Revocation <span className="text-rose-400">*</span>
+          <label htmlFor="revoke-reason" className="mb-1 block text-xs font-bold uppercase tracking-wider text-[var(--ink-soft)]">
+            {t.reasonLabel} <span aria-hidden="true" className="text-[var(--secondary)]">*</span>
           </label>
           <textarea
+            id="revoke-reason"
             rows={3}
             value={reason}
             onChange={(e) => setReason(e.target.value)}
-            placeholder="e.g. Student cancelled registration, incorrect details on certificate, or administrative invalidation..."
-            className="w-full px-3 py-2 text-xs rounded-xl border border-white/10 bg-black/30 text-white placeholder-slate-500 outline-none focus:border-rose-500 transition resize-none"
+            placeholder={t.reasonPlaceholder}
+            className="w-full resize-none rounded-xl border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-xs text-[var(--ink)] placeholder:text-[var(--ink-soft)] transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-[var(--primary)] motion-reduce:transition-none"
           />
         </div>
 
-        <div className="flex items-center justify-end gap-3 pt-3 border-t border-white/10">
-          <button
-            type="button"
-            disabled={revokeMutation.isPending}
-            onClick={onClose}
-            className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl transition"
-          >
-            Cancel
-          </button>
-          <button
+        <div className="flex items-center justify-end gap-3 border-t border-[var(--line)] pt-3">
+          <DashboardButton variant="secondary" size="sm" disabled={revokeMutation.isPending} onClick={onClose}>
+            {actions.cancel}
+          </DashboardButton>
+          <DashboardButton
+            variant="danger"
+            size="sm"
             type="submit"
-            disabled={revokeMutation.isPending || !reason.trim() || reason.trim().length < 3}
-            className="inline-flex items-center gap-1.5 px-5 py-2 bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold rounded-xl transition disabled:opacity-50"
+            disabled={!reason.trim() || reason.trim().length < 3}
+            loading={revokeMutation.isPending}
+            loadingLabel={t.submitting}
           >
-            {revokeMutation.isPending ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                <span>Revoking...</span>
-              </>
-            ) : (
-              <>
-                <Ban className="w-4 h-4" />
-                <span>Revoke Certificate</span>
-              </>
-            )}
-          </button>
+            <Ban aria-hidden="true" className="h-3.5 w-3.5" />
+            {t.submit}
+          </DashboardButton>
         </div>
       </form>
     </Modal>
