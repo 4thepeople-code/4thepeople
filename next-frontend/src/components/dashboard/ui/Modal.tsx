@@ -37,6 +37,16 @@ export default function Modal({ open, onClose, title, description, size = 'md', 
   const dialogRef = useRef<HTMLDivElement>(null);
   const previouslyFocused = useRef<HTMLElement | null>(null);
 
+  // Latest `onClose` without re-running the open effect below. Parents pass a
+  // fresh closure on every render (inline handleClose), and with `onClose` in
+  // the deps the effect re-ran on each keystroke inside the dialog: cleanup
+  // restored focus to the trigger behind the dialog, the body refocused the
+  // panel, and the input lost the caret after one character.
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  });
+
   useEffect(() => {
     if (!open) return;
     previouslyFocused.current = document.activeElement as HTMLElement | null;
@@ -45,7 +55,7 @@ export default function Modal({ open, onClose, title, description, size = 'md', 
 
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
-        onClose();
+        onCloseRef.current();
         return;
       }
       if (event.key === 'Tab') {
@@ -77,7 +87,7 @@ export default function Modal({ open, onClose, title, description, size = 'md', 
       document.removeEventListener('keydown', onKey);
       previouslyFocused.current?.focus();
     };
-  }, [open, onClose]);
+  }, [open]);
 
   if (!open) return null;
 
