@@ -252,3 +252,48 @@
 .student-scope .animate-dashboard-toast-in {
   animation: dashboard-toast-in 180ms ease-out;
 }
+
+/*
+ * Overlay scope — dialogs, dropdown menus and toasts can render OUTSIDE a
+ * .dashboard-scope wrapper: the manager frame mounts its modals as siblings of
+ * DashboardShell (RoleGuard returns a bare fragment), and ToastProvider mounts
+ * at the app root. Outside a scope the --surface/--ink/--line custom properties
+ * are undefined, so `bg-[var(--surface)]` computed to transparent and the page
+ * showed through the dialog. This class re-declares the dashboard token set on
+ * the overlay surface itself so every overlay is self-sufficient. It sets ONLY
+ * custom properties (no background/color side effects), mirrors the role-
+ * dashboard palette (white surfaces, violet primary) and carries a .dark twin
+ * so college-admin dark mode keeps working.
+ */
+.overlay-scope {
+  --bg: #ffffff;
+  --surface: #ffffff;
+  --ink: #111827;
+  --ink-soft: #6b7280;
+  --line: #e5e7eb;
+  --primary: #7c3aed;
+  --primary-strong: #6d28d9;
+  --primary-soft: #f5f3ff;
+  --secondary: #ff4a3d;
+  --secondary-soft: #ffe9e6;
+  --on-primary: #ffffff;
+}
+
+.dark .overlay-scope {
+  --bg: #0d0f14;
+  --surface: #14171f;
+  --ink: #f2f3f7;
+  --ink-soft: #a7acbb;
+  --line: rgba(242, 243, 247, 0.12);
+  --primary: #8183ff;
+  --primary-strong: #6366f1;
+  --primary-soft: rgba(99, 102, 241, 0.2);
+  --secondary: #ff6a5c;
+  --secondary-soft: rgba(255, 74, 61, 0.18);
+  --on-primary: #0d0f14;
+}
+
+/* Entrance animation for overlays that render outside .dashboard-scope. */
+.overlay-scope.animate-dashboard-toast-in {
+  animation: dashboard-toast-in 180ms ease-out;
+}

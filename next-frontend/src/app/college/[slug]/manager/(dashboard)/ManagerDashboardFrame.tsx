@@ -123,7 +123,7 @@ export default function ManagerDashboardFrame({ slug, children }: ManagerDashboa
                 <button
                   type="button"
                   onClick={() => chooseClub(club.id)}
-                  className="flex min-h-11 w-full items-center justify-between gap-3 rounded-xl border border-[var(--line)] bg-[var(--surface)] px-4 py-3 text-left text-sm font-semibold text-[var(--ink)] transition-colors duration-150 motion-reduce:transition-none hover:border-[var(--primary)] focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-[var(--primary)]"
+                  className="flex min-h-11 w-full items-center justify-between gap-3 rounded-xl border border-[var(--line)] bg-[var(--surface)] px-4 py-3 text-left text-sm font-semibold text-[var(--ink)] transition-colors duration-150 motion-reduce:transition-none hover:border-[var(--primary)] hover:bg-[var(--primary-soft)]/40 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-[var(--primary)]"
                 >
                   <span className="flex items-center gap-3">
                     <Building2 aria-hidden="true" className="h-4 w-4 text-[var(--primary)]" />

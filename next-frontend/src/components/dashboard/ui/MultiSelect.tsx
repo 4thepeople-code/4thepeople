@@ -184,7 +184,7 @@ export default function MultiSelect({
 
         {/* Dropdown */}
         {isOpen && !disabled && (
-          <div className="absolute inset-x-0 top-full z-40 mt-1.5 overflow-hidden rounded-2xl border border-[var(--line)] bg-[var(--surface)] shadow-lg">
+          <div className="overlay-scope absolute inset-x-0 top-full z-50 mt-1.5 overflow-hidden rounded-2xl border border-[var(--line)] bg-[var(--surface)] shadow-lg">
             <div className="flex items-center gap-2 border-b border-[var(--line)] bg-[var(--bg)] px-3 py-2.5">
               <Search aria-hidden="true" className="h-3.5 w-3.5 shrink-0 text-[var(--ink-soft)]" />
               <input

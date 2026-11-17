@@ -122,7 +122,7 @@ function ToastRow({ item, onDismiss }: { item: ToastItem; onDismiss: (id: number
   return (
     <div
       role="status"
-      className={`animate-dashboard-toast-in pointer-events-auto flex items-start gap-2.5 rounded-2xl border p-3.5 shadow-lg ${variantStyles[item.variant]}`}
+      className={`overlay-scope animate-dashboard-toast-in pointer-events-auto flex items-start gap-2.5 rounded-2xl border p-3.5 shadow-lg ${variantStyles[item.variant]}`}
     >
       <Icon aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" />
       <p className="flex-1 text-xs font-medium leading-relaxed">{item.message}</p>

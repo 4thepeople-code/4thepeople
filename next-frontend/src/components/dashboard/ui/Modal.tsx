@@ -62,7 +62,7 @@ export default function Modal({ open, onClose, title, description, size = 'md', 
         aria-modal="true"
         aria-label={title}
         tabIndex={-1}
-        className={`animate-dashboard-toast-in relative w-full ${sizes[size]} max-h-[90vh] overflow-y-auto rounded-3xl border border-[var(--line)] bg-[var(--surface)] p-6 shadow-xl outline-hidden`}
+        className={`overlay-scope animate-dashboard-toast-in relative w-full ${sizes[size]} max-h-[90vh] overflow-y-auto rounded-3xl border border-[var(--line)] bg-[var(--surface)] p-6 shadow-xl outline-hidden`}
       >
         <div className="mb-4 flex items-start justify-between gap-4">
           <div className="min-w-0">
