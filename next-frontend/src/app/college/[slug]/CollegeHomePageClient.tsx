@@ -11,16 +11,16 @@ import {
   Search,
   X,
   Building2,
-  CheckCircle2,
   Clock,
   MapPin,
-  Sparkles,
 } from 'lucide-react';
 import { useUpcomingEvents } from '@/lib/api/events';
 import { useClubs } from '@/lib/api/clubs';
 import { useDepartments } from '@/lib/api/departments';
+import { campusPublic } from '@/lib/copy';
 import PublicLayout from '@/components/public/PublicLayout';
 import EventModal from '@/components/public/EventModal';
+import EventCard from '@/components/common/EventCard';
 import GalleryLightbox from '@/components/public/GalleryLightbox';
 import CampusClubCard from '@/components/college/CampusClubCard';
 import CampusEventCard from '@/components/college/CampusEventCard';
@@ -52,6 +52,17 @@ const formatDateParts = (dateString?: string, endDateString?: string) => {
   }
 
   return { day, month, weekday, time };
+};
+
+/** Short display date for the hero eyebrow, e.g. "Thu 12 Nov". */
+const formatShortDateLabel = (dateString?: string) => {
+  if (!dateString) return 'TBA';
+  const dateObj = new Date(dateString);
+  if (isNaN(dateObj.getTime())) return 'TBA';
+  const weekday = dateObj.toLocaleDateString('en-US', { weekday: 'short' });
+  const month = dateObj.toLocaleDateString('en-US', { month: 'short' });
+  const day = dateObj.getDate();
+  return `${weekday} ${day} ${month}`;
 };
 
 /** Season label from the current date (e.g. "Fall 2026"). */
@@ -132,10 +143,9 @@ function ErrorBlock({ title, message, onRetry }: { title: string; message: strin
 /* ------------------------------------------------------------------ */
 
 const benefits = [
-  { num: '01', title: 'WORD OF MOUTH VERIFIED', description: 'Heard friends talking about a hackathon or concert? Find official timings, venues, and registration links instantly here.', highlight: 'Instant access' },
-  { num: '02', title: 'DIRECT REGISTRATIONS', description: 'No confusing forms. Click through to RSVP or join event queues organized directly by student club leaders.', highlight: 'Quick RSVP' },
-  { num: '03', title: 'DISCOVER YOUR TRIBE', description: 'Connect with communities that match your passion, from coding to dance, theatre to robotics.', highlight: 'Real community' },
-  { num: '04', title: 'BUILD EXPERIENCES', description: 'Turn ideas into memories. Participate, volunteer, or lead teams in campus-wide events.', highlight: 'Hands-on leadership' },
+  { title: 'WORD OF MOUTH VERIFIED', description: 'Heard friends talking about a hackathon or concert? Find official timings, venues, and registration links instantly here.', highlight: 'Instant access' },
+  { title: 'DIRECT REGISTRATIONS', description: 'No confusing forms. Click through to RSVP or join event queues organized directly by student club leaders.', highlight: 'Quick RSVP' },
+  { title: 'DISCOVER YOUR TRIBE', description: 'Connect with communities that match your passion, from coding to dance, theatre to robotics.', highlight: 'Real community' },
 ];
 
 /* ------------------------------------------------------------------ */
@@ -153,31 +163,11 @@ export function CollegeHomePageClient({ slug }: CollegeHomePageClientProps) {
   // Student Search & Category Filter State
   const [searchQuery, setSearchQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('ALL');
+  const [timeFilter, setTimeFilter] = useState<'ALL' | 'WEEK' | 'MONTH'>('ALL');
 
   // Modals & Lightbox
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
   const [activeGalleryEvent, setActiveGalleryEvent] = useState<Event | null>(null);
-
-  // Filter events based on search and category
-  const filteredEvents = useMemo(() => {
-    return events.filter((ev) => {
-      const q = searchQuery.toLowerCase().trim();
-      const matchesSearch =
-        !q ||
-        ev.title?.toLowerCase().includes(q) ||
-        ev.description?.toLowerCase().includes(q) ||
-        ev.venue?.toLowerCase().includes(q) ||
-        ev.location?.toLowerCase().includes(q) ||
-        ev.club?.name?.toLowerCase().includes(q);
-
-      const matchesCategory =
-        activeCategory === 'ALL' ||
-        ev.category?.toUpperCase() === activeCategory ||
-        ev.club?.category?.toUpperCase().includes(activeCategory);
-
-      return matchesSearch && matchesCategory;
-    });
-  }, [events, searchQuery, activeCategory]);
 
   // Categories derived from real fetched data (events + clubs), nothing hardcoded.
   const derivedCategories = useMemo(() => {
@@ -222,6 +212,49 @@ export function CollegeHomePageClient({ slug }: CollegeHomePageClientProps) {
     spotlightEvent?.endAt
   );
 
+  // Events for the homepage grid: hero event excluded (it owns the hero slot),
+  // optional client-side time window (All | This week | This month), then
+  // search + category narrowing.
+  const filteredEvents = useMemo(() => {
+    const list = events.filter((ev) => ev.id !== heroEvent?.id);
+    const timeFiltered =
+      timeFilter === 'ALL'
+        ? list
+        : list.filter((ev) => {
+            const startAt = ev.startAt ? new Date(ev.startAt).getTime() : NaN;
+            if (Number.isNaN(startAt)) return false;
+            const now = new Date();
+            if (timeFilter === 'WEEK') {
+              const weekStart = new Date(now);
+              weekStart.setHours(0, 0, 0, 0);
+              weekStart.setDate(weekStart.getDate() - ((weekStart.getDay() + 6) % 7));
+              const weekEnd = new Date(weekStart);
+              weekEnd.setDate(weekEnd.getDate() + 7);
+              return startAt >= weekStart.getTime() && startAt < weekEnd.getTime();
+            }
+            const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+            const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+            return startAt >= monthStart.getTime() && startAt < monthEnd.getTime();
+          });
+    const q = searchQuery.toLowerCase().trim();
+    return timeFiltered.filter((ev) => {
+      const matchesSearch =
+        !q ||
+        ev.title?.toLowerCase().includes(q) ||
+        ev.description?.toLowerCase().includes(q) ||
+        ev.venue?.toLowerCase().includes(q) ||
+        ev.location?.toLowerCase().includes(q) ||
+        ev.club?.name?.toLowerCase().includes(q);
+
+      const matchesCategory =
+        activeCategory === 'ALL' ||
+        ev.category?.toUpperCase() === activeCategory ||
+        ev.club?.category?.toUpperCase().includes(activeCategory);
+
+      return matchesSearch && matchesCategory;
+    });
+  }, [events, timeFilter, searchQuery, activeCategory, heroEvent]);
+
   const handleNavigateToEvent = (ev: Event) => {
     if (!ev) return;
     router.push(`/college/${slug}/events/${ev.id}`);
@@ -256,7 +289,7 @@ export function CollegeHomePageClient({ slug }: CollegeHomePageClientProps) {
               ))}
             </ul>
             <div aria-hidden className="relative h-full flex-1 overflow-hidden">
-              <div className="animate-scroll-x flex w-max items-center hover:[animation-play-state:paused]">
+              <div className="animate-scroll-x flex w-max items-center hover:[animation-play-state:paused] focus-within:[animation-play-state:paused]">
                 {[...events, ...events, ...events, ...events].map((ev, idx) => {
                   const dateParts = formatDateParts(ev.startAt || ev.startDate || ev.date);
                   return (
@@ -300,7 +333,7 @@ export function CollegeHomePageClient({ slug }: CollegeHomePageClientProps) {
                 {heroEvent ? (
                   <>
                     <p className="mt-8 text-xs font-bold uppercase tracking-[0.28em] text-[var(--accent-strong)]">
-                      ★ Next up · {heroDateParts.weekday} {heroDateParts.month} {heroDateParts.day}
+                      Next up · {formatShortDateLabel(heroEvent.startAt || heroEvent.startDate || heroEvent.date)}
                     </p>
                     <h1 className="font-campus mt-4 text-[40px] uppercase leading-[0.95] tracking-tight text-[var(--text-primary)] sm:text-[64px] lg:text-[88px]">
                       {heroEvent.title.toUpperCase()}
@@ -323,8 +356,8 @@ export function CollegeHomePageClient({ slug }: CollegeHomePageClientProps) {
                         href={`/college/${slug}/events/${heroEvent.id}`}
                         className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-[var(--accent-strong)] px-8 py-3 text-base font-bold text-white transition-transform hover:-translate-y-0.5"
                       >
-                        View event details
-                        {typeof heroEvent.registeredCount === 'number' ? ` · ${heroEvent.registeredCount} going` : ''}
+                        {campusPublic.events.viewDetails}
+                        {typeof heroEvent.registeredCount === 'number' && heroEvent.registeredCount > 0 ? ` · ${heroEvent.registeredCount} going` : ''}
                       </Link>
                       <button
                         type="button"
@@ -336,11 +369,19 @@ export function CollegeHomePageClient({ slug }: CollegeHomePageClientProps) {
                     </div>
                   </>
                 ) : (
-                  <h1 className="font-campus mt-8 text-[40px] uppercase leading-[0.95] tracking-tight text-[var(--text-primary)] sm:text-[64px] lg:text-[88px]">
-                    Every event.
-                    <br />
-                    One place.
-                  </h1>
+                  <>
+                    <h1 className="font-campus mt-8 text-[40px] uppercase leading-[0.95] tracking-tight text-[var(--text-primary)] sm:text-[64px] lg:text-[88px]">
+                      {collegeDisplay}
+                    </h1>
+                    <div className="mt-9 flex flex-wrap items-center gap-4">
+                      <Link
+                        href={`/college/${slug}/clubs`}
+                        className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-[var(--accent-strong)] px-8 py-3 text-base font-bold text-white transition-transform hover:-translate-y-0.5"
+                      >
+                        {campusPublic.home.browseClubs}
+                      </Link>
+                    </div>
+                  </>
                 )}
 
                 {/* Instant Search Bar */}
@@ -445,11 +486,9 @@ export function CollegeHomePageClient({ slug }: CollegeHomePageClientProps) {
                             className="h-full w-full rounded-[13px] object-cover"
                           />
                         ) : (
-                          <div className="flex h-full w-full flex-col justify-end rounded-[13px] bg-[var(--accent-primary)] p-6">
-                            <span className="text-xs font-bold uppercase tracking-[0.24em] text-[var(--text-primary)]">
-                              ★ Featured event
-                            </span>
-                            <p className="font-campus mt-3 text-4xl uppercase leading-[0.95] text-[var(--text-primary)]">
+                          <div className="flex h-full w-full flex-col justify-end rounded-[13px] bg-[var(--surface-tile)] p-6">
+                            <p className="font-campus text-6xl font-bold leading-[0.95] text-[var(--text-primary)]">{heroDateParts.day}</p>
+                            <p className="font-campus mt-1 text-2xl font-bold uppercase leading-[0.95] text-[var(--text-primary)]">
                               {heroEvent.title}
                             </p>
                           </div>
@@ -466,9 +505,11 @@ export function CollegeHomePageClient({ slug }: CollegeHomePageClientProps) {
                       <p className="text-sm font-semibold text-[var(--text-secondary)]">
                         {heroEvent.venue || heroEvent.location || 'Venue to be announced'}
                       </p>
-                      {typeof heroEvent.registeredCount === 'number' && (
-                        <p className="text-sm text-[var(--text-muted)]">{heroEvent.registeredCount} students going</p>
-                      )}
+                      {typeof heroEvent.registeredCount === 'number' && heroEvent.registeredCount > 0 ? (
+                        <p className="text-sm text-[var(--text-muted)]">
+                          {heroEvent.registeredCount} {heroEvent.registeredCount === 1 ? 'student' : 'students'} going
+                        </p>
+                      ) : null}
                     </div>
                   )}
                 </div>
@@ -506,33 +547,37 @@ export function CollegeHomePageClient({ slug }: CollegeHomePageClientProps) {
                   Campus event schedule
                 </p>
                 <h2 className="font-display mt-3 text-3xl font-bold uppercase tracking-tight text-[var(--text-primary)] sm:text-5xl">
-                  Recent &amp; upcoming <span className="text-[var(--accent-primary)]">events</span>
+                  Recent &amp; upcoming events
                 </h2>
                 <p className="mt-3 max-w-xl text-sm text-[var(--text-secondary)] sm:text-base">
                   Full schedules, locations, host clubs, and RSVP details at {collegeDisplay}.
                 </p>
               </div>
 
-              {/* Category Filter Bar — derived from real data */}
-              {derivedCategories.length > 0 && (
-                <div className="flex flex-wrap items-center gap-2">
-                  {['ALL', ...derivedCategories].map((category) => (
-                    <button
-                      key={category}
-                      type="button"
-                      onClick={() => setActiveCategory(category)}
-                      aria-pressed={activeCategory === category}
-                      className={`inline-flex min-h-11 cursor-pointer items-center whitespace-nowrap rounded-full border-2 px-4 py-2 text-xs font-bold uppercase tracking-wider transition-all ${
-                        activeCategory === category
-                          ? 'bg-[var(--surface-inverse)] text-[var(--text-inverse)]'
-                          : 'border-[var(--border-strong)] bg-[var(--surface-card)] text-[var(--text-primary)] hover:bg-[var(--surface-tile)]'
-                      }`}
-                    >
-                      {category}
-                    </button>
-                  ))}
-                </div>
-              )}
+              {/* Time Filter — All | This week | This month (client-side from startAt) */}
+              <div className="flex flex-wrap items-center gap-2">
+                {(
+                  [
+                    { id: 'ALL', label: campusPublic.events.filterAll },
+                    { id: 'WEEK', label: campusPublic.events.filterThisWeek },
+                    { id: 'MONTH', label: campusPublic.events.filterThisMonth },
+                  ] as Array<{ id: 'ALL' | 'WEEK' | 'MONTH'; label: string }>
+                ).map((option) => (
+                  <button
+                    key={option.id}
+                    type="button"
+                    onClick={() => setTimeFilter(option.id)}
+                    aria-pressed={timeFilter === option.id}
+                    className={`inline-flex min-h-11 cursor-pointer items-center whitespace-nowrap rounded-full border-2 px-4 py-2 text-xs font-bold uppercase tracking-wider transition-all ${
+                      timeFilter === option.id
+                        ? 'bg-[var(--surface-inverse)] text-[var(--text-inverse)]'
+                        : 'border-[var(--border-strong)] bg-[var(--surface-card)] text-[var(--text-primary)] hover:bg-[var(--surface-tile)]'
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
             </div>
 
             {/* Search Result Feedback Bar */}
@@ -598,6 +643,7 @@ export function CollegeHomePageClient({ slug }: CollegeHomePageClientProps) {
                       onClick={() => {
                         setSearchQuery('');
                         setActiveCategory('ALL');
+                        setTimeFilter('ALL');
                       }}
                       className="mt-5 inline-flex min-h-11 cursor-pointer items-center justify-center rounded-xl bg-[var(--accent-strong)] px-5 text-sm font-bold text-white transition-transform hover:-translate-y-0.5"
                     >
@@ -607,26 +653,38 @@ export function CollegeHomePageClient({ slug }: CollegeHomePageClientProps) {
                 )}
               </div>
             ) : (
-              <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-                {filteredEvents.map((event) => (
-                  <CampusEventCard
-                    key={event.id}
-                    event={event}
-                    href={`/college/${slug}/events/${event.id}`}
-                    hostFallback={collegeDisplay}
-                  />
-                ))}
-              </div>
+              <>
+                <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+                  {filteredEvents.slice(0, 6).map((event) => (
+                    <EventCard
+                      key={event.id}
+                      event={event}
+                      href={`/college/${slug}/events/${event.id}`}
+                      variant="card"
+                    />
+                  ))}
+                </div>
+                {filteredEvents.length > 6 && (
+                  <div className="mt-10 flex justify-center">
+                    <Link
+                      href={`/college/${slug}/events`}
+                      className="inline-flex min-h-11 items-center justify-center rounded-2xl border-2 border-[var(--border-strong)] bg-[var(--surface-card)] px-6 py-3 text-sm font-bold text-[var(--text-primary)] transition-transform hover:-translate-y-0.5"
+                    >
+                      {campusPublic.events.seeAll}
+                    </Link>
+                  </div>
+                )}
+              </>
             )}
           </div>
         </section>
 
-        {/* 4. SPOTLIGHT BAND — highest registeredCount excluding the hero event */}
-        {spotlightEvent && (
+        {/* 4. SPOTLIGHT BAND — most popular event (top RSVPs), hero excluded */}
+        {spotlightEvent && (typeof spotlightEvent.registeredCount === 'number' && spotlightEvent.registeredCount >= campusPublic.events.popularityThreshold) && (
           <section id="spotlight" className="bg-[var(--surface-inverse)] text-[var(--text-inverse)]">
             <div className="mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8 lg:py-28">
               <span className="inline-flex items-center gap-2 rounded-full border border-[var(--border-inverse)] bg-[var(--surface-inverse-tile)] px-4 py-2 text-xs font-bold uppercase tracking-[0.16em] text-[var(--text-inverse-muted)]">
-                ★ Crowd favourite
+                Crowd favourite
               </span>
 
               <h2 className="font-campus mt-7 text-[44px] uppercase leading-[0.92] tracking-tight text-[var(--text-inverse)] sm:text-[68px]">
@@ -665,7 +723,6 @@ export function CollegeHomePageClient({ slug }: CollegeHomePageClientProps) {
                 </div>
 
                 <div className="relative">
-                  <div aria-hidden className="absolute -inset-6 -rotate-3 rounded-[2rem] bg-[var(--accent-primary)]" />
                   <div className="relative rounded-[2rem] border-2 border-[var(--border-inverse)] bg-[var(--surface-inverse-hover)] px-8 py-12 text-center">
                     {typeof spotlightEvent.registeredCount === 'number' ? (
                       <>
@@ -677,7 +734,7 @@ export function CollegeHomePageClient({ slug }: CollegeHomePageClientProps) {
                     )}
                     <Link
                       href={`/college/${slug}/events/${spotlightEvent.id}`}
-                      className="mt-8 inline-flex min-h-14 items-center justify-center rounded-2xl bg-[var(--accent-primary)] px-8 py-3 text-xl font-bold text-[var(--text-primary)] transition-transform hover:-rotate-1"
+                      className="mt-8 inline-flex min-h-14 items-center justify-center rounded-2xl bg-[var(--accent-primary)] px-8 py-3 text-xl font-bold text-[var(--text-primary)] transition-transform hover:-translate-y-0.5"
                     >
                       Grab your spot
                     </Link>
@@ -695,7 +752,7 @@ export function CollegeHomePageClient({ slug }: CollegeHomePageClientProps) {
               <div>
                 <p className="text-xs font-bold uppercase tracking-[0.22em] text-[var(--accent-strong)]">Student organizations</p>
                 <h2 className="font-display mt-3 text-3xl font-bold uppercase tracking-tight text-[var(--text-primary)] sm:text-5xl">
-                  Explore campus <span className="text-[var(--accent-primary)]">clubs</span>
+                  Explore campus clubs
                 </h2>
                 <p className="mt-3 max-w-xl text-sm text-[var(--text-secondary)] sm:text-base">
                   The student communities hosting these events across {collegeDisplay}. Join a club to participate, organize, or lead.
@@ -820,7 +877,7 @@ export function CollegeHomePageClient({ slug }: CollegeHomePageClientProps) {
                       </div>
 
                       <div className="mt-6 flex items-center justify-between border-t border-[var(--border-soft)] pt-4 text-xs font-bold">
-                        {typeof dept.clubCount === 'number' && (
+                        {typeof dept.clubCount === 'number' && dept.clubCount > 0 && (
                           <span className="flex items-center gap-1.5 text-[var(--text-secondary)]">
                             <Building2 className="h-3.5 w-3.5" aria-hidden />
                             {dept.clubCount} clubs associated
@@ -847,7 +904,7 @@ export function CollegeHomePageClient({ slug }: CollegeHomePageClientProps) {
                 <div>
                   <p className="text-xs font-bold uppercase tracking-[0.22em] text-[var(--accent-strong)]">Browse by interest</p>
                   <h2 className="font-display mt-3 text-3xl font-bold uppercase tracking-tight text-[var(--text-primary)] sm:text-5xl">
-                    Event <span className="text-[var(--accent-primary)]">categories</span>
+                    Event categories
                   </h2>
                 </div>
                 <p className="max-w-sm text-xs text-[var(--text-secondary)] sm:text-sm">
@@ -894,72 +951,29 @@ export function CollegeHomePageClient({ slug }: CollegeHomePageClientProps) {
             <div className="mb-12 max-w-3xl">
               <p className="text-xs font-bold uppercase tracking-[0.22em] text-[var(--accent-strong)]">Student community</p>
               <h2 className="font-display mt-3 text-3xl font-bold uppercase tracking-tight text-[var(--text-primary)] sm:text-5xl">
-                Campus is <span className="text-[var(--accent-primary)]">better together.</span>
+                Campus is better together.
               </h2>
             </div>
 
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
               {benefits.map((item) => (
                 <div
-                  key={item.num}
+                  key={item.title}
                   className="flex flex-col justify-between rounded-3xl border-2 border-[var(--border-strong)] bg-[var(--surface-card)] p-6 shadow-brutal-sm sm:p-7"
                 >
                   <div>
                     <div className="mb-4 flex items-center justify-between">
-                      <span aria-hidden className="font-display text-3xl font-black text-[var(--accent-primary)]">
-                        {item.num}
-                      </span>
                       <span className="rounded-full border-2 border-[var(--border-soft)] bg-[var(--surface-tile)] px-2.5 py-0.5 text-[11px] font-semibold text-[var(--text-secondary)]">
                         {item.highlight}
                       </span>
                     </div>
 
-                    <h3 className="font-display text-xl font-bold uppercase tracking-tight text-[var(--text-primary)]">{item.title}</h3>
+                    <h3 className="font-campus text-2xl font-bold uppercase leading-tight tracking-tight text-[var(--text-primary)]">{item.title}</h3>
 
                     <p className="mt-2 text-sm leading-relaxed text-[var(--text-secondary)]">{item.description}</p>
                   </div>
-
-                  <div className="mt-5 flex items-center gap-2 border-t border-[var(--border-soft)] pt-3 text-xs font-semibold text-[var(--text-secondary)]">
-                    <CheckCircle2 className="h-4 w-4 text-[var(--accent-strong)]" aria-hidden />
-                    <span>Open to all enrolled students at {collegeDisplay}</span>
-                  </div>
                 </div>
               ))}
-            </div>
-          </div>
-        </section>
-
-        {/* 9. FINAL CTA */}
-        <section className="border-t-2 border-dashed border-[var(--border-soft)] bg-[var(--surface-page)] py-16 text-center md:py-24">
-          <div className="mx-auto max-w-4xl space-y-4 px-4 sm:px-6 lg:px-8">
-            <div className="inline-flex items-center gap-2 rounded-full border-2 border-[var(--border-strong)] bg-[var(--surface-card)] px-3.5 py-1.5 text-xs font-bold uppercase tracking-widest text-[var(--text-primary)]">
-              <Sparkles className="h-3.5 w-3.5 text-[var(--accent-strong)]" aria-hidden />
-              <span>Never miss a beat</span>
-            </div>
-
-            <h2 className="font-campus text-4xl uppercase tracking-tight text-[var(--text-primary)] sm:text-6xl">
-              Your campus. Your events.
-            </h2>
-
-            <p className="mx-auto max-w-lg text-sm text-[var(--text-secondary)] sm:text-base">
-              Discover student clubs, reserve your spot at upcoming events, and make campus life truly memorable.
-            </p>
-
-            <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
-              <button
-                type="button"
-                onClick={scrollToEvents}
-                className="inline-flex min-h-14 cursor-pointer items-center gap-2 rounded-2xl bg-[var(--accent-strong)] px-8 py-3 text-base font-bold text-white transition-transform hover:-translate-y-0.5"
-              >
-                <span>Find an event now</span>
-                <ArrowRight className="h-4 w-4" aria-hidden />
-              </button>
-              <Link
-                href={`/college/${slug}/clubs`}
-                className="inline-flex min-h-14 items-center gap-2 rounded-2xl border-2 border-[var(--border-strong)] bg-[var(--surface-card)] px-7 py-3 text-base font-bold text-[var(--text-primary)] transition-transform hover:-translate-y-0.5"
-              >
-                <span>Explore all clubs</span>
-              </Link>
             </div>
           </div>
         </section>

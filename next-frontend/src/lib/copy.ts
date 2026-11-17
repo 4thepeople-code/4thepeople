@@ -1145,6 +1145,12 @@ export const campusPublic = {
     emptyTitle: 'No upcoming events',
     emptyDescription: (college: string) => `No upcoming events at ${college} right now. Check back soon or browse the club directory.`,
     emptyAction: 'Browse all events',
+    seeAll: 'See all events',
+    popularityThreshold: 10,
+  },
+
+  home: {
+    browseClubs: 'Browse clubs',
   },
 
   eventDetail: {
