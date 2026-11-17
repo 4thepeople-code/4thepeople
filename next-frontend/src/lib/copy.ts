@@ -1065,6 +1065,15 @@ export const campusPublic = {
     loadingLabel: 'Loading content',
   },
 
+  footer: {
+    home: 'Home',
+    events: 'Events',
+    clubs: 'Clubs',
+    departments: 'Departments',
+    studentPortal: 'Student portal',
+    managerPortal: 'Manager portal',
+  },
+
   clubsDirectory: {
     eyebrow: 'Campus directory',
     title: 'Find your community',
@@ -1114,6 +1123,28 @@ export const campusPublic = {
     errClubLoad: 'This club could not be loaded. It may have been removed — check the address or try again.',
     clubNotFoundTitle: 'Club not found',
     backToClubs: 'Back to all clubs',
+    seeUpcoming: (count: number) => `See upcoming events (${count})`,
+    share: 'Share',
+    shareCopied: 'Link copied to clipboard!',
+    departmentsTitle: 'Departments',
+  },
+
+  events: {
+    tabUpcoming: 'Upcoming',
+    tabPast: 'Past',
+    statusLive: 'Live now',
+    statusUpcoming: 'Upcoming',
+    fewSeatsLeft: 'Few seats left',
+    beFirstRsvp: 'Be the first to RSVP',
+    viewDetails: 'View details & RSVP',
+    filterAll: 'All',
+    filterThisWeek: 'This week',
+    filterThisMonth: 'This month',
+    pageTitle: 'Campus events',
+    pageDescription: (college: string) => `Upcoming workshops, competitions and community activities at ${college}.`,
+    emptyTitle: 'No upcoming events',
+    emptyDescription: (college: string) => `No upcoming events at ${college} right now. Check back soon or browse the club directory.`,
+    emptyAction: 'Browse all events',
   },
 
   eventDetail: {
