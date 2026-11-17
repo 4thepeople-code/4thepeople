@@ -1,28 +1,18 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
 import { useDepartments } from '@/lib/api/departments';
 import PublicLayout from '@/components/public/PublicLayout';
-import { useTheme } from '@/context/ThemeContext';
-import {
-  Search,
-  Building2,
-  AlertCircle,
-  RefreshCw,
-  ArrowUpRight,
-  Sparkles,
-  Users,
-} from 'lucide-react';
+import CampusChip from '@/components/college/CampusChip';
+import { campusPublic } from '@/lib/copy';
 
 export interface DepartmentsListPageClientProps {
   slug: string;
 }
 
-export function DepartmentsListPageClient({ slug }: DepartmentsListPageClientProps) {
-  const router = useRouter();
-  const { isDark } = useTheme();
+const t = campusPublic.departmentsList;
 
+export function DepartmentsListPageClient({ slug }: DepartmentsListPageClientProps) {
   const { data: rawDepartments = [], isLoading, isError, error, refetch } = useDepartments(slug);
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -43,222 +33,130 @@ export function DepartmentsListPageClient({ slug }: DepartmentsListPageClientPro
 
   return (
     <PublicLayout collegeSlug={slug} collegeName={collegeDisplay}>
-      <div className="py-12 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
-        {/* Header & Search */}
-        <div
-          className={`flex flex-col md:flex-row md:items-end justify-between gap-8 border-b pb-8 ${
-            isDark ? 'border-white/10' : 'border-slate-200'
-          }`}
-        >
-          <div>
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/10 text-[#00F0FF] text-xs font-bold uppercase tracking-wider mb-3">
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>Campus Academic Divisions</span>
+      {/* Header band */}
+      <section className="relative overflow-hidden border-b-2 border-[var(--border-strong)] bg-[var(--surface-tile)]">
+        <div aria-hidden className="absolute -right-16 top-0 h-72 w-72 rounded-full border-[14px] border-[var(--border-strong)]/15" />
+        <div className="relative mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8 lg:py-20">
+          <p className="text-xs font-bold uppercase tracking-[0.22em] text-[var(--accent-strong)]">{t.eyebrow}</p>
+          <div className="mt-3 flex flex-col justify-between gap-8 lg:flex-row lg:items-end">
+            <div>
+              <h1 className="font-campus text-5xl uppercase leading-[0.95] tracking-wide text-[var(--text-primary)] sm:text-6xl">
+                {t.title}
+              </h1>
+              <p className="mt-4 max-w-2xl text-lg leading-snug text-[var(--text-secondary)]">{t.description(collegeDisplay)}</p>
             </div>
-            <h1
-              className={`font-['Syne',sans-serif] text-4xl sm:text-6xl font-extrabold uppercase tracking-tight ${
-                isDark ? 'text-white' : 'text-[#0F172A]'
-              }`}
-            >
-              EXPLORE <span className="text-[#00F0FF]">DEPARTMENTS.</span>
-            </h1>
-            <p className={`text-base max-w-xl mt-2 ${isDark ? 'text-gray-400' : 'text-slate-600'}`}>
-              Discover campus departments at {collegeDisplay} and explore their student clubs, technical teams, and creative societies.
-            </p>
+
+            {/* Search */}
+            {!isLoading && !isError && rawDepartments.length > 0 && (
+              <div className="w-full lg:w-80">
+                <label htmlFor="departments-search" className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-[var(--text-secondary)]">
+                  {t.searchLabel}
+                </label>
+                <input
+                  id="departments-search"
+                  type="search"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder={t.searchPlaceholder}
+                  className="min-h-11 w-full rounded-xl border-2 border-[var(--border-strong)] bg-[var(--surface-card)] px-4 text-sm font-medium text-[var(--text-primary)] placeholder:text-[var(--text-muted)] transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] motion-reduce:transition-none"
+                />
+              </div>
+            )}
           </div>
-
-          {/* Search Input */}
-          {!isLoading && !isError && rawDepartments.length > 0 && (
-            <div className="relative w-full md:w-80">
-              <Search
-                className={`w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 ${
-                  isDark ? 'text-gray-400' : 'text-slate-400'
-                }`}
-              />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search departments..."
-                className={`w-full pl-11 pr-4 py-3 border rounded-2xl text-sm transition-all focus:outline-hidden focus:border-[#00F0FF] ${
-                  isDark
-                    ? 'bg-[#12141C] border-white/10 text-white placeholder-gray-500 shadow-inner'
-                    : 'bg-white border-slate-200 text-[#0F172A] placeholder-slate-400 shadow-xs'
-                }`}
-              />
-            </div>
-          )}
         </div>
+      </section>
 
-        {/* Error Alert */}
+      <div className="mx-auto max-w-7xl space-y-10 px-4 py-12 sm:px-6 lg:px-8 lg:py-16">
+        {/* Error state */}
         {isError && (
-          <div className="p-6 bg-red-500/10 border border-red-500/30 rounded-3xl flex flex-col sm:flex-row items-center justify-between gap-4 text-red-300">
-            <div className="flex items-center gap-3">
-              <AlertCircle className="w-6 h-6 shrink-0 text-red-400" />
-              <p className="text-sm font-medium">
-                {error instanceof Error ? error.message : 'Failed to load academic departments.'}
-              </p>
-            </div>
+          <div className="flex flex-col items-start justify-between gap-4 rounded-3xl border-2 border-[var(--border-strong)] bg-[var(--surface-card)] p-6 shadow-brutal-xs sm:flex-row sm:items-center">
+            <p className="text-sm font-medium text-[var(--text-secondary)]">
+              {error instanceof Error ? error.message : t.errLoad}
+            </p>
             <button
               type="button"
               onClick={() => refetch()}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-200 text-xs font-bold uppercase tracking-wider rounded-xl border border-red-500/40 transition cursor-pointer"
+              className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-xl bg-[var(--accent-strong)] px-5 text-sm font-bold text-[var(--on-primary)] transition-transform hover:-translate-y-0.5 motion-reduce:transition-none focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)]"
             >
-              <RefreshCw className="w-3.5 h-3.5" />
-              <span>Retry</span>
+              {campusPublic.common.retry}
             </button>
           </div>
         )}
 
-        {/* Loading Skeletons */}
+        {/* Loading state */}
         {isLoading && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3" role="status" aria-label={t.loadingLabel}>
             {[1, 2, 3, 4, 5, 6].map((n) => (
-              <div
-                key={n}
-                className={`h-64 rounded-3xl animate-pulse border p-6 flex flex-col justify-between ${
-                  isDark ? 'bg-white/5 border-white/5' : 'bg-slate-100 border-slate-200'
-                }`}
-              >
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center">
-                    <div className={`h-6 w-16 rounded-full ${isDark ? 'bg-white/10' : 'bg-slate-200'}`} />
-                    <div className={`h-6 w-20 rounded-full ${isDark ? 'bg-white/10' : 'bg-slate-200'}`} />
-                  </div>
-                  <div className={`h-7 w-3/4 rounded-lg ${isDark ? 'bg-white/10' : 'bg-slate-200'}`} />
-                  <div className={`h-12 w-full rounded-lg ${isDark ? 'bg-white/10' : 'bg-slate-200'}`} />
-                </div>
-                <div className={`h-4 w-1/3 rounded ${isDark ? 'bg-white/10' : 'bg-slate-200'}`} />
-              </div>
+              <div key={n} className="h-64 animate-pulse rounded-3xl border-2 border-[var(--border-soft)] bg-[var(--surface-tile)] motion-reduce:animate-none" />
             ))}
           </div>
         )}
 
-        {/* Empty State when no departments exist */}
+        {/* Empty state — no departments at this college (feature not yet in use) */}
         {!isLoading && !isError && rawDepartments.length === 0 && (
-          <div
-            className={`text-center py-20 rounded-3xl border space-y-4 ${
-              isDark
-                ? 'bg-[#12141C] border-white/10 text-gray-400'
-                : 'bg-white border-slate-200 text-slate-500 shadow-sm'
-            }`}
-          >
-            <div className="w-16 h-16 rounded-2xl bg-cyan-500/10 text-[#00F0FF] flex items-center justify-center mx-auto mb-2">
-              <Building2 className="w-8 h-8" />
-            </div>
-            <h3
-              className={`font-['Syne',sans-serif] text-2xl font-bold uppercase tracking-wide ${
-                isDark ? 'text-white' : 'text-[#0F172A]'
-              }`}
-            >
-              No departments yet
-            </h3>
-            <p className={`text-sm max-w-sm mx-auto ${isDark ? 'text-gray-400' : 'text-slate-500'}`}>
-              Academic departments have not been added yet for {collegeDisplay}. Please check back later.
+          <div className="rounded-3xl border-2 border-dashed border-[var(--border-soft)] bg-[var(--surface-card)] p-10 text-center">
+            <p className="font-display text-xl font-bold uppercase tracking-tight text-[var(--text-primary)]">{t.emptyTitle}</p>
+            <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-[var(--text-secondary)]">
+              {t.emptyDescription(collegeDisplay)}
             </p>
+            <a
+              href={`/college/${slug}#clubs`}
+              className="mt-5 inline-flex min-h-11 items-center justify-center rounded-xl bg-[var(--accent-strong)] px-5 text-sm font-bold text-[var(--on-primary)] transition-transform hover:-translate-y-0.5 motion-reduce:transition-none focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-card)]"
+            >
+              {campusPublic.clubsDirectory.emptyAction}
+            </a>
           </div>
         )}
 
-        {/* Empty Search Filter State */}
+        {/* Empty search state */}
         {!isLoading && !isError && rawDepartments.length > 0 && filteredDepartments.length === 0 && (
-          <div
-            className={`text-center py-16 rounded-3xl border space-y-3 ${
-              isDark
-                ? 'bg-[#12141C] border-white/10 text-gray-400'
-                : 'bg-white border-slate-200 text-slate-500 shadow-sm'
-            }`}
-          >
-            <Search className="w-12 h-12 text-gray-400 mx-auto" />
-            <h3
-              className={`font-['Syne',sans-serif] text-xl font-bold uppercase ${
-                isDark ? 'text-white' : 'text-[#0F172A]'
-              }`}
-            >
-              No Matching Departments
-            </h3>
-            <p className={`text-xs max-w-sm mx-auto ${isDark ? 'text-gray-400' : 'text-slate-500'}`}>
-              No departments match &quot;{searchQuery}&quot;. Try a different keyword or short code.
-            </p>
+          <div className="rounded-3xl border-2 border-dashed border-[var(--border-soft)] bg-[var(--surface-card)] p-10 text-center">
+            <p className="font-display text-xl font-bold uppercase tracking-tight text-[var(--text-primary)]">{t.noMatchesTitle}</p>
+            <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-[var(--text-secondary)]">{t.noMatchesFix}</p>
             <button
               type="button"
               onClick={() => setSearchQuery('')}
-              className="mt-2 px-4 py-2 rounded-full bg-[#00F0FF] text-black text-xs font-bold uppercase cursor-pointer"
+              className="mt-5 inline-flex min-h-11 items-center justify-center rounded-xl border-2 border-[var(--border-strong)] bg-[var(--surface-card)] px-5 text-sm font-bold text-[var(--text-primary)] transition-colors hover:bg-[var(--surface-tile)] motion-reduce:transition-none focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
             >
-              Clear Search
+              {t.clearSearch}
             </button>
           </div>
         )}
 
-        {/* Departments Grid */}
+        {/* Departments grid */}
         {!isLoading && !isError && filteredDepartments.length > 0 && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {filteredDepartments.map((dept) => {
               const clubCount = dept.clubCount ?? (dept.clubs ? dept.clubs.length : 0);
               return (
-                <div
+                <a
                   key={dept.id}
-                  onClick={() => router.push(`/college/${slug}/departments/${dept.id}`)}
-                  className={`group relative rounded-3xl p-6 sm:p-7 border transition-all duration-300 flex flex-col justify-between cursor-pointer ${
-                    isDark
-                      ? 'bg-[#12141C] border-white/10 hover:border-cyan-500/40 hover:shadow-2xl hover:shadow-cyan-500/10'
-                      : 'bg-white border-slate-200 hover:border-cyan-500/50 shadow-sm hover:shadow-xl'
-                  }`}
+                  href={`/college/${slug}/departments/${dept.id}`}
+                  className="group flex h-full cursor-pointer flex-col justify-between rounded-3xl border-2 border-[var(--border-strong)] bg-[var(--surface-card)] p-6 shadow-brutal-md transition-transform duration-200 hover:[@media(hover:hover)_and_(prefers-reduced-motion:no-preference)]:-translate-x-1 hover:[@media(hover:hover)_and_(prefers-reduced-motion:no-preference)]:-translate-y-1 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)]"
+                  aria-label={`${t.viewDepartment}: ${dept.name}`}
                 >
                   <div>
-                    {/* Top Row: Short Code Badge & Club Count */}
-                    <div className="flex items-center justify-between gap-3 mb-5">
-                      <span className="px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/25 text-xs font-black tracking-widest text-[#00F0FF] uppercase">
-                        {dept.shortCode || dept.code || 'DEPT'}
-                      </span>
-                      <span
-                        className={`text-xs font-bold flex items-center gap-1.5 px-3 py-1 rounded-full border ${
-                          isDark
-                            ? 'bg-white/5 border-white/10 text-gray-300'
-                            : 'bg-slate-100 border-slate-200 text-slate-600'
-                        }`}
-                      >
-                        <Users className="w-3.5 h-3.5 text-cyan-500" />
-                        <span>
-                          {clubCount} {clubCount === 1 ? 'Club' : 'Clubs'}
-                        </span>
-                      </span>
+                    <div className="mb-5 flex items-center justify-between gap-3">
+                      <CampusChip variant="accent">{dept.shortCode || dept.code || t.noCode}</CampusChip>
+                      <CampusChip>{t.clubsPill(clubCount)}</CampusChip>
                     </div>
 
-                    {/* Department Name */}
-                    <h3
-                      className={`font-['Syne',sans-serif] text-2xl font-extrabold tracking-tight uppercase group-hover:text-[#00F0FF] transition-colors mb-3 line-clamp-2 ${
-                        isDark ? 'text-white' : 'text-[#0F172A]'
-                      }`}
-                    >
+                    <h3 className="font-display text-2xl font-bold uppercase tracking-tight text-[var(--text-primary)] transition-colors group-hover:text-[var(--accent-primary)]">
                       {dept.name}
                     </h3>
 
-                    {/* Description */}
-                    <p
-                      className={`text-xs leading-relaxed line-clamp-3 mb-6 ${
-                        isDark ? 'text-gray-400' : 'text-slate-600'
-                      }`}
-                    >
-                      {dept.description ||
-                        'Academic department offering student programs, hands-on learning, and community initiatives.'}
+                    <p className="mt-3 line-clamp-3 text-sm font-medium text-[var(--text-secondary)]">
+                      {dept.description}
                     </p>
                   </div>
 
-                  {/* Bottom Row */}
-                  <div
-                    className={`pt-4 border-t flex items-center justify-between ${
-                      isDark ? 'border-white/5' : 'border-slate-100'
-                    }`}
-                  >
-                    <span className={`text-xs font-semibold ${isDark ? 'text-gray-400' : 'text-slate-500'}`}>
-                      View Department
-                    </span>
-                    <span className="inline-flex items-center gap-1 text-xs font-extrabold uppercase tracking-wider text-[#00F0FF] group-hover:translate-x-1 transition-transform">
-                      <span>Explore</span>
-                      <ArrowUpRight className="w-4 h-4 text-[#00F0FF]" />
+                  <div className="mt-6 flex items-center justify-between border-t-2 border-dashed border-[var(--border-soft)] pt-4">
+                    <span className="text-xs font-semibold text-[var(--text-muted)]">{t.viewDepartment}</span>
+                    <span className="inline-flex items-center gap-1 text-xs font-bold uppercase tracking-wider text-[var(--accent-strong)] transition-transform group-hover:translate-x-1 motion-reduce:transition-none">
+                      <span aria-hidden>→</span>
                     </span>
                   </div>
-                </div>
+                </a>
               );
             })}
           </div>
@@ -269,4 +167,3 @@ export function DepartmentsListPageClient({ slug }: DepartmentsListPageClientPro
 }
 
 export default DepartmentsListPageClient;
-
