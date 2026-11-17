@@ -42,6 +42,7 @@ const {
   deleteAdminAvatar,
 } = require('../controllers/adminController');
 const { singleImage } = require('../middleware/uploadMiddleware');
+const { adminRefund } = require('../controllers/paymentController');
 
 // All routes in this router require ADMIN permissions
 router.use(requireAdmin);
@@ -120,5 +121,8 @@ router.get('/verify', (req, res) => {
 // Student roster import route
 // POST /admin/students/roster
 router.post('/students/roster', uploadStudentRoster);
+
+// Payment Refunds
+router.post('/payments/transactions/:transactionId/refund', adminRefund);
 
 module.exports = router;

@@ -44,6 +44,8 @@ exports.registerForEvent = asyncHandler(async (req, res) => {
         where: { id: eventId, collegeId: req.collegeId },
         select: {
           id: true,
+          isPaid: true,
+          fee: true,
           registrationMode: true,
           customFormDefinition: true,
           registrationDeadline: true,
@@ -53,6 +55,10 @@ exports.registerForEvent = asyncHandler(async (req, res) => {
     ]);
     if (!event || !eventStatusRow) {
       throw new AppError('Event not found', 404);
+    }
+
+    if (event.isPaid) {
+      throw new AppError('This is a paid event. Registration requires completing payment checkout.', 400);
     }
 
     if (eventStatusRow.status === 'CANCELLED') {

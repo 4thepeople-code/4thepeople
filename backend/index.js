@@ -35,6 +35,7 @@ const registrationRouter = require('./routes/registrationRoutes');
 const { certificateRouter, managerCertificateRouter } = require('./routes/certificateRoutes');
 const publicRouter = require('./routes/publicRoutes');
 const externalRouter = require('./routes/externalRoutes');
+const paymentRouter = require('./routes/paymentRoutes');
 const platformAuthRouter = require('./platform/platformAuthRoutes');
 const platformAdminManagementRouter = require('./platform/platformAdminManagementRoutes');
 const platformCollegeManagementRouter = require('./platform/platformCollegeManagementRoutes');
@@ -52,6 +53,24 @@ app.set('trust proxy', trustProxySetting);
 
 // Shared Proxy Secret Guard (enforce trusted reverse proxy boundary)
 app.use(validateProxySharedSecret);
+
+// Webhook Raw Body Handling (must be registered BEFORE general JSON parser)
+// Preserves exact raw bytes as Buffer on req.rawBody for cryptographic HMAC signature verification
+app.use(
+  ['/api/payments/webhooks', '/payments/webhooks'],
+  express.raw({ type: '*/*', limit: '2mb' }),
+  (req, res, next) => {
+    req.rawBody = req.body;
+    if (req.body && Buffer.isBuffer(req.body)) {
+      try {
+        req.body = JSON.parse(req.body.toString('utf8'));
+      } catch {
+        // Leave as Buffer if unparseable
+      }
+    }
+    next();
+  }
+);
 
 // Standard Express Middlewares
 app.use(cookieParser());
@@ -136,6 +155,9 @@ app.use('/api/external', externalRouter);
 
 app.use('/certificates', certificateRouter);
 app.use('/api/certificates', certificateRouter);
+
+app.use('/payments', paymentRouter);
+app.use('/api/payments', paymentRouter);
 
 // Public club and event browsing routes: GET /clubs, GET /events, etc.
 app.use('/', publicRouter);

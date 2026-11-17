@@ -356,6 +356,8 @@ exports.registerExternalParticipant = asyncHandler(async (req, res) => {
         title: true,
         status: true,
         visibility: true,
+        isPaid: true,
+        fee: true,
         registrationMode: true,
         registrationDeadline: true,
         customFormDefinition: true,
@@ -366,6 +368,11 @@ exports.registerExternalParticipant = asyncHandler(async (req, res) => {
 
     if (!event) {
       throw new AppError('Event not found', 404);
+    }
+
+    // SAFEGUARD: paid events must not register through free registration endpoint
+    if (event.isPaid) {
+      throw new AppError('This is a paid event. Registration requires completing payment checkout.', 400);
     }
 
     // SAFEGUARD: validate event actually belongs to the effective college.

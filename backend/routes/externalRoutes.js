@@ -16,6 +16,10 @@ const {
   cancelExternalRegistration,
   getExternalRegistrationStatus,
 } = require('../controllers/externalController');
+const {
+  externalCheckout,
+  externalVerifyPayment,
+} = require('../controllers/paymentController');
 
 // ─── OTP routes ──────────────────────────────────────────────────────────────
 // Resolved host college context (subdomain/path) or derived from eventId on root domain.
@@ -58,6 +62,21 @@ router.get(
   validate({ params: eventParams }),
   authenticateExternalToken,
   getExternalRegistrationStatus
+);
+
+// ─── Payment & Checkout routes ───────────────────────────────────────────────
+router.post(
+  '/events/:eventId/checkout',
+  validate({ params: eventParams }),
+  authenticateExternalToken,
+  externalCheckout
+);
+
+router.post(
+  '/events/:eventId/verify-payment',
+  validate({ params: eventParams }),
+  authenticateExternalToken,
+  externalVerifyPayment
 );
 
 module.exports = router;

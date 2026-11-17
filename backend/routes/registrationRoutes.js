@@ -10,6 +10,10 @@ const {
   listMyRegistrations,
   exportEventRegistrations,
 } = require('../controllers/registrationController');
+const {
+  studentCheckout,
+  studentVerifyPayment,
+} = require('../controllers/paymentController');
 
 // User Registration Endpoints
 router.get('/my-registrations', authenticateToken, listMyRegistrations);
@@ -18,5 +22,9 @@ router.get('/:eventId/export', validate({ params: eventParams }), authenticateTo
 // Cross-college registration uses crossCollegeRegisterMiddleware (accepts cross-tenant JWTs)
 router.post('/:eventId/register', validate({ params: eventParams }), crossCollegeRegisterMiddleware, registerForEvent);
 router.delete('/:eventId/register', validate({ params: eventParams }), crossCollegeRegisterMiddleware, cancelRegistration);
+
+// Paid Event Payment & Checkout
+router.post('/:eventId/checkout', validate({ params: eventParams }), crossCollegeRegisterMiddleware, studentCheckout);
+router.post('/:eventId/verify-payment', validate({ params: eventParams }), crossCollegeRegisterMiddleware, studentVerifyPayment);
 
 module.exports = router;
