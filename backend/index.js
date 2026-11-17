@@ -15,7 +15,7 @@ const { resolveCollege } = require('./middleware/resolveCollege');
 const { corsOptionsDelegate, validateOriginOrReferer } = require('./middleware/originValidation');
 const { validateProxySharedSecret } = require('./middleware/proxySecurity');
 const { startEventStatusJob } = require('./services/eventStatusJob');
-const { startOutboxWorkerLoop } = require('./workers/outboxRunner');
+const { startOutboxWorkerLoop, stopOutboxWorkerLoop } = require('./workers/outboxRunner');
 
 if (process.env.NODE_ENV !== 'test') {
   startEventStatusJob();
@@ -150,10 +150,73 @@ app.use((req, res, next) => {
 app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;
+let server = null;
+let isShuttingDown = false;
+let shutdownRegistered = false;
+
+async function gracefulShutdown(signal, options = {}) {
+  const exitFn = options.exitFn || process.exit;
+  if (isShuttingDown) {
+    return;
+  }
+  isShuttingDown = true;
+  console.log(`\n[Server] Received ${signal}. Starting graceful shutdown...`);
+
+  // Prevent hanging indefinitely if active connections or operations stall
+  const forceExitTimeout = setTimeout(() => {
+    console.error(
+      '[Server] Graceful shutdown timed out after 10s: forcing exit. ' +
+      'In-flight outbox worker job or HTTP connection did not drain in time. ' +
+      'Any in-flight claimed outbox job will require lease recovery via fn_outbox_expire.'
+    );
+    exitFn(1);
+  }, 10000);
+  if (typeof forceExitTimeout.unref === 'function') {
+    forceExitTimeout.unref();
+  }
+
+  try {
+    // 1. Stop accepting new HTTP connections by closing the HTTP server
+    if (server && typeof server.close === 'function') {
+      await new Promise((resolve) => {
+        server.close((err) => {
+          if (err) {
+            console.error('[Server] Error closing HTTP server:', err.message);
+          } else {
+            console.log('[Server] HTTP server closed.');
+          }
+          resolve();
+        });
+      });
+    }
+
+    // 2. Stop in-process outbox worker and disconnect its Prisma connection
+    await stopOutboxWorkerLoop();
+
+    clearTimeout(forceExitTimeout);
+    console.log('[Server] Graceful shutdown completed cleanly.');
+    exitFn(0);
+  } catch (err) {
+    clearTimeout(forceExitTimeout);
+    console.error('[Server] Error during graceful shutdown:', err.message || err);
+    exitFn(1);
+  }
+}
+
+function registerShutdownHandlers() {
+  if (shutdownRegistered) return;
+  shutdownRegistered = true;
+  process.once('SIGTERM', () => gracefulShutdown('SIGTERM'));
+  process.once('SIGINT', () => gracefulShutdown('SIGINT'));
+}
+
 if (process.env.NODE_ENV !== 'test') {
-  app.listen(PORT, () => {
+  server = app.listen(PORT, () => {
     console.log(`Server Running at http://localhost:${PORT}`);
   });
+  registerShutdownHandlers();
 }
+
+app.gracefulShutdown = gracefulShutdown;
 
 module.exports = app;

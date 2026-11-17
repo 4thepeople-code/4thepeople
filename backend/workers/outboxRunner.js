@@ -44,10 +44,25 @@ function createOutboxWorker(options = {}) {
     }
   }
 
-  const workerUrl =
-    options.databaseUrl ||
-    process.env.OUTBOX_WORKER_DATABASE_URL ||
-    process.env.DATABASE_URL;
+  const explicitUrl =
+    typeof options.databaseUrl === 'string'
+      ? options.databaseUrl.trim()
+      : options.databaseUrl;
+
+  const envUrl =
+    typeof process.env.OUTBOX_WORKER_DATABASE_URL === 'string'
+      ? process.env.OUTBOX_WORKER_DATABASE_URL.trim()
+      : '';
+
+  const workerUrl = explicitUrl || envUrl;
+
+  if (!workerUrl) {
+    throw new Error(
+      '[OutboxWorker] Missing required environment variable OUTBOX_WORKER_DATABASE_URL. ' +
+      'The outbox worker must connect using dedicated credentials (yuva_outbox_worker) ' +
+      'and cannot fall back to DATABASE_URL.'
+    );
+  }
 
   const leaseSeconds =
     Number(options.leaseSeconds || process.env.OUTBOX_LEASE_SECONDS) || 120;
@@ -102,13 +117,15 @@ async function processBatch(worker, options = {}) {
 let activeLoopTimeout = null;
 let isLoopRunning = false;
 let activeWorker = null;
+let activeTickPromise = null;
+let shutdownPromise = null;
 
 /**
  * Starts a continuous polling worker loop.
  */
 function startOutboxWorkerLoop(options = {}) {
-  if (isLoopRunning) {
-    console.warn('[OutboxWorker] Loop is already running.');
+  if (isLoopRunning || shutdownPromise || activeTickPromise) {
+    console.warn('[OutboxWorker] Loop is already running or shutting down.');
     return;
   }
 
@@ -117,8 +134,9 @@ function startOutboxWorkerLoop(options = {}) {
   const reaperIntervalMs =
     Number(options.reaperIntervalMs || process.env.OUTBOX_REAPER_INTERVAL_MS) || 60000;
 
-  activeWorker = createOutboxWorker(options);
+  activeWorker = options.worker || createOutboxWorker(options);
   isLoopRunning = true;
+  shutdownPromise = null;
 
   let lastReaperRun = 0;
 
@@ -126,8 +144,8 @@ function startOutboxWorkerLoop(options = {}) {
     `[OutboxWorker] Starting background worker loop (poll: ${pollIntervalMs}ms, reaper: ${reaperIntervalMs}ms)...`
   );
 
-  async function tick() {
-    if (!isLoopRunning) return;
+  async function runTick() {
+    if (!isLoopRunning || shutdownPromise) return;
 
     try {
       const now = Date.now();
@@ -140,49 +158,103 @@ function startOutboxWorkerLoop(options = {}) {
           }
         } catch (reaperErr) {
           console.warn('[OutboxWorker] Reaper execution error:', reaperErr.message);
+          if (!isLoopRunning || shutdownPromise || options.throwOnTickError) {
+            throw reaperErr;
+          }
         }
       }
+
+      // Check shutdown status before claiming a new batch
+      if (!isLoopRunning || shutdownPromise) return;
 
       const stats = await processBatch(activeWorker, options);
 
       // If jobs were processed and more may be waiting, poll immediately
       const nextDelay = stats.claimed > 0 ? 100 : pollIntervalMs;
-      if (isLoopRunning) {
-        activeLoopTimeout = setTimeout(tick, nextDelay);
+      if (isLoopRunning && !shutdownPromise) {
+        activeLoopTimeout = setTimeout(scheduleNextTick, nextDelay);
       }
     } catch (err) {
       console.error('[OutboxWorker] Polling loop error:', err.message);
-      if (isLoopRunning) {
-        activeLoopTimeout = setTimeout(tick, pollIntervalMs);
+      if (isLoopRunning && !shutdownPromise) {
+        activeLoopTimeout = setTimeout(scheduleNextTick, pollIntervalMs);
+        if (options.throwOnTickError) {
+          throw err;
+        }
+      } else {
+        throw err;
       }
     }
   }
 
-  tick();
+  function scheduleNextTick() {
+    activeLoopTimeout = null;
+    if (!isLoopRunning || shutdownPromise || activeTickPromise) return;
+
+    activeTickPromise = (async () => {
+      await runTick();
+    })().finally(() => {
+      activeTickPromise = null;
+    });
+  }
+
+  scheduleNextTick();
 }
 
 /**
- * Gracefully stops the worker loop and disconnects database client.
+ * Gracefully stops the worker loop, drains in-flight processing, and disconnects database client.
+ * Idempotent: concurrent calls share the same in-flight shutdown promise.
+ *
+ * @returns {Promise<void>}
  */
-async function stopOutboxWorkerLoop() {
-  if (!isLoopRunning) return;
+function stopOutboxWorkerLoop() {
+  if (shutdownPromise) {
+    return shutdownPromise;
+  }
+
+  if (!isLoopRunning && !activeWorker && !activeTickPromise) {
+    return Promise.resolve();
+  }
 
   console.log('[OutboxWorker] Stopping worker loop...');
   isLoopRunning = false;
+
   if (activeLoopTimeout) {
     clearTimeout(activeLoopTimeout);
     activeLoopTimeout = null;
   }
 
-  if (activeWorker) {
+  shutdownPromise = (async () => {
     try {
-      await activeWorker.disconnect();
-    } catch (err) {
-      console.warn('[OutboxWorker] Error disconnecting worker prisma:', err.message);
+      // Drain currently executing tick and its complete batch of claimed jobs
+      if (activeTickPromise) {
+        console.log('[OutboxWorker] Awaiting in-flight worker tick and batch processing...');
+        try {
+          await activeTickPromise;
+        } catch (tickErr) {
+          console.warn('[OutboxWorker] In-flight tick error during shutdown drain:', tickErr.message);
+        }
+      }
+
+      // Disconnect Prisma client only after active tick has settled
+      if (activeWorker) {
+        try {
+          await activeWorker.disconnect();
+        } catch (err) {
+          console.warn('[OutboxWorker] Error disconnecting worker prisma:', err.message);
+        } finally {
+          activeWorker = null;
+        }
+      }
+
+      activeTickPromise = null;
+      console.log('[OutboxWorker] Worker loop stopped.');
+    } finally {
+      shutdownPromise = null;
     }
-    activeWorker = null;
-  }
-  console.log('[OutboxWorker] Worker loop stopped.');
+  })();
+
+  return shutdownPromise;
 }
 
 /**
@@ -236,4 +308,8 @@ module.exports = {
   processBatch,
   startOutboxWorkerLoop,
   stopOutboxWorkerLoop,
+  getActiveTickPromise: () => activeTickPromise,
+  getActiveWorker: () => activeWorker,
+  isWorkerLoopRunning: () => isLoopRunning,
+  getShutdownPromise: () => shutdownPromise,
 };

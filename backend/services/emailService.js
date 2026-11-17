@@ -320,6 +320,68 @@ const sendDeletionVerificationCode = async (
 };
 
 /**
+ * Sends Student Account Activation Code Email
+ *
+ * @param {string} toEmail
+ * @param {string} name
+ * @param {string} rollNumber
+ * @param {string} code
+ */
+const sendStudentActivationEmail = async (
+  toEmail,
+  name,
+  rollNumber,
+  code
+) => {
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 32px; background-color: #0B0F17; color: #F8FAFC; border: 1px solid #1E293B; border-radius: 20px;">
+
+      <div style="text-align: center; margin-bottom: 24px;">
+        <h1 style="font-size: 34px; font-weight: 900; color: #FFFFFF; letter-spacing: 2px; margin: 0; font-family: 'Syne', Arial, sans-serif;">
+          <span style="color: #FF5733;">4</span> THE PEOPLE<span style="color: #FF5733;">.</span>
+        </h1>
+        <p style="color: #FF5733; font-size: 11px; font-weight: 800; letter-spacing: 3px; text-transform: uppercase; margin-top: 4px;">
+          Campus Events &amp; Club Manager
+        </p>
+      </div>
+
+      <h2 style="color: #FFFFFF; font-size: 20px; font-weight: 800; margin-top: 0;">
+        Activate Your Student Account
+      </h2>
+
+      <p style="color: #94A3B8; font-size: 14px; line-height: 1.6;">
+        Hello <strong style="color: #F8FAFC;">${name}</strong>,
+      </p>
+
+      <p style="color: #94A3B8; font-size: 14px; line-height: 1.6;">
+        Your activation code for roll number
+        <strong style="color: #F8FAFC;">${rollNumber}</strong>:
+      </p>
+
+      <div style="background: #12141C; border: 2px solid #FF5733; border-radius: 16px;
+                  padding: 28px 24px; text-align: center; margin: 28px 0;">
+        <p style="color: #94A3B8; font-size: 12px; font-weight: 700; letter-spacing: 2px;
+                  text-transform: uppercase; margin: 0 0 12px;">Activation Code</p>
+        <p style="font-size: 48px; letter-spacing: 12px; font-weight: 900; color: #FF5733;
+                  margin: 0; font-family: 'Courier New', monospace;">${code}</p>
+      </div>
+
+      <p style="color: #64748B; font-size: 12px; margin-top: 24px; border-top: 1px solid #1E293B; padding-top: 16px;">
+        This code expires in 10 minutes. If you did not request this, please contact your college administrator.
+      </p>
+
+    </div>
+  `;
+
+  return sendEmail({
+    toEmail,
+    toName: name,
+    subject: '4 THE PEOPLE — Student Account Activation Code',
+    html,
+  });
+};
+
+/**
  * Sends a College Administrator Invitation Email
  *
  * @param {Object} options
@@ -406,5 +468,6 @@ module.exports = {
   sendCollegeAdminInviteEmail,
   sendManagerPasswordResetOtp,
   sendDeletionVerificationCode,
+  sendStudentActivationEmail,
   verifyTestDatabaseHost,
 };

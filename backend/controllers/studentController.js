@@ -9,7 +9,7 @@ const {
   hashActivationCode,
   verifyActivationCode,
 } = require('../utils/cryptoUtils');
-const { enqueueEmail } = require('../services/outboxService');
+const { sendStudentActivationEmail } = require('../services/emailService');
 
 function generateStudentToken(user, collegeId) {
   const jwtSecret = process.env.JWT_SECRET || process.env.JWT_SECRET_TOKEN;
@@ -331,6 +331,8 @@ exports.requestActivation = asyncHandler(async (req, res) => {
     return await sendGenericResponse();
   }
 
+  let activationPayload = null;
+
   await withTenant(req.collegeId, async (tx) => {
     // 1. Locate student
     const user = await tx.user.findFirst({
@@ -389,19 +391,27 @@ exports.requestActivation = asyncHandler(async (req, res) => {
       },
     });
 
-    // 6. Enqueue email into outbox with AES-256-GCM + AAD
-    await enqueueEmail(tx, {
-      collegeId: req.collegeId,
-      recipientEmail: user.email,
-      recipientName: user.name,
-      templateType: 'STUDENT_ACTIVATION',
-      payload: {
-        name: user.name,
-        rollNumber: normalizedRoll,
-        code,
-      },
-    });
+    activationPayload = {
+      toEmail: user.email,
+      name: user.name,
+      rollNumber: normalizedRoll,
+      code,
+    };
   });
+
+  // 6. Dispatch activation email directly via Brevo (consistent with admin & manager invites)
+  if (activationPayload) {
+    try {
+      await sendStudentActivationEmail(
+        activationPayload.toEmail,
+        activationPayload.name,
+        activationPayload.rollNumber,
+        activationPayload.code
+      );
+    } catch (emailErr) {
+      console.error('[StudentActivation] Failed to send activation email via Brevo:', emailErr.message || emailErr);
+    }
+  }
 
   return await sendGenericResponse();
 });
