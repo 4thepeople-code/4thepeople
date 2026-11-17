@@ -1044,3 +1044,162 @@ export const student = {
       action: 'Switch to manager workspace',
     },
 } as const;
+
+/**
+ * Campus public pages (college home, clubs directory, club page, event page,
+ * departments). Single light campus theme; tenant name always comes from the
+ * slug — nothing is hardcoded to one college.
+ */
+export const campusPublic = {
+  common: {
+    retry: 'Try again',
+    errGeneric: 'The content could not be loaded. Check your connection and try again.',
+    loadingLabel: 'Loading content',
+  },
+
+  clubsDirectory: {
+    eyebrow: 'Campus directory',
+    title: 'Find your community',
+    description: (college: string) =>
+      `Join active student clubs at ${college}, connect with passionate peers, and take part in workshops, competitions and campus projects.`,
+    searchLabel: 'Search clubs',
+    searchPlaceholder: 'Search clubs by name…',
+    categories: ['ALL', 'TECHNOLOGY', 'CULTURAL', 'SPORTS', 'ARTS', 'LITERARY', 'SOCIAL'],
+    countPill: (count: number) => `${count} ${count === 1 ? 'club' : 'clubs'}`,
+    loadingLabel: 'Loading clubs',
+    errLoad: 'The club directory could not be loaded. Check your connection and try again.',
+    emptyTitle: 'No clubs are listed yet',
+    emptyDescription: (college: string) =>
+      `Student organizations appear here once they are registered at ${college}. Meanwhile, you can explore upcoming campus events.`,
+    emptyAction: 'Explore campus events',
+    noMatchesTitle: 'No clubs match',
+    noMatchesFix: 'Try a different keyword or clear the search to see every club.',
+    clearSearch: 'Clear search',
+  },
+
+  clubDetail: {
+    backLabel: 'All clubs',
+    noCategory: 'Campus club',
+    membersChip: (count: number) => `${count} members`,
+    allEvents: 'All events',
+    storyEyebrow: 'About the club',
+    storyTitle: 'The story behind the club',
+    noDescription:
+      'This club has not written a story yet. Explore its events below to see what the team is building on campus.',
+    scheduleEyebrow: 'Live schedule',
+    scheduleTitle: 'Upcoming events',
+    loadingEvents: 'Loading upcoming events',
+    errEvents: 'Upcoming events for this club could not be loaded. Check your connection and try again.',
+    noUpcomingTitle: 'No upcoming events',
+    noUpcomingDescription: (club: string) =>
+      `${club} has not scheduled any events right now. Browse the full campus calendar to find other activities.`,
+    noUpcomingAction: 'Browse all events',
+    archiveEyebrow: 'Archives',
+    archiveTitle: 'Past events & gallery',
+    loadingPast: 'Loading past events',
+    errPast: 'Past events for this club could not be loaded. Check your connection and try again.',
+    completed: 'Completed',
+    viewGallery: 'View gallery',
+    noPastTitle: 'No past events yet',
+    noPastDescription: (club: string) => `Completed events and photo galleries from ${club} will appear here.`,
+    clubLoadingLabel: 'Loading club',
+    errClubLoad: 'This club could not be loaded. It may have been removed — check the address or try again.',
+    clubNotFoundTitle: 'Club not found',
+    backToClubs: 'Back to all clubs',
+  },
+
+  eventDetail: {
+    backLabel: 'Back to campus',
+    noCategory: 'Campus event',
+    statusLive: 'Live now',
+    hostClub: 'Host club',
+    noHost: 'Campus clubs',
+    date: 'Date',
+    time: 'Time',
+    venue: 'Venue',
+    noVenue: 'Venue to be announced',
+    attending: 'Attending',
+    attendingCount: (count: number) => `${count} ${count === 1 ? 'student' : 'students'}`,
+    share: 'Share event link',
+    shareCopied: 'Event link copied to clipboard!',
+    presentedBy: 'Presented by',
+    registrationOpen: 'Registration open',
+    capacityFull: 'Event full',
+    capacityNote: (filled: number, capacity: number) => `${filled} / ${capacity} spots filled`,
+    noCapacityNote: (count: number) => `${count} ${count === 1 ? 'student' : 'students'} registered`,
+    registerCta: 'Register now',
+    registering: 'Registering…',
+    externalCta: 'Register on the official form',
+    externalNote: 'Opens the official registration form in a new tab.',
+    rsvpConfirmed: 'RSVP confirmed',
+    cancelRsvp: 'Cancel RSVP',
+    cancelling: 'Cancelling…',
+    rsvpConfirmedTitle: 'RSVP confirmed!',
+    rsvpConfirmedBody: (eventTitle: string) =>
+      `Your registration for "${eventTitle}" is confirmed. Check your email for further instructions.`,
+    done: 'Done',
+    formEyebrow: 'Registration questions',
+    formDescription: 'Please complete these organizer questions to finalize your registration.',
+    required: 'Required',
+    selectOption: 'Select an option…',
+    formCancel: 'Cancel',
+    formSubmit: 'Submit & register',
+    formSubmitting: 'Submitting…',
+    descriptionTitle: 'Event description',
+    noDescription:
+      'The organizers have not added a description yet. Check the schedule details above or contact the host club.',
+    galleryTitle: 'Event gallery',
+    galleryCount: (count: number) => `${count} ${count === 1 ? 'photo' : 'photos'}`,
+    hostedByEyebrow: 'Hosted by',
+    organizerEyebrow: 'About the organizer',
+    organizerNoDescription:
+      'This student organization brings campus events, workshops and community activities to your college.',
+    viewClubProfile: 'View full club profile',
+    eventLoadingLabel: 'Loading event',
+    errEventLoad: 'This event could not be loaded. It may have been removed — check the address or try again.',
+    eventNotFoundTitle: 'Event not available',
+    backToCampus: 'Back to the campus homepage',
+  },
+
+  departmentsList: {
+    eyebrow: 'Academic divisions',
+    title: 'Departments & chapters',
+    description: (college: string) =>
+      `Academic divisions across ${college} anchor departmental clubs, technical teams and student societies.`,
+    searchLabel: 'Search departments',
+    searchPlaceholder: 'Search departments…',
+    clubsPill: (count: number) => `${count} ${count === 1 ? 'club' : 'clubs'}`,
+    loadingLabel: 'Loading departments',
+    errLoad: 'The department list could not be loaded. Check your connection and try again.',
+    emptyTitle: 'No departments yet',
+    emptyDescription: (college: string) =>
+      `Academic departments have not been added yet for ${college}. Please check back later.`,
+    noMatchesTitle: 'No departments match',
+    noMatchesFix: 'No departments match your search. Try a different keyword or short code.',
+    clearSearch: 'Clear search',
+    viewDepartment: 'View department',
+    noCode: 'DEPT',
+  },
+
+  departmentDetail: {
+    backLabel: 'All departments',
+    affiliatedPill: (count: number) => `${count} affiliated ${count === 1 ? 'club' : 'clubs'}`,
+    noDescription:
+      'Student organizations, technical chapters and project teams operating under this academic department.',
+    clubsEyebrow: 'Student communities',
+    clubsTitle: 'Affiliated clubs',
+    clubsDescription: (department: string, college: string) =>
+      `Clubs and student societies associated with ${department} at ${college}.`,
+    loadingClubs: 'Loading affiliated clubs',
+    noClubsTitle: 'No clubs in this department yet',
+    noClubsDescription:
+      'There are currently no active clubs linked to this department. Check back later or explore other departments.',
+    noClubsAction: 'Browse other departments',
+    loadingLabel: 'Loading department',
+    errLoad: 'This department could not be loaded. Check your connection and try again.',
+    notFoundTitle: 'Department not found',
+    notFoundDescription: 'The academic department you requested does not exist or may have been removed.',
+    notFoundAction: 'Return to departments',
+    noCode: 'DEPT',
+  },
+} as const;

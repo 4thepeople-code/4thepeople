@@ -22,6 +22,8 @@ import { useDepartments } from '@/lib/api/departments';
 import PublicLayout from '@/components/public/PublicLayout';
 import EventModal from '@/components/public/EventModal';
 import GalleryLightbox from '@/components/public/GalleryLightbox';
+import CampusClubCard from '@/components/college/CampusClubCard';
+import CampusEventCard from '@/components/college/CampusEventCard';
 import type { Event } from '@/types/models';
 
 export interface CollegeHomePageClientProps {
@@ -606,66 +608,14 @@ export function CollegeHomePageClient({ slug }: CollegeHomePageClientProps) {
               </div>
             ) : (
               <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-                {filteredEvents.map((event) => {
-                  const dateParts = formatDateParts(event.startAt || event.startDate || event.date, event.endAt);
-                  const status = (event.status || 'Upcoming').toUpperCase();
-
-                  return (
-                    <Link key={event.id} href={`/college/${slug}/events/${event.id}`} className="group block" aria-label={`View details for ${event.title}`}>
-                      <article className="flex h-full flex-col rounded-3xl border-2 border-[var(--border-strong)] bg-[var(--surface-card)] p-6 shadow-brutal-md transition-transform duration-200 group-hover:[@media(hover:hover)_and_(prefers-reduced-motion:no-preference)]:-translate-x-1 group-hover:[@media(hover:hover)_and_(prefers-reduced-motion:no-preference)]:-translate-y-1">
-                        <div className="flex items-center justify-between">
-                          <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--surface-inverse)] px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-[var(--text-inverse)]">
-                            {status === 'ONGOING' && (
-                              <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-[var(--accent-primary)]" />
-                            )}
-                            {status.toLowerCase()}
-                          </span>
-                          <span className="font-display text-sm font-bold uppercase tracking-wide text-[var(--text-muted)]">
-                            {dateParts.weekday}
-                          </span>
-                        </div>
-
-                        <div className="mt-5 flex items-end gap-3">
-                          <span className="font-display text-6xl font-bold leading-none text-[var(--text-primary)]">{dateParts.day}</span>
-                          <span className="font-display pb-1 text-xl font-bold uppercase text-[var(--text-primary)]">{dateParts.month}</span>
-                        </div>
-
-                        <h3 className="font-display mt-5 text-2xl font-bold uppercase tracking-tight text-[var(--text-primary)] transition-colors group-hover:text-[var(--accent-primary)]" title={event.title}>
-                          {event.title}
-                        </h3>
-                        <p className="mt-2 text-sm font-medium text-[var(--text-muted)]">
-                          {event.club?.name || collegeDisplay}
-                          {event.category ? ` · ${event.category}` : ''}
-                        </p>
-                        {event.description && (
-                          <p className="mt-3 text-sm leading-relaxed text-[var(--text-secondary)]">{event.description}</p>
-                        )}
-
-                        <div className="mt-6 grid gap-2 rounded-2xl bg-[var(--surface-tile)] p-4 text-sm font-medium text-[var(--text-secondary)]">
-                          <p className="flex items-center gap-2">
-                            <Clock className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                            {dateParts.time}
-                          </p>
-                          <p className="flex items-center gap-2">
-                            <MapPin className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                            <span className="truncate">{event.venue || event.location || 'Venue to be announced'}</span>
-                          </p>
-                          {typeof event.registeredCount === 'number' && (
-                            <p className="flex items-center gap-2">
-                              <Users className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                              {event.registeredCount} students going
-                            </p>
-                          )}
-                        </div>
-
-                        <span className="mt-5 inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl bg-[var(--accent-strong)] px-3 text-sm font-bold text-white">
-                          View details &amp; RSVP
-                          <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" aria-hidden />
-                        </span>
-                      </article>
-                    </Link>
-                  );
-                })}
+                {filteredEvents.map((event) => (
+                  <CampusEventCard
+                    key={event.id}
+                    event={event}
+                    href={`/college/${slug}/events/${event.id}`}
+                    hostFallback={collegeDisplay}
+                  />
+                ))}
               </div>
             )}
           </div>
@@ -786,57 +736,9 @@ export function CollegeHomePageClient({ slug }: CollegeHomePageClientProps) {
               </div>
             ) : (
               <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                {clubs.slice(0, 6).map((club) => {
-                  const clubImage = resolveImageUrl(
-                    club.coverImageUrl,
-                    club.coverImage?.url,
-                    club.coverUrl,
-                    club.bannerUrl,
-                    club.logoUrl,
-                    club.logo?.url
-                  );
-                  const memberCount = club._count?.members ?? club.membersCount ?? club.memberCount;
-
-                  return (
-                    <Link key={club.id} href={`/college/${slug}/clubs/${club.id}`} className="group block" aria-label={`View the ${club.name} club`}>
-                      <article className="flex h-full flex-col rounded-3xl border-2 border-[var(--border-strong)] bg-[var(--surface-card)] p-6 shadow-brutal-md transition-transform duration-200 group-hover:[@media(hover:hover)_and_(prefers-reduced-motion:no-preference)]:-translate-x-1 group-hover:[@media(hover:hover)_and_(prefers-reduced-motion:no-preference)]:-translate-y-1">
-                        {clubImage ? (
-                          <img
-                            src={clubImage}
-                            alt={`Cover for ${club.name}`}
-                            className="aspect-[4/3] w-full rounded-2xl border border-[var(--border-soft)] object-cover"
-                          />
-                        ) : (
-                          <div className="grid aspect-[4/3] w-full place-items-center rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-tile)]">
-                            <span aria-hidden className="font-display text-6xl font-bold text-[var(--text-muted)]">
-                              {club.name.charAt(0).toUpperCase()}
-                            </span>
-                          </div>
-                        )}
-
-                        <div className="mt-5 flex items-start justify-between gap-3">
-                          <div>
-                            <h3 className="font-display text-2xl font-bold uppercase tracking-tight text-[var(--text-primary)] transition-colors group-hover:text-[var(--accent-primary)]">
-                              {club.name}
-                            </h3>
-                            {club.category && (
-                              <p className="mt-1 text-xs font-bold uppercase tracking-wider text-[var(--accent-strong)]">{club.category}</p>
-                            )}
-                          </div>
-                          {typeof memberCount === 'number' && (
-                            <span className="shrink-0 rounded-full border-2 border-[var(--border-strong)] px-3 py-1 text-xs font-bold text-[var(--text-primary)]">
-                              {memberCount} members
-                            </span>
-                          )}
-                        </div>
-
-                        {club.description && (
-                          <p className="mt-3 line-clamp-2 text-sm font-medium text-[var(--text-secondary)]">{club.description}</p>
-                        )}
-                      </article>
-                    </Link>
-                  );
-                })}
+                {clubs.slice(0, 6).map((club) => (
+                  <CampusClubCard key={club.id} club={club} href={`/college/${slug}/clubs/${club.id}`} />
+                ))}
               </div>
             )}
           </div>
