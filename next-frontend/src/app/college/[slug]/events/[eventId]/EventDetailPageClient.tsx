@@ -5,9 +5,9 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useUpcomingEvents, useMyRegistrationStatus, useRegisterForEventMutation, useCancelRegistrationMutation } from '@/lib/api/events';
 import { useAuth } from '@/context/AuthContext';
-import { useTheme } from '@/context/ThemeContext';
 import PublicLayout from '@/components/public/PublicLayout';
 import GalleryLightbox from '@/components/public/GalleryLightbox';
+import CampusChip from '@/components/college/CampusChip';
 import {
   ArrowLeft,
   ArrowRight,
@@ -17,19 +17,20 @@ import {
   Clock,
   Share2,
   ExternalLink,
-  Sparkles,
   AlertCircle,
   RefreshCw,
   CheckCircle2,
-  Image as ImageIcon,
 } from 'lucide-react';
 import type { Event } from '@/types/models';
+import { campusPublic } from '@/lib/copy';
 
 export interface EventDetailPageClientProps {
   slug: string;
   eventId: string;
   clubId?: string;
 }
+
+const t = campusPublic.eventDetail;
 
 const formatDateParts = (dateString?: string) => {
   if (!dateString) return { day: 'TBA', month: 'TBA', full: 'Date TBA' };
@@ -71,10 +72,9 @@ const getValidUrl = (url?: string | null) => {
 
 export function EventDetailPageClient({ slug, eventId, clubId: propClubId }: EventDetailPageClientProps) {
   const router = useRouter();
-  const { isDark } = useTheme();
   const { user } = useAuth();
 
-  // Queries
+  // Queries (unchanged)
   const { data: upcomingEvents = [], isLoading, isError, error, refetch } = useUpcomingEvents(slug);
   const { data: regStatus } = useMyRegistrationStatus(slug, eventId, Boolean(user));
 
@@ -106,6 +106,9 @@ export function EventDetailPageClient({ slug, eventId, clubId: propClubId }: Eve
   const rawRegistrationUrl =
     event?.registrationUrl || event?.url || event?.formUrl || event?.link || event?.externalUrl;
   const validRegistrationUrl = getValidUrl(rawRegistrationUrl);
+
+  const isCapacityFull =
+    event?.capacity !== null && event?.capacity !== undefined && (event.registeredCount || 0) >= event.capacity;
 
   const handleRegister = async () => {
     if (validRegistrationUrl) {
@@ -206,491 +209,344 @@ export function EventDetailPageClient({ slug, eventId, clubId: propClubId }: Eve
     }
   };
 
+  const infoTile = (label: string, value: React.ReactNode) => (
+    <div className="rounded-2xl border-2 border-[var(--border-strong)] bg-[var(--surface-card)] p-5 shadow-brutal-xs">
+      <p className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">{label}</p>
+      <p className="font-display mt-1 text-xl font-bold uppercase text-[var(--text-primary)]">{value}</p>
+    </div>
+  );
+
   return (
     <PublicLayout collegeSlug={slug} collegeName={collegeDisplay}>
-      <div className="py-8 sm:py-12 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8 sm:space-y-10">
-        {/* Back Link & Share Notification Bar */}
-        <div className="flex items-center justify-between gap-4">
-          <Link
-            href={`/college/${slug}`}
-            className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-extrabold uppercase transition cursor-pointer ${
-              isDark
-                ? 'bg-white/5 border border-white/10 text-gray-300 hover:text-white hover:border-white/20'
-                : 'bg-white border border-slate-200 text-slate-700 hover:text-slate-900 shadow-2xs hover:border-slate-300'
-            }`}
-          >
-            <ArrowLeft className="w-4 h-4" />
-            <span>Back</span>
-          </Link>
-
-          {shareNotice && (
-            <div className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold bg-cyan-500/15 border border-cyan-500/30 text-cyan-600 dark:text-[#00F0FF] animate-in fade-in">
-              <CheckCircle2 className="w-3.5 h-3.5" />
-              <span>Event link copied to clipboard!</span>
-            </div>
-          )}
-        </div>
-
-        {/* Error State */}
-        {isError && (
-          <div className="p-8 bg-red-500/10 border border-red-500/20 rounded-3xl text-center space-y-4">
-            <AlertCircle className="w-10 h-10 text-red-400 mx-auto" />
-            <h2 className={`text-xl font-extrabold font-['Syne',sans-serif] ${isDark ? 'text-white' : 'text-[#0F172A]'}`}>
-              Event Not Available
+      {/* Error state */}
+      {isError && (
+        <div className="mx-auto max-w-2xl px-4 py-20 sm:px-6">
+          <div className="space-y-4 rounded-3xl border-2 border-[var(--border-strong)] bg-[var(--surface-card)] p-10 text-center shadow-brutal-sm">
+            <h2 className="font-display text-2xl font-bold uppercase tracking-tight text-[var(--text-primary)] sm:text-3xl">
+              {t.eventNotFoundTitle}
             </h2>
-            <p className="text-sm text-red-300">
-              {error instanceof Error ? error.message : 'Failed to load event details.'}
+            <p className="mx-auto max-w-md text-sm leading-relaxed text-[var(--text-secondary)]">
+              {error instanceof Error ? error.message : t.errEventLoad}
             </p>
             <button
               type="button"
               onClick={() => refetch()}
-              className="px-5 py-2.5 bg-red-500/20 text-red-200 rounded-full text-xs font-bold uppercase cursor-pointer"
+              className="mt-2 inline-flex min-h-11 items-center justify-center rounded-xl bg-[var(--accent-strong)] px-5 text-sm font-bold text-[var(--on-primary)] transition-transform hover:-translate-y-0.5 motion-reduce:transition-none focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)]"
             >
-              Retry
+              {campusPublic.common.retry}
             </button>
           </div>
-        )}
+        </div>
+      )}
 
-        {/* Loading State */}
-        {isLoading && (
-          <div
-            className={`h-[420px] rounded-3xl animate-pulse border ${
-              isDark ? 'bg-white/5 border-white/5' : 'bg-slate-100 border-slate-200'
-            }`}
-          />
-        )}
+      {/* Loading state */}
+      {isLoading && (
+        <div className="mx-auto max-w-7xl space-y-8 px-4 py-12 sm:px-6 lg:px-8" role="status" aria-label={t.eventLoadingLabel}>
+          <div className="h-40 w-2/3 animate-pulse rounded-2xl bg-[var(--surface-tile)] motion-reduce:animate-none" />
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {[1, 2, 3, 4, 5].map((n) => (
+              <div key={n} className="h-24 animate-pulse rounded-2xl border-2 border-[var(--border-soft)] bg-[var(--surface-tile)] motion-reduce:animate-none" />
+            ))}
+          </div>
+          <div className="h-14 w-56 animate-pulse rounded-xl bg-[var(--surface-tile)] motion-reduce:animate-none" />
+        </div>
+      )}
 
-        {/* Event Main Content */}
-        {!isLoading && !isError && event && (
-          <>
-            <div
-              className={`rounded-3xl border overflow-hidden p-6 sm:p-8 lg:p-10 transition-colors ${
-                isDark ? 'bg-[#12141C] border-white/15 shadow-2xl' : 'bg-white border-slate-200 shadow-md'
-              }`}
+      {/* Empty state: list loaded but nothing to show */}
+      {!isLoading && !isError && !event && (
+        <div className="mx-auto max-w-2xl px-4 py-20 sm:px-6">
+          <div className="space-y-4 rounded-3xl border-2 border-dashed border-[var(--border-soft)] bg-[var(--surface-card)] p-10 text-center">
+            <h2 className="font-display text-2xl font-bold uppercase tracking-tight text-[var(--text-primary)]">
+              {t.eventNotFoundTitle}
+            </h2>
+            <p className="mx-auto max-w-md text-sm leading-relaxed text-[var(--text-secondary)]">{t.errEventLoad}</p>
+            <Link
+              href={`/college/${slug}#events`}
+              className="mt-2 inline-flex min-h-11 items-center justify-center rounded-xl bg-[var(--accent-strong)] px-5 text-sm font-bold text-[var(--on-primary)] transition-transform hover:-translate-y-0.5 motion-reduce:transition-none focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-card)]"
             >
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 items-start">
-                {/* Left Column (Information First) */}
-                <div className="lg:col-span-7 flex flex-col justify-between space-y-6">
-                  <div className="space-y-4">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="px-3 py-1 rounded-full bg-cyan-500/15 border border-cyan-500/30 text-cyan-600 dark:text-[#00F0FF] text-[11px] font-black uppercase tracking-wider">
-                        {event.category || 'CAMPUS EVENT'}
-                      </span>
-                      <span className="px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-[10px] font-black uppercase tracking-wider">
-                        REGISTRATION OPEN
-                      </span>
-                      {club?.name && (
-                        <Link
-                          href={`/college/${slug}/clubs/${clubId}`}
-                          className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition ${
-                            isDark
-                              ? 'bg-white/5 hover:bg-white/10 text-gray-300'
-                              : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-                          }`}
-                        >
-                          <Building2 className="w-3.5 h-3.5 text-cyan-500" />
-                          <span>{club.name}</span>
-                        </Link>
-                      )}
-                    </div>
+              {t.backToCampus}
+            </Link>
+          </div>
+        </div>
+      )}
 
-                    <h1
-                      className={`font-['Syne',sans-serif] text-3xl sm:text-4xl lg:text-5xl font-black uppercase tracking-tight leading-[1.05] ${
-                        isDark ? 'text-white' : 'text-[#0F172A]'
-                      }`}
-                    >
-                      {event.title}
-                    </h1>
-
-                    <p className={`text-xs sm:text-sm font-medium ${isDark ? 'text-gray-400' : 'text-slate-500'}`}>
-                      Presented by{' '}
-                      {club?.name ? (
-                        <Link
-                          href={`/college/${slug}/clubs/${clubId}`}
-                          className="text-cyan-600 dark:text-[#00F0FF] hover:underline font-bold"
-                        >
-                          {club.name}
-                        </Link>
-                      ) : (
-                        <span className="font-bold text-cyan-500">{collegeDisplay} Clubs</span>
-                      )}
-                    </p>
-                  </div>
-
-                  {/* Date, Time, Location Cards */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div
-                      className={`p-3.5 rounded-2xl border flex items-start gap-3 ${
-                        isDark ? 'bg-white/5 border-white/10 text-gray-200' : 'bg-slate-50 border-slate-200 text-slate-800'
-                      }`}
-                    >
-                      <div className="p-2 rounded-xl bg-cyan-500/15 text-cyan-500 shrink-0">
-                        <Calendar className="w-4 h-4" />
-                      </div>
-                      <div>
-                        <span className="block text-[10px] font-bold uppercase tracking-wider text-gray-400">Date</span>
-                        <span className="font-extrabold text-sm">{dateInfo.full}</span>
-                      </div>
-                    </div>
-
-                    {eventTime && (
-                      <div
-                        className={`p-3.5 rounded-2xl border flex items-start gap-3 ${
-                          isDark ? 'bg-white/5 border-white/10 text-gray-200' : 'bg-slate-50 border-slate-200 text-slate-800'
-                        }`}
-                      >
-                        <div className="p-2 rounded-xl bg-purple-500/15 text-purple-400 shrink-0">
-                          <Clock className="w-4 h-4" />
-                        </div>
-                        <div>
-                          <span className="block text-[10px] font-bold uppercase tracking-wider text-gray-400">Time</span>
-                          <span className="font-extrabold text-sm font-mono">{eventTime}</span>
-                        </div>
-                      </div>
-                    )}
-
-                    <div
-                      className={`sm:col-span-2 p-3.5 rounded-2xl border flex items-start gap-3 ${
-                        isDark ? 'bg-white/5 border-white/10 text-gray-200' : 'bg-slate-50 border-slate-200 text-slate-800'
-                      }`}
-                    >
-                      <div className="p-2 rounded-xl bg-pink-500/15 text-pink-500 shrink-0">
-                        <MapPin className="w-4 h-4" />
-                      </div>
-                      <div>
-                        <span className="block text-[10px] font-bold uppercase tracking-wider text-gray-400">Venue / Location</span>
-                        <span className="font-extrabold text-sm">{event.venue || event.location || 'Campus Main Venue'}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Action CTA Buttons */}
-                  <div className="pt-2 flex flex-col gap-2.5">
-                    {regError && (
-                      <div className="p-3 rounded-xl bg-red-500/15 border border-red-500/30 text-xs font-semibold text-red-400 flex items-center gap-2">
-                        <AlertCircle className="w-4 h-4 shrink-0" />
-                        <span>{regError}</span>
-                      </div>
-                    )}
-                    <div className="flex flex-wrap items-center gap-3">
-                      {validRegistrationUrl ? (
-                        <a
-                          href={validRegistrationUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex-1 min-w-[200px] py-3.5 px-6 rounded-full font-extrabold text-xs uppercase tracking-wider shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer bg-[#00F0FF] hover:bg-[#38f2ff] text-black shadow-cyan-500/30 hover:scale-[1.01] active:scale-[0.99]"
-                          title="Open official registration form"
-                        >
-                          <span>Register for Event</span>
-                          <ExternalLink className="w-4 h-4 shrink-0" />
-                        </a>
-                      ) : isRegistered ? (
-                        <div className="flex-1 flex flex-wrap items-center gap-2">
-                          <div className="flex-1 min-w-[160px] py-3.5 px-6 rounded-full font-extrabold text-xs uppercase tracking-wider shadow-lg bg-emerald-500 text-black flex items-center justify-center gap-2 cursor-default">
-                            <CheckCircle2 className="w-4 h-4" />
-                            <span>RSVP Confirmed</span>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={handleCancelRegistration}
-                            disabled={cancelMutation.isPending}
-                            className="py-3 px-4 rounded-full font-bold text-xs uppercase tracking-wider border border-red-500/30 text-red-400 hover:bg-red-500/10 transition cursor-pointer"
-                            title="Cancel RSVP"
-                          >
-                            {cancelMutation.isPending ? 'Cancelling...' : 'Cancel RSVP'}
-                          </button>
-                        </div>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={handleRegister}
-                          disabled={
-                            registerMutation.isPending ||
-                            (event.capacity !== null &&
-                              event.capacity !== undefined &&
-                              (event.registeredCount || 0) >= event.capacity)
-                          }
-                          className={`flex-1 min-w-[200px] py-3.5 px-6 rounded-full font-extrabold text-xs uppercase tracking-wider shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer ${
-                            event.capacity !== null &&
-                            event.capacity !== undefined &&
-                            (event.registeredCount || 0) >= event.capacity
-                              ? 'bg-gray-600 text-gray-300 cursor-not-allowed'
-                              : 'bg-[#00F0FF] hover:bg-[#38f2ff] text-black shadow-cyan-500/30'
-                          }`}
-                        >
-                          {registerMutation.isPending ? (
-                            <>
-                              <RefreshCw className="w-4 h-4 animate-spin" />
-                              <span>Registering...</span>
-                            </>
-                          ) : event.capacity !== null &&
-                            event.capacity !== undefined &&
-                            (event.registeredCount || 0) >= event.capacity ? (
-                            <>
-                              <AlertCircle className="w-4 h-4" />
-                              <span>Event Full (Capacity Reached)</span>
-                            </>
-                          ) : (
-                            <>
-                              <span>RSVP / Register Now</span>
-                              <ArrowRight className="w-4 h-4" />
-                            </>
-                          )}
-                        </button>
-                      )}
-
-                      <button
-                        type="button"
-                        onClick={handleShare}
-                        className={`p-3.5 rounded-full border transition cursor-pointer ${
-                          isDark
-                            ? 'bg-white/5 border-white/10 hover:bg-white/10 text-gray-300'
-                            : 'bg-slate-50 border-slate-200 hover:bg-slate-100 text-slate-700'
-                        }`}
-                        title="Share Event Link"
-                        aria-label="Share Event Link"
-                      >
-                        <Share2 className="w-4 h-4" />
-                      </button>
-                    </div>
-
-                    {validRegistrationUrl && (
-                      <p className="text-[11px] text-cyan-600 dark:text-cyan-400 font-medium flex items-center gap-1.5">
-                        <ExternalLink className="w-3.5 h-3.5 shrink-0" />
-                        <span>Redirects to official Google Form / Registration Page</span>
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Registration Count Note */}
-                  <div className={`text-xs font-semibold ${isDark ? 'text-gray-400' : 'text-slate-500'}`}>
-                    <span className={`font-extrabold ${isDark ? 'text-white' : 'text-[#0F172A]'}`}>
-                      {event.capacity !== null && event.capacity !== undefined
-                        ? `${event.registeredCount ?? 0} / ${event.capacity} spots filled`
-                        : `${event.registeredCount ?? 0} Students registered`}
-                    </span>
-                    {event.capacity !== null &&
-                    event.capacity !== undefined &&
-                    (event.registeredCount ?? 0) >= event.capacity
-                      ? ' • Capacity Full'
-                      : ' • Direct Club RSVP'}
-                  </div>
-                </div>
-
-                {/* Right Column (Image Showcase + Organizer) */}
-                <div className="lg:col-span-5 flex flex-col space-y-4">
-                  <div className="relative rounded-2xl overflow-hidden aspect-[4/3] bg-gray-900 border border-white/10 shadow-lg group">
-                    <img
-                      src={
-                        event.coverImage?.url ||
-                        event.coverUrl ||
-                        event.bannerUrl ||
-                        event.coverImageUrl ||
-                        'https://images.unsplash.com/photo-1504384308090-c894fdcc538d?q=80&w=800&auto=format&fit=crop'
-                      }
-                      alt={event.title}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent pointer-events-none" />
-
-                    <div className="absolute bottom-3 right-3 px-2.5 py-1 rounded-lg bg-black/75 backdrop-blur-md text-[10px] font-bold text-white border border-white/20 flex items-center gap-1">
-                      <Sparkles className="w-3 h-3 text-cyan-400" />
-                      <span>Event Poster</span>
-                    </div>
-                  </div>
-
-                  {/* Host Club Card */}
-                  <div
-                    className={`p-4 rounded-2xl border flex items-center justify-between gap-3 ${
-                      isDark ? 'bg-white/5 border-white/10' : 'bg-slate-50 border-slate-200'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3 truncate">
-                      <div className="w-10 h-10 rounded-xl overflow-hidden bg-cyan-500/10 border border-cyan-500/20 shrink-0">
-                        {club?.logo?.url ? (
-                          <img
-                            src={club.logo.url}
-                            alt={`${club.name || 'Club'} logo`}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <Building2 className="w-5 h-5 m-auto text-cyan-500" />
-                        )}
-                      </div>
-                      <div className="truncate">
-                        <span className="block text-[10px] font-black uppercase tracking-wider text-gray-400">Host Club</span>
-                        <span className={`block font-bold text-xs truncate ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                          {club?.name || `${collegeDisplay} Club`}
-                        </span>
-                      </div>
-                    </div>
-
-                    {clubId && (
-                      <Link
-                        href={`/college/${slug}/clubs/${clubId}`}
-                        className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold transition ${
-                          isDark
-                            ? 'bg-white/10 hover:bg-white/20 text-white'
-                            : 'bg-white hover:bg-slate-200 text-slate-800 border border-slate-200'
-                        }`}
-                      >
-                        Profile →
-                      </Link>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Description & Sidebar */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-              <div
-                className={`lg:col-span-8 rounded-3xl p-6 sm:p-8 border space-y-4 ${
-                  isDark ? 'bg-[#12141C] border-white/10' : 'bg-white border-slate-200 shadow-sm'
-                }`}
+      {/* Event main content */}
+      {!isLoading && !isError && event && (
+        <>
+          {/* Hero (demo layout: back link, status chip, display title, info tiles) */}
+          <section className="relative overflow-hidden border-b-2 border-[var(--border-strong)] bg-[var(--surface-tile)]">
+            <div aria-hidden className="absolute -right-16 top-0 h-72 w-72 rounded-full border-[14px] border-[var(--border-strong)]/15" />
+            <div className="relative mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8 lg:py-20">
+              <Link
+                href={`/college/${slug}`}
+                className="inline-flex min-h-11 items-center text-sm font-bold uppercase tracking-wider text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)] motion-reduce:transition-none"
               >
-                <h2
-                  className={`font-['Syne',sans-serif] text-2xl font-extrabold uppercase ${
-                    isDark ? 'text-white' : 'text-[#0F172A]'
-                  }`}
-                >
-                  Event <span className="text-cyan-500">Description</span>
-                </h2>
-                <p
-                  className={`text-sm leading-relaxed font-normal whitespace-pre-line ${
-                    isDark ? 'text-gray-300' : 'text-slate-600'
-                  }`}
-                >
-                  {event.description ||
-                    'Join us for an incredible session organized by our active campus club. Bring your enthusiasm and collaborate with passionate peers!'}
-                </p>
-              </div>
+                <ArrowLeft aria-hidden className="mr-1.5 h-4 w-4" />
+                {t.backLabel}
+              </Link>
 
-              {/* Organizer Profile Card Sidebar */}
-              <div
-                className={`lg:col-span-4 rounded-3xl p-6 border space-y-4 ${
-                  isDark ? 'bg-[#12141C] border-white/10' : 'bg-white border-slate-200 shadow-sm'
-                }`}
-              >
-                <span className="text-[10px] font-black uppercase text-cyan-500 tracking-widest">
-                  About The Organizer
-                </span>
-                <div className="space-y-2">
-                  <h3
-                    className={`font-['Syne',sans-serif] text-xl font-bold ${
-                      isDark ? 'text-white' : 'text-[#0F172A]'
-                    }`}
-                  >
-                    {club?.name || `${collegeDisplay} Organization`}
-                  </h3>
-                  <p className={`text-xs line-clamp-4 leading-relaxed ${isDark ? 'text-gray-400' : 'text-slate-500'}`}>
-                    {club?.description ||
-                      'Student organization committed to tech innovation, learning, and campus community events.'}
-                  </p>
-                </div>
-                {clubId && (
+              <div className="mt-8 flex flex-wrap items-center gap-2">
+                <CampusChip variant="accent" dot={(event.status || '').toUpperCase() === 'ONGOING'}>
+                  {(event.status || 'UPCOMING').toUpperCase() === 'ONGOING' ? t.statusLive : (event.status || 'UPCOMING').toUpperCase()}
+                </CampusChip>
+                <CampusChip>{event.category || t.noCategory}</CampusChip>
+                {club?.name && clubId && (
                   <Link
                     href={`/college/${slug}/clubs/${clubId}`}
-                    className={`block w-full text-center py-2.5 rounded-xl text-xs font-bold transition-colors ${
-                      isDark ? 'bg-white/5 hover:bg-white/10 text-white' : 'bg-slate-100 hover:bg-slate-200 text-slate-800'
-                    }`}
+                    className="inline-flex min-h-11 items-center gap-1.5 rounded-full border-2 border-[var(--border-strong)] bg-[var(--surface-card)] px-3 text-xs font-bold text-[var(--text-primary)] transition-colors hover:bg-[var(--surface-page)] motion-reduce:transition-none focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
                   >
-                    View Full Club Profile →
+                    <Building2 aria-hidden className="h-3.5 w-3.5 text-[var(--accent-strong)]" />
+                    {club.name}
                   </Link>
                 )}
               </div>
-            </div>
 
-            {/* Event Photo Gallery */}
-            {event.gallery && event.gallery.length > 0 && (
-              <section className="space-y-4 pt-4">
-                <div className="flex items-center gap-2">
-                  <ImageIcon className="w-5 h-5 text-cyan-500" />
-                  <h2
-                    className={`font-['Syne',sans-serif] text-2xl font-extrabold uppercase ${
-                      isDark ? 'text-white' : 'text-[#0F172A]'
-                    }`}
+              <h1 className="font-campus mt-6 text-5xl uppercase leading-[0.9] tracking-wide text-[var(--text-primary)] sm:text-6xl">
+                {event.title}
+              </h1>
+              <p className="mt-4 max-w-2xl text-sm font-medium text-[var(--text-secondary)]">
+                {t.presentedBy}{' '}
+                {club?.name && clubId ? (
+                  <Link href={`/college/${slug}/clubs/${clubId}`} className="font-bold text-[var(--accent-strong)] hover:underline">
+                    {club.name}
+                  </Link>
+                ) : (
+                  <span className="font-bold text-[var(--accent-strong)]">{club?.name || `${collegeDisplay} ${t.noHost}`}</span>
+                )}
+              </p>
+
+              {/* Info tiles */}
+              <div className="mt-9 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {infoTile(t.hostClub, club?.name || '—')}
+                {infoTile(t.date, dateInfo.full)}
+                {eventTime && infoTile(t.time, eventTime)}
+                {infoTile(t.venue, event.venue || event.location || t.noVenue)}
+                {typeof event.registeredCount === 'number' && infoTile(t.attending, t.attendingCount(event.registeredCount))}
+              </div>
+
+              <div className="mt-10">
+                <a
+                  href="#register"
+                  className="inline-flex min-h-14 items-center justify-center rounded-xl bg-[var(--accent-strong)] px-8 text-base font-bold text-[var(--on-primary)] transition-transform hover:-translate-y-0.5 motion-reduce:transition-none focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-tile)]"
+                >
+                  {t.registerCta}
+                </a>
+              </div>
+            </div>
+          </section>
+
+          {/* Registration band (real flow: internal RSVP, custom form, external URL, capacity) */}
+          <section id="register" className="border-b-2 border-[var(--border-strong)] bg-[var(--surface-page)]">
+            <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
+              {regError && (
+                <div className="mb-4 flex items-center gap-2 rounded-xl border-2 border-[var(--border-strong)] bg-[var(--surface-card)] p-3 text-xs font-semibold text-[var(--text-primary)]">
+                  <AlertCircle aria-hidden className="h-4 w-4 shrink-0 text-[var(--accent-strong)]" />
+                  <span>{regError}</span>
+                </div>
+              )}
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                <div className="flex flex-wrap items-center gap-3">
+                  {validRegistrationUrl ? (
+                    <a
+                      href={validRegistrationUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title="Open official registration form"
+                      className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-[var(--accent-strong)] px-6 text-sm font-bold text-[var(--on-primary)] transition-transform hover:-translate-y-0.5 motion-reduce:transition-none focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)] sm:flex-none"
+                    >
+                      {t.externalCta}
+                      <ExternalLink aria-hidden className="h-4 w-4 shrink-0" />
+                    </a>
+                  ) : isRegistered ? (
+                    <>
+                      <span className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[var(--surface-inverse)] px-6 text-sm font-bold uppercase tracking-wider text-[var(--text-inverse)]">
+                        <CheckCircle2 aria-hidden className="h-4 w-4" />
+                        {t.rsvpConfirmed}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={handleCancelRegistration}
+                        disabled={cancelMutation.isPending}
+                        className="inline-flex min-h-11 items-center justify-center rounded-xl border-2 border-[var(--border-strong)] bg-[var(--surface-card)] px-5 text-sm font-bold text-[var(--text-primary)] transition-colors hover:bg-[var(--surface-tile)] disabled:cursor-not-allowed disabled:opacity-50 motion-reduce:transition-none focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
+                      >
+                        {cancelMutation.isPending ? t.cancelling : t.cancelRsvp}
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleRegister}
+                      disabled={registerMutation.isPending || isCapacityFull}
+                      className={`inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl px-6 text-sm font-bold transition-transform focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)] motion-reduce:transition-none sm:flex-none ${
+                        isCapacityFull
+                          ? 'cursor-not-allowed border-2 border-[var(--border-strong)] bg-[var(--surface-tile)] text-[var(--text-muted)]'
+                          : 'bg-[var(--accent-strong)] text-[var(--on-primary)] hover:-translate-y-0.5'
+                      }`}
+                    >
+                      {registerMutation.isPending ? (
+                        <>
+                          <RefreshCw aria-hidden className="h-4 w-4 animate-spin motion-reduce:animate-none" />
+                          {t.registering}
+                        </>
+                      ) : isCapacityFull ? (
+                        <>
+                          <AlertCircle aria-hidden className="h-4 w-4" />
+                          {t.capacityFull}
+                        </>
+                      ) : (
+                        <>
+                          {t.registerCta}
+                          <ArrowRight aria-hidden className="h-4 w-4" />
+                        </>
+                      )}
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={handleShare}
+                    title={t.share}
+                    aria-label={t.share}
+                    className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border-2 border-[var(--border-strong)] bg-[var(--surface-card)] text-[var(--text-primary)] transition-colors hover:bg-[var(--surface-tile)] motion-reduce:transition-none focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
                   >
-                    Event <span className="text-cyan-500">Gallery</span>
-                  </h2>
+                    <Share2 aria-hidden className="h-4 w-4" />
+                  </button>
                 </div>
 
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                <div className="text-xs font-semibold text-[var(--text-secondary)]">
+                  {validRegistrationUrl ? (
+                    <span className="flex items-center gap-1.5">
+                      <ExternalLink aria-hidden className="h-3.5 w-3.5 shrink-0" />
+                      {t.externalNote}
+                    </span>
+                  ) : (
+                    <span>
+                      {event.capacity !== null && event.capacity !== undefined
+                        ? t.capacityNote(event.registeredCount ?? 0, event.capacity)
+                        : t.noCapacityNote(event.registeredCount ?? 0)}
+                      {isCapacityFull ? ` · ${t.capacityFull}` : ''}
+                    </span>
+                  )}
+                </div>
+              </div>
+              {shareNotice && (
+                <p className="mt-4 inline-flex items-center gap-1.5 rounded-full border-2 border-[var(--border-strong)] bg-[var(--surface-card)] px-3.5 py-1.5 text-xs font-bold text-[var(--text-primary)]" role="status">
+                  <CheckCircle2 aria-hidden className="h-3.5 w-3.5 text-[var(--accent-strong)]" />
+                  {t.shareCopied}
+                </p>
+              )}
+            </div>
+          </section>
+
+          {/* Description + organizer */}
+          <div className="mx-auto max-w-7xl grid grid-cols-1 gap-8 px-4 py-14 sm:px-6 lg:grid-cols-12 lg:px-8">
+            <div className="space-y-4 lg:col-span-8">
+              <h2 className="font-display text-2xl font-bold uppercase tracking-tight text-[var(--text-primary)] sm:text-3xl">
+                {t.descriptionTitle}
+              </h2>
+              <p className="whitespace-pre-line text-sm leading-relaxed text-[var(--text-secondary)] sm:text-base">
+                {event.description || t.noDescription}
+              </p>
+            </div>
+
+            <aside className="space-y-4 rounded-3xl border-2 border-[var(--border-strong)] bg-[var(--surface-card)] p-6 shadow-brutal-sm lg:col-span-4">
+              <p className="text-xs font-bold uppercase tracking-[0.22em] text-[var(--accent-strong)]">{t.organizerEyebrow}</p>
+              <h3 className="font-display text-xl font-bold uppercase tracking-tight text-[var(--text-primary)]">
+                {club?.name || `${collegeDisplay} ${t.noHost}`}
+              </h3>
+              <p className="line-clamp-4 text-xs leading-relaxed text-[var(--text-secondary)]">
+                {club?.description || t.organizerNoDescription}
+              </p>
+              {clubId && (
+                <Link
+                  href={`/college/${slug}/clubs/${clubId}`}
+                  className="mt-2 block min-h-11 w-full rounded-xl border-2 border-[var(--border-strong)] bg-[var(--surface-card)] px-4 py-2.5 text-center text-xs font-bold uppercase tracking-wider text-[var(--text-primary)] transition-colors hover:bg-[var(--surface-tile)] motion-reduce:transition-none focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
+                >
+                  {t.viewClubProfile}
+                  <span aria-hidden> →</span>
+                </Link>
+              )}
+            </aside>
+          </div>
+
+          {/* Event photo gallery */}
+          {event.gallery && event.gallery.length > 0 && (
+            <section className="border-t-2 border-dashed border-[var(--border-soft)] bg-[var(--surface-page)]">
+              <div className="mx-auto max-w-7xl space-y-4 px-4 py-14 sm:px-6 lg:px-8">
+                <div className="flex items-center justify-between gap-4">
+                  <h2 className="font-display text-2xl font-bold uppercase tracking-tight text-[var(--text-primary)] sm:text-3xl">
+                    {t.galleryTitle}
+                  </h2>
+                  <CampusChip>{t.galleryCount(event.gallery.length)}</CampusChip>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">
                   {event.gallery.map((photo, idx) => (
-                    <div
+                    <button
                       key={photo.publicId || idx}
+                      type="button"
                       onClick={() => setActiveGalleryEvent(event)}
-                      className="group relative rounded-2xl overflow-hidden aspect-square bg-gray-900 border border-white/10 cursor-pointer shadow-sm hover:shadow-lg transition-all"
+                      className="group relative aspect-square cursor-pointer overflow-hidden rounded-2xl border-2 border-[var(--border-strong)] bg-[var(--surface-tile)] shadow-brutal-xs transition-all duration-200 hover:[@media(hover:hover)_and_(prefers-reduced-motion:no-preference)]:-translate-x-1 hover:[@media(hover:hover)_and_(prefers-reduced-motion:no-preference)]:-translate-y-1 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)]"
+                      aria-label={`${t.galleryTitle} ${idx + 1}`}
                     >
                       <img
                         src={photo.url}
                         alt={`Event gallery ${idx + 1}`}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        className="h-full w-full object-cover"
                       />
-                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white">
-                        <Sparkles className="w-6 h-6 text-cyan-400" />
-                      </div>
-                    </div>
+                    </button>
                   ))}
                 </div>
-              </section>
-            )}
-          </>
-        )}
-      </div>
+              </div>
+            </section>
+          )}
+        </>
+      )}
 
-      {/* Custom Questions Registration Modal */}
+      {/* Custom questions registration modal */}
       {showFormModal && event?.customFormDefinition?.fields && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
           <div
-            className={`border rounded-3xl max-w-lg w-full p-6 sm:p-8 space-y-5 shadow-2xl ${
-              isDark ? 'bg-[#12141C] border-white/15 text-white' : 'bg-white border-slate-200 text-[#0F172A]'
-            }`}
+            role="dialog"
+            aria-modal="true"
+            aria-label={event.title}
+            className="max-h-[90vh] w-full max-w-lg space-y-5 overflow-y-auto rounded-3xl border-2 border-[var(--border-strong)] bg-[var(--surface-card)] p-6 shadow-brutal-lg sm:p-8"
           >
             <div className="space-y-1">
-              <span className="text-[10px] font-bold tracking-widest text-[#00F0FF] uppercase">
-                Registration Questions
-              </span>
-              <h3 className={`font-['Syne',sans-serif] text-xl font-extrabold uppercase ${isDark ? 'text-white' : 'text-[#0F172A]'}`}>
-                {event.title}
-              </h3>
-              <p className={`text-xs ${isDark ? 'text-gray-400' : 'text-slate-600'}`}>
-                Please complete these organizer questions to finalize your registration.
-              </p>
+              <p className="text-xs font-bold uppercase tracking-[0.22em] text-[var(--accent-strong)]">{t.formEyebrow}</p>
+              <h3 className="font-display text-xl font-bold uppercase tracking-tight text-[var(--text-primary)]">{event.title}</h3>
+              <p className="text-xs leading-relaxed text-[var(--text-secondary)]">{t.formDescription}</p>
             </div>
 
             {formValidationError && (
-              <div className="p-3 rounded-xl bg-red-500/15 border border-red-500/30 text-xs font-semibold text-red-400 flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 shrink-0" />
+              <div className="flex items-center gap-2 rounded-xl border-2 border-[var(--border-strong)] bg-[var(--surface-tile)] p-3 text-xs font-semibold text-[var(--text-primary)]">
+                <AlertCircle aria-hidden className="h-4 w-4 shrink-0 text-[var(--accent-strong)]" />
                 <span>{formValidationError}</span>
               </div>
             )}
 
-            <form onSubmit={handleCustomFormSubmit} className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
+            <form onSubmit={handleCustomFormSubmit} className="space-y-4">
               {event.customFormDefinition.fields.map((field, idx) => {
                 const fieldKey: string = field.id || field.name || `field_${idx}`;
                 const value = formAnswers[fieldKey] !== undefined ? String(formAnswers[fieldKey]) : '';
 
                 return (
                   <div key={fieldKey} className="space-y-1.5">
-                    <label className={`block text-xs font-bold uppercase tracking-wider ${isDark ? 'text-gray-200' : 'text-slate-700'}`}>
-                      {field.label || fieldKey} {field.required && <span className="text-red-400">*</span>}
+                    <label htmlFor={`form-${fieldKey}`} className="block text-xs font-bold uppercase tracking-wider text-[var(--text-secondary)]">
+                      {field.label || fieldKey} {field.required && <span className="text-[var(--accent-strong)]">*</span>}
                     </label>
 
                     {field.type === 'SELECT' ? (
                       <select
+                        id={`form-${fieldKey}`}
                         value={value}
                         onChange={(e) =>
                           setFormAnswers((prev) => ({ ...prev, [fieldKey]: e.target.value }))
                         }
-                        className={`w-full px-4 py-2.5 rounded-xl border text-sm transition-all focus:outline-hidden focus:border-[#00F0FF] ${
-                          isDark
-                            ? 'bg-[#0B0C10] border-white/10 text-white'
-                            : 'bg-slate-50 border-slate-200 text-slate-900'
-                        }`}
+                        className="min-h-11 w-full rounded-xl border-2 border-[var(--border-strong)] bg-[var(--surface-card)] px-4 text-sm font-medium text-[var(--text-primary)] transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] motion-reduce:transition-none"
                         required={field.required}
                       >
-                        <option value="">Select an option...</option>
+                        <option value="">{t.selectOption}</option>
                         {field.options?.map((opt) => (
                           <option key={opt} value={opt}>
                             {opt}
@@ -700,7 +556,7 @@ export function EventDetailPageClient({ slug, eventId, clubId: propClubId }: Eve
                     ) : field.type === 'RADIO' ? (
                       <div className="space-y-1.5 pt-1">
                         {field.options?.map((opt) => (
-                          <label key={opt} className="flex items-center gap-2 text-xs cursor-pointer">
+                          <label key={opt} className="flex min-h-11 items-center gap-2 text-sm text-[var(--text-primary)]">
                             <input
                               type="radio"
                               name={fieldKey}
@@ -710,7 +566,7 @@ export function EventDetailPageClient({ slug, eventId, clubId: propClubId }: Eve
                                 setFormAnswers((prev) => ({ ...prev, [fieldKey]: e.target.value }))
                               }
                               required={field.required}
-                              className="text-cyan-500 focus:ring-cyan-500"
+                              className="accent-[var(--accent-strong)]"
                             />
                             <span>{opt}</span>
                           </label>
@@ -718,6 +574,7 @@ export function EventDetailPageClient({ slug, eventId, clubId: propClubId }: Eve
                       </div>
                     ) : (
                       <input
+                        id={`form-${fieldKey}`}
                         type={field.type === 'NUMBER' ? 'number' : 'text'}
                         value={value}
                         onChange={(e) =>
@@ -727,11 +584,7 @@ export function EventDetailPageClient({ slug, eventId, clubId: propClubId }: Eve
                           }))
                         }
                         placeholder={`Enter ${field.label || fieldKey}...`}
-                        className={`w-full px-4 py-2.5 rounded-xl border text-sm transition-all focus:outline-hidden focus:border-[#00F0FF] ${
-                          isDark
-                            ? 'bg-[#0B0C10] border-white/10 text-white placeholder-gray-600'
-                            : 'bg-slate-50 border-slate-200 text-slate-900 placeholder-slate-400'
-                        }`}
+                        className="min-h-11 w-full rounded-xl border-2 border-[var(--border-strong)] bg-[var(--surface-card)] px-4 text-sm font-medium text-[var(--text-primary)] placeholder:text-[var(--text-muted)] transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] motion-reduce:transition-none"
                         required={field.required}
                       />
                     )}
@@ -739,31 +592,29 @@ export function EventDetailPageClient({ slug, eventId, clubId: propClubId }: Eve
                 );
               })}
 
-              <div className="flex items-center justify-end gap-3 pt-3 border-t">
+              <div className="flex items-center justify-end gap-3 border-t-2 border-dashed border-[var(--border-soft)] pt-4">
                 <button
                   type="button"
                   onClick={() => setShowFormModal(false)}
                   disabled={registerMutation.isPending}
-                  className={`px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider border transition cursor-pointer ${
-                    isDark ? 'bg-white/5 border-white/10 text-gray-300 hover:text-white' : 'bg-slate-100 border-slate-200 text-slate-700'
-                  }`}
+                  className="min-h-11 rounded-xl border-2 border-[var(--border-strong)] bg-[var(--surface-card)] px-4 text-xs font-bold uppercase tracking-wider text-[var(--text-primary)] transition-colors hover:bg-[var(--surface-tile)] disabled:cursor-not-allowed disabled:opacity-50 motion-reduce:transition-none focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)]"
                 >
-                  Cancel
+                  {t.formCancel}
                 </button>
                 <button
                   type="submit"
                   disabled={registerMutation.isPending}
-                  className="px-5 py-2.5 rounded-xl bg-[#00F0FF] hover:bg-[#38f2ff] text-black font-extrabold text-xs uppercase tracking-wider transition cursor-pointer flex items-center gap-2"
+                  className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[var(--accent-strong)] px-5 text-xs font-bold uppercase tracking-wider text-[var(--on-primary)] transition-transform hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50 motion-reduce:transition-none focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-card)]"
                 >
                   {registerMutation.isPending ? (
                     <>
-                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                      <span>Submitting...</span>
+                      <RefreshCw aria-hidden className="h-3.5 w-3.5 animate-spin motion-reduce:animate-none" />
+                      {t.formSubmitting}
                     </>
                   ) : (
                     <>
-                      <span>Submit & Register</span>
-                      <ArrowRight className="w-3.5 h-3.5" />
+                      {t.formSubmit}
+                      <ArrowRight aria-hidden className="h-3.5 w-3.5" />
                     </>
                   )}
                 </button>
@@ -773,45 +624,37 @@ export function EventDetailPageClient({ slug, eventId, clubId: propClubId }: Eve
         </div>
       )}
 
-      {/* Confirmation Modal */}
+      {/* Confirmation modal */}
       {showModal && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
           <div
-            className={`border rounded-3xl max-w-md w-full p-8 text-center space-y-4 shadow-2xl ${
-              isDark ? 'bg-[#12141C] border-white/15 text-white' : 'bg-white border-slate-200 text-[#0F172A]'
-            }`}
+            role="dialog"
+            aria-modal="true"
+            aria-label={t.rsvpConfirmedTitle}
+            className="w-full max-w-md space-y-4 rounded-3xl border-2 border-[var(--border-strong)] bg-[var(--surface-card)] p-8 text-center shadow-brutal-lg"
           >
-            <div className="w-16 h-16 rounded-full bg-emerald-500/20 text-emerald-500 flex items-center justify-center mx-auto border border-emerald-500/30">
-              <CheckCircle2 className="w-10 h-10" />
+            <div className="mx-auto grid h-16 w-16 place-items-center rounded-full border-2 border-[var(--border-strong)] bg-[var(--surface-tile)]">
+              <CheckCircle2 aria-hidden className="h-9 w-9 text-[var(--accent-strong)]" />
             </div>
-            <h3
-              className={`font-['Syne',sans-serif] text-2xl font-black uppercase ${
-                isDark ? 'text-white' : 'text-[#0F172A]'
-              }`}
-            >
-              RSVP Confirmed!
-            </h3>
-            <p className={`text-xs leading-relaxed ${isDark ? 'text-gray-300' : 'text-slate-600'}`}>
-              Your registration for <strong>{event?.title}</strong> is confirmed. Check your email for further instructions.
+            <h3 className="font-campus text-3xl uppercase tracking-wide text-[var(--text-primary)]">{t.rsvpConfirmedTitle}</h3>
+            <p className="text-xs leading-relaxed text-[var(--text-secondary)]">
+              {t.rsvpConfirmedBody(event?.title || '')}
             </p>
             <button
               type="button"
               onClick={() => setShowModal(false)}
-              className="w-full py-3 rounded-full bg-[#00F0FF] text-black text-xs font-bold uppercase tracking-wider cursor-pointer"
+              className="min-h-11 w-full rounded-xl bg-[var(--accent-strong)] px-5 text-sm font-bold text-[var(--on-primary)] transition-transform hover:-translate-y-0.5 motion-reduce:transition-none focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-[var(--accent-strong)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-card)]"
             >
-              Done
+              {t.done}
             </button>
           </div>
         </div>
       )}
 
-      {/* Gallery Lightbox */}
-      {activeGalleryEvent && (
-        <GalleryLightbox event={activeGalleryEvent} onClose={() => setActiveGalleryEvent(null)} />
-      )}
+      {/* Gallery lightbox */}
+      {activeGalleryEvent && <GalleryLightbox event={activeGalleryEvent} onClose={() => setActiveGalleryEvent(null)} />}
     </PublicLayout>
   );
 }
 
 export default EventDetailPageClient;
-
