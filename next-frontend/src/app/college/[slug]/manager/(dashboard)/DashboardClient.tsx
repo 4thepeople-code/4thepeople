@@ -406,10 +406,10 @@ export default function ManagerDashboardClient({ slug }: ManagerDashboardClientP
               </span>
               <div className="min-w-0">
                 <p className="text-xs font-bold uppercase tracking-wider text-[var(--primary)]">
-                  Primary Club · {clubs[0].name}
+                  {t.primaryClubEyebrow(clubs[0].name)}
                 </p>
                 <p className="text-xs text-[var(--ink-soft)] mt-0.5">
-                  Publish an event or preview the live campus directory for this college.
+                  {t.primaryClubHint}
                 </p>
               </div>
             </div>
@@ -419,8 +419,8 @@ export default function ManagerDashboardClient({ slug }: ManagerDashboardClientP
                   {t.createEventForClub}
                 </DashboardButton>
               </Link>
-              <Link href={`/college/${slug}/events`} target="_blank" rel="noopener noreferrer">
-                <DashboardButton variant="secondary" size="sm" leftIcon={<ExternalLink aria-hidden="true" className="h-4 w-4" />}>
+              <Link href={`/college/${slug}`} aria-label={t.browsePublicFeed}>
+                <DashboardButton variant="secondary" size="sm" leftIcon={<ArrowRight aria-hidden="true" className="h-4 w-4" />}>
                   {t.browsePublicFeed}
                 </DashboardButton>
               </Link>
@@ -434,8 +434,8 @@ export default function ManagerDashboardClient({ slug }: ManagerDashboardClientP
               <Compass aria-hidden="true" className="h-4 w-4 text-[var(--primary)] shrink-0" />
               <span>{t.browsePublicFeedHint}</span>
             </div>
-            <Link href={`/college/${slug}/events`} target="_blank" rel="noopener noreferrer">
-              <DashboardButton variant="secondary" size="sm" leftIcon={<ExternalLink aria-hidden="true" className="h-3.5 w-3.5" />}>
+            <Link href={`/college/${slug}`} aria-label={t.browsePublicFeed}>
+              <DashboardButton variant="secondary" size="sm" leftIcon={<ArrowRight aria-hidden="true" className="h-3.5 w-3.5" />}>
                 {t.browsePublicFeed}
               </DashboardButton>
             </Link>
