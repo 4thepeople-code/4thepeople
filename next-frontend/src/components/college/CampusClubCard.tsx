@@ -22,6 +22,7 @@ export default function CampusClubCard({ club, href }: CampusClubCardProps) {
     club.logo?.url,
   );
   const memberCount = club._count?.members ?? club.membersCount ?? club.memberCount;
+  const upcomingEvents = club.events?.length ?? club._count?.events;
 
   return (
     <Link href={href} className="group block" aria-label={`View the ${club.name} club`}>
@@ -57,7 +58,13 @@ export default function CampusClubCard({ club, href }: CampusClubCardProps) {
         </div>
 
         {club.description && (
-          <p className="mt-3 line-clamp-2 text-sm font-medium text-[var(--text-secondary)]">{club.description}</p>
+          <p className="mt-3 line-clamp-1 text-sm font-medium text-[var(--text-secondary)]">{club.description}</p>
+        )}
+
+        {typeof upcomingEvents === 'number' && upcomingEvents > 0 && (
+          <p className="mt-3 text-xs font-bold uppercase tracking-wider text-[var(--text-secondary)]">
+            {upcomingEvents} upcoming {upcomingEvents === 1 ? 'event' : 'events'}
+          </p>
         )}
       </article>
     </Link>
