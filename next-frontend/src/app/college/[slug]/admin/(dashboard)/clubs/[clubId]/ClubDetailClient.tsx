@@ -173,7 +173,7 @@ export default function ClubDetailClient({ slug, clubId }: ClubDetailClientProps
               onClick={handleRefresh}
               leftIcon={<RefreshCw aria-hidden="true" className="h-4 w-4" />}
             >
-              {actions.retry}
+              {actions.refresh}
             </DashboardButton>
             <DashboardButton
               variant="secondary"

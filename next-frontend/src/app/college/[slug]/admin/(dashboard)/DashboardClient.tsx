@@ -134,7 +134,7 @@ export default function DashboardClient({ slug }: DashboardClientProps) {
             onClick={handleRefresh}
             leftIcon={<RefreshCw aria-hidden="true" className="h-4 w-4" />}
           >
-            {actions.retry}
+            {actions.refresh}
           </DashboardButton>
         }
       />

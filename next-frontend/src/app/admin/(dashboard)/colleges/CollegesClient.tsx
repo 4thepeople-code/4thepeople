@@ -516,7 +516,7 @@ export default function CollegesClient() {
           </Field>
           <div className="flex items-end">
             <DashboardButton variant="secondary" size="sm" onClick={() => refetch()} loading={isRefetching} loadingLabel={t.loadingLabel} leftIcon={isRefetching ? undefined : <RefreshCw aria-hidden="true" className="h-4 w-4" />}>
-              {isRefetching ? t.loadingLabel : actions.retry}
+              {isRefetching ? t.loadingLabel : actions.refresh}
             </DashboardButton>
           </div>
         </div>

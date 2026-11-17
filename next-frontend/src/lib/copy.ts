@@ -40,6 +40,8 @@ export const actions = {
   delete: 'Delete',
   keep: 'Keep',
   undo: 'Undo',
+  /** Refresh while data is loaded fine; "Try again" is for real error states. */
+  refresh: 'Refresh',
   retry: 'Try again',
   logOut: 'Log out',
   goToLogin: 'Go to login',

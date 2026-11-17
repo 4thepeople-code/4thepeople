@@ -81,7 +81,7 @@ export default function MyClubsClient({ slug }: MyClubsClientProps) {
             onClick={() => void refetch()}
             leftIcon={<RefreshCw aria-hidden="true" className="h-4 w-4" />}
           >
-            {actions.retry}
+            {actions.refresh}
           </DashboardButton>
           <DashboardButton
             variant="primary"
