@@ -4,6 +4,7 @@ import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useTheme } from '@/context/ThemeContext';
+import { campusPublic } from '@/lib/copy';
 import BrandLogo from '@/components/BrandLogo';
 
 export interface PublicFooterProps {
@@ -23,7 +24,11 @@ export function PublicFooter({ collegeSlug, collegeName }: PublicFooterProps) {
   };
 
   const homeHref = getPath('/');
+  const eventsHref = getPath('/events');
   const clubsHref = getPath('/clubs');
+  const departmentsHref = getPath('/departments');
+  const studentHref = getPath('/student');
+  const managerHref = getPath('/manager');
   const loginHref = getPath('/login');
 
   /* ================================================================== */
@@ -60,24 +65,39 @@ export function PublicFooter({ collegeSlug, collegeName }: PublicFooterProps) {
               <ul className="space-y-1">
                 <li>
                   <Link href={homeHref} className={footerLink}>
-                    Home
+                    {campusPublic.footer.home}
+                  </Link>
+                </li>
+                <li>
+                  <Link href={eventsHref} className={footerLink}>
+                    {campusPublic.footer.events}
                   </Link>
                 </li>
                 <li>
                   <Link href={clubsHref} className={footerLink}>
-                    Clubs Directory
+                    {campusPublic.footer.clubs}
+                  </Link>
+                </li>
+                <li>
+                  <Link href={departmentsHref} className={footerLink}>
+                    {campusPublic.footer.departments}
                   </Link>
                 </li>
               </ul>
             </div>
 
-            {/* Portals Link */}
+            {/* Portals */}
             <div className="space-y-2 md:col-span-3">
-              <h4 className={footerHeading}>Manager Access</h4>
+              <h4 className={footerHeading}>Portals</h4>
               <ul className="space-y-1">
                 <li>
-                  <Link href={loginHref} className={footerLink}>
-                    Manager Portal Login
+                  <Link href={studentHref} className={footerLink}>
+                    {campusPublic.footer.studentPortal}
+                  </Link>
+                </li>
+                <li>
+                  <Link href={managerHref} className={footerLink}>
+                    {campusPublic.footer.managerPortal}
                   </Link>
                 </li>
               </ul>

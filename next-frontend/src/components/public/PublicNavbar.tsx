@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import { Compass, Menu, X, ArrowUpRight, LogIn, Sun, Moon, UserCheck } from 'lucide-react';
 import { useTheme } from '@/context/ThemeContext';
 import { useAuth } from '@/context/AuthContext';
+import { actions } from '@/lib/copy';
 import BrandLogo from '@/components/BrandLogo';
 
 export interface PublicNavbarProps {
@@ -54,7 +55,7 @@ export function PublicNavbar({ collegeSlug, collegeName }: PublicNavbarProps) {
   };
 
   const homeHref = getPath('/');
-  const eventsHref = `${getPath('/')}#upcoming-events`;
+  const eventsHref = getPath('/events');
   const clubsHref = getPath('/clubs');
   const departmentsHref = getPath('/departments');
   const loginHref = getPath('/login');
@@ -72,6 +73,7 @@ export function PublicNavbar({ collegeSlug, collegeName }: PublicNavbarProps) {
   /* Campus chrome (college pages) — single light theme, no toggle       */
   /* ================================================================== */
   if (campus) {
+    const isClubPage = pathname.startsWith(`/college/${collegeSlug}/clubs`);
     const desktopLink = (active: boolean) =>
       `inline-flex h-11 items-center text-sm font-semibold transition-colors ${
         active
@@ -111,9 +113,9 @@ export function PublicNavbar({ collegeSlug, collegeName }: PublicNavbarProps) {
                 Home
               </Link>
 
-              <a href={eventsHref} onClick={scrollToEvents} className={desktopLink(false)}>
+              <Link href={eventsHref} className={desktopLink(pathname === eventsHref || pathname.startsWith(`${eventsHref}/`))}>
                 Events
-              </a>
+              </Link>
 
               <Link href={clubsHref} className={desktopLink(pathname.includes('/clubs'))}>
                 Clubs Directory
@@ -144,11 +146,11 @@ export function PublicNavbar({ collegeSlug, collegeName }: PublicNavbarProps) {
               )}
 
               <Link
-                href={clubsHref}
+                href={isClubPage ? eventsHref : clubsHref}
                 className="inline-flex h-11 items-center gap-2 rounded-xl bg-[var(--accent-strong)] px-5 text-sm font-bold text-white transition-transform hover:-translate-y-0.5"
               >
                 <Compass className="h-4 w-4" aria-hidden />
-                <span>Explore Clubs</span>
+                <span>{isClubPage ? actions.browseEvents : 'Explore Clubs'}</span>
                 <ArrowUpRight className="h-4 w-4" aria-hidden />
               </Link>
             </div>
@@ -187,16 +189,13 @@ export function PublicNavbar({ collegeSlug, collegeName }: PublicNavbarProps) {
               >
                 Home
               </Link>
-              <a
+              <Link
                 href={eventsHref}
-                onClick={(e) => {
-                  setMobileMenuOpen(false);
-                  scrollToEvents(e);
-                }}
+                onClick={() => setMobileMenuOpen(false)}
                 className="flex min-h-11 items-center rounded-lg px-3 text-sm font-semibold text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-tile)] hover:text-[var(--text-primary)]"
               >
                 Events
-              </a>
+              </Link>
               <Link
                 href={clubsHref}
                 onClick={() => setMobileMenuOpen(false)}
@@ -247,12 +246,12 @@ export function PublicNavbar({ collegeSlug, collegeName }: PublicNavbarProps) {
 
               <div className="mt-2 border-t-2 border-dashed border-[var(--border-soft)] pt-3">
                 <Link
-                  href={clubsHref}
+                  href={isClubPage ? eventsHref : clubsHref}
                   onClick={() => setMobileMenuOpen(false)}
                   className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[var(--accent-strong)] px-5 text-sm font-bold text-white transition-transform hover:-translate-y-0.5"
                 >
                   <Compass className="h-4 w-4" aria-hidden />
-                  <span>Explore Clubs</span>
+                  <span>{isClubPage ? actions.browseEvents : 'Explore Clubs'}</span>
                 </Link>
               </div>
             </div>
