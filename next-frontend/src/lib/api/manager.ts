@@ -28,6 +28,9 @@ export interface CreateEventInput {
   registrationMode?: 'INTERNAL' | 'EXTERNAL' | 'NONE';
   capacity?: number | null;
   visibility?: EventVisibility;
+  isPaid?: boolean;
+  fee?: number;
+  currency?: string;
   customFormDefinition?: { fields: unknown[] } | null;
   registrationDeadline?: string | null;
 }
@@ -45,6 +48,20 @@ export interface EventAttendeeItem {
   participantCollegeName?: string | null;
   homeCollegeId?: string | null;
   isUserDeleted?: boolean;
+  paymentTransactionId?: string | null;
+  paymentTransaction?: {
+    id: string;
+    amount: number;
+    currency: string;
+    status: string;
+    gatewayProvider?: string;
+    createdAt?: string;
+    refunds?: Array<{
+      id: string;
+      amount: number;
+      status: string;
+    }>;
+  } | null;
   user?: {
     id: string;
     name: string;

@@ -17,15 +17,13 @@ import {
   UserPlus,
   UserCheck,
   Globe,
-  Mail,
-  Phone,
   MapPin,
-  Shield,
   Loader2,
   X,
-  ExternalLink,
   Power,
+  CreditCard,
 } from 'lucide-react';
+import CollegePaymentConfigModal from './CollegePaymentConfigModal';
 import {
   usePlatformCollegesQuery,
   useCreateCollegeMutation,
@@ -62,6 +60,7 @@ export default function PlatformCollegesTab() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showAssignAdminModal, setShowAssignAdminModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [selectedCollege, setSelectedCollege] = useState<PlatformCollege | null>(null);
 
   // Form states
@@ -292,6 +291,11 @@ export default function PlatformCollegesTab() {
   const openViewModal = (college: PlatformCollege) => {
     setSelectedCollege(college);
     setShowViewModal(true);
+  };
+
+  const openPaymentModal = (college: PlatformCollege) => {
+    setSelectedCollege(college);
+    setShowPaymentModal(true);
   };
 
   // Helper for admin badge styling
@@ -581,10 +585,19 @@ export default function PlatformCollegesTab() {
                           {/* Edit */}
                           <button
                             onClick={() => openEditModal(college)}
-                            className="p-1.5 text-slate-500 hover:text-purple-600 dark:hover:text-purple-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+                            className="p-1.5 text-slate-500 hover:text-purple-600 dark:hover:text-purple-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
                             title="Edit college information"
                           >
                             <Edit2 className="w-3.5 h-3.5" />
+                          </button>
+
+                          {/* Payment Gateway Configuration */}
+                          <button
+                            onClick={() => openPaymentModal(college)}
+                            className="p-1.5 text-slate-500 hover:text-purple-600 dark:hover:text-purple-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
+                            title="Configure Payment Gateway"
+                          >
+                            <CreditCard className="w-3.5 h-3.5" />
                           </button>
 
                           {/* Assign Admin (if unassigned) */}
@@ -1136,6 +1149,17 @@ export default function PlatformCollegesTab() {
           </div>
         </div>
       )}
+
+      {/* College Payment Gateway Configuration Modal */}
+      <CollegePaymentConfigModal
+        isOpen={showPaymentModal}
+        college={selectedCollege}
+        onClose={() => {
+          setShowPaymentModal(false);
+          setSelectedCollege(null);
+        }}
+        onSuccess={(msg) => showNotification(msg)}
+      />
     </div>
   );
 }

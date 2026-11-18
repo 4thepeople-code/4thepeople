@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "type-check": "tsc --noEmit",
-    "test": "tsx tests/foundation.test.ts && tsx tests/public-directory.test.ts && tsx tests/student-portal.test.ts && tsx tests/manager-portal.test.ts && tsx tests/college-admin.test.ts && tsx tests/platform-admin.test.ts"
+    "test": "tsx tests/foundation.test.ts && tsx tests/public-directory.test.ts && tsx tests/student-portal.test.ts && tsx tests/manager-portal.test.ts && tsx tests/college-admin.test.ts && tsx tests/platform-admin.test.ts && tsx tests/payment-subsystem.test.ts"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.106.1",

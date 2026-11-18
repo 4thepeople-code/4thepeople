@@ -13,21 +13,17 @@ import type { PlatformAdminUser } from '@/types/platform';
 import {
   Users,
   UserPlus,
-  Shield,
   ShieldCheck,
   ShieldAlert,
   KeyRound,
   RotateCcw,
   CheckCircle2,
-  XCircle,
   AlertTriangle,
   Loader2,
   Eye,
   EyeOff,
   Copy,
   Check,
-  Lock,
-  QrCode,
 } from 'lucide-react';
 
 export function PlatformAdminsTab() {

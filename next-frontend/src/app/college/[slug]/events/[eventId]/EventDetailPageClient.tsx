@@ -33,7 +33,13 @@ import {
   CheckCircle2,
   Globe,
   Image as ImageIcon,
+  CreditCard,
 } from 'lucide-react';
+import { launchPaymentCheckout } from '@/lib/payment/paymentSdk';
+import {
+  useStudentCheckoutMutation,
+  useStudentVerifyPaymentMutation,
+} from '@/lib/api/payment';
 import type { Event } from '@/types/models';
 
 export interface EventDetailPageClientProps {
@@ -92,11 +98,14 @@ export function EventDetailPageClient({ slug, eventId, clubId: propClubId }: Eve
   const registerMutation = useRegisterForEventMutation(slug);
   const cancelMutation = useCancelRegistrationMutation(slug);
   const cancelExternalMutation = useCancelExternalMutation(slug);
+  const studentCheckoutMutation = useStudentCheckoutMutation();
+  const studentVerifyPaymentMutation = useStudentVerifyPaymentMutation(slug);
 
   const [showModal, setShowModal] = useState(false);
   const [showFormModal, setShowFormModal] = useState(false);
   const [showExternalDialog, setShowExternalDialog] = useState(false);
   const [showCrossCollegeModal, setShowCrossCollegeModal] = useState(false);
+  const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [formAnswers, setFormAnswers] = useState<Record<string, unknown>>({});
   const [formValidationError, setFormValidationError] = useState<string | null>(null);
   const [shareNotice, setShareNotice] = useState(false);
@@ -131,6 +140,56 @@ export function EventDetailPageClient({ slug, eventId, clubId: propClubId }: Eve
   const rawRegistrationUrl =
     event?.registrationUrl || event?.url || event?.formUrl || event?.link || event?.externalUrl;
   const validRegistrationUrl = getValidUrl(rawRegistrationUrl);
+
+  const executePaidCheckout = async (submittedAnswers?: Record<string, unknown>) => {
+    if (!event?.id || !user) return;
+    try {
+      setIsCheckingOut(true);
+      setRegError(null);
+
+      const session = await studentCheckoutMutation.mutateAsync({
+        eventId: event.id,
+        formAnswers: submittedAnswers,
+        returnUrl: window.location.href,
+      });
+
+      await launchPaymentCheckout({
+        session,
+        participant: {
+          name: user.name || 'Student Participant',
+          email: user.email,
+          phone: (user as unknown as { phone?: string })?.phone || undefined,
+        },
+        onSuccess: async (verifyPayload) => {
+          const verifyRes = await studentVerifyPaymentMutation.mutateAsync({
+            eventId: event.id,
+            payload: verifyPayload,
+          });
+
+          if (verifyRes.success && verifyRes.registration) {
+            setShowModal(true);
+          } else {
+            router.push(
+              `/college/${slug}/events/${event.id}/payment/status?transactionId=${session.transactionId}`
+            );
+          }
+        },
+        onFailure: (err) => {
+          setRegError(err.message);
+        },
+        onDismiss: () => {
+          setRegError('Checkout cancelled. You may complete your registration within 15 minutes before the seat reservation expires.');
+        },
+      });
+    } catch (err: unknown) {
+      const msg =
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+        (err instanceof Error ? err.message : 'Failed to initiate payment checkout.');
+      setRegError(msg);
+    } finally {
+      setIsCheckingOut(false);
+    }
+  };
 
   const handleRegister = async () => {
     if (validRegistrationUrl) {
@@ -168,6 +227,12 @@ export function EventDetailPageClient({ slug, eventId, clubId: propClubId }: Eve
       return;
     }
 
+    // If event is paid, initiate checkout
+    if (event.isPaid) {
+      await executePaidCheckout();
+      return;
+    }
+
     try {
       setRegError(null);
       await registerMutation.mutateAsync({ eventId: event.id });
@@ -187,6 +252,11 @@ export function EventDetailPageClient({ slug, eventId, clubId: propClubId }: Eve
     const fields = event.customFormDefinition?.fields;
     if (fields && Array.isArray(fields) && fields.length > 0) {
       setShowFormModal(true);
+      return;
+    }
+
+    if (event.isPaid) {
+      await executePaidCheckout();
       return;
     }
 
@@ -215,6 +285,12 @@ export function EventDetailPageClient({ slug, eventId, clubId: propClubId }: Eve
         setFormValidationError(`"${f.label || key}" is required.`);
         return;
       }
+    }
+
+    if (event.isPaid) {
+      setShowFormModal(false);
+      await executePaidCheckout(formAnswers);
+      return;
     }
 
     try {
@@ -373,6 +449,17 @@ export function EventDetailPageClient({ slug, eventId, clubId: propClubId }: Eve
                           <span>{club.name}</span>
                         </Link>
                       )}
+
+                      {event.isPaid ? (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20 text-xs font-bold uppercase tracking-wider">
+                          <CreditCard className="w-3.5 h-3.5" />
+                          <span>Fee: ₹{event.fee || 0}</span>
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-cyan-500/10 text-cyan-600 dark:text-[#00F0FF] border border-cyan-500/20 text-xs font-bold uppercase tracking-wider">
+                          <span>Free RSVP</span>
+                        </span>
+                      )}
                     </div>
 
                     <h1
@@ -515,6 +602,9 @@ export function EventDetailPageClient({ slug, eventId, clubId: propClubId }: Eve
                           onClick={handleRegister}
                           disabled={
                             registerMutation.isPending ||
+                            isCheckingOut ||
+                            studentCheckoutMutation.isPending ||
+                            studentVerifyPaymentMutation.isPending ||
                             (isCrossCollege && event.visibility !== 'PUBLIC') ||
                             (event.capacity !== null &&
                               event.capacity !== undefined &&
@@ -529,10 +619,13 @@ export function EventDetailPageClient({ slug, eventId, clubId: propClubId }: Eve
                               : 'bg-[#00F0FF] hover:bg-[#38f2ff] text-black shadow-cyan-500/30'
                           }`}
                         >
-                          {registerMutation.isPending ? (
+                          {registerMutation.isPending ||
+                          isCheckingOut ||
+                          studentCheckoutMutation.isPending ||
+                          studentVerifyPaymentMutation.isPending ? (
                             <>
                               <RefreshCw className="w-4 h-4 animate-spin" />
-                              <span>Registering...</span>
+                              <span>{isCheckingOut ? 'Securing Checkout...' : 'Registering...'}</span>
                             </>
                           ) : event.capacity !== null &&
                             event.capacity !== undefined &&
@@ -548,7 +641,7 @@ export function EventDetailPageClient({ slug, eventId, clubId: propClubId }: Eve
                             </>
                           ) : (
                             <>
-                              <span>RSVP / Register Now</span>
+                              <span>{event.isPaid ? `Pay ₹${event.fee || 0} & Register` : 'RSVP / Register Now'}</span>
                               <ArrowRight className="w-4 h-4" />
                             </>
                           )}

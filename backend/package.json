@@ -17,7 +17,7 @@
     "test:phase_s1_closure": "node tests/phase_s1_closure_targeted.test.js",
     "test:platform_colleges": "node tests/platform_college_management.test.js",
     "test:certificates": "node tests/certificates.test.js",
-    "test:payments": "node --test tests/paymentCredentialService.test.js tests/paymentAdapters.test.js tests/paymentConfigService.test.js tests/paymentLifecycle.test.js",
+    "test:payments": "node --test tests/paymentCredentialService.test.js tests/paymentAdapters.test.js tests/paymentConfigService.test.js tests/paymentLifecycle.test.js tests/paymentContractClosure.test.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

@@ -143,6 +143,8 @@ export interface Event {
   capacity?: number | null;
   registeredCount?: number;
   isPaid?: boolean;
+  fee?: number;
+  currency?: string;
   ticketPrice?: number | string | null;
   customFormDefinition?: CustomFormDefinition | null;
   coverImageUrl?: string | null;
@@ -174,6 +176,20 @@ export interface EventRegistration {
   isUserDeleted?: boolean;
   registeredByRole?: string | null;
   formAnswers?: Record<string, unknown> | null;
+  paymentTransactionId?: string | null;
+  paymentTransaction?: {
+    id: string;
+    amount: number;
+    currency: string;
+    status: string;
+    gatewayProvider?: string;
+    createdAt?: string;
+    refunds?: Array<{
+      id: string;
+      amount: number;
+      status: string;
+    }>;
+  } | null;
   registeredAt: string;
   user?: User | null;
   event?: Event;

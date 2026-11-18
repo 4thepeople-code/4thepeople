@@ -363,6 +363,130 @@ class PaymentVerificationService {
       });
     }
   }
+
+  /**
+   * Retrieves authoritative, safe transaction status for an authorized caller.
+   *
+   * @param {Object} params
+   * @param {string} params.collegeId - College UUID
+   * @param {string} params.transactionId - Transaction UUID
+   * @param {Object} [params.caller] - Caller context { userId, userRole, externalEmail }
+   * @returns {Promise<Object>} Authoritative transaction status and registration state
+   */
+  async getTransactionStatus(params) {
+    const { collegeId, transactionId, caller = {} } = params;
+
+    if (!collegeId) throw new Error('collegeId is required');
+    if (!transactionId) throw new Error('transactionId is required');
+
+    // 1. Fetch transaction with safe, projected columns
+    const txn = await this.prisma.paymentTransaction.findUnique({
+      where: { id: transactionId },
+      select: {
+        id: true,
+        collegeId: true,
+        eventId: true,
+        reservationId: true,
+        participantType: true,
+        userId: true,
+        externalParticipantId: true,
+        amount: true,
+        currency: true,
+        status: true,
+        gatewayProvider: true,
+        paymentMode: true,
+        gatewayOrderId: true,
+        gatewayPaymentId: true,
+        paymentMethod: true,
+        vpaMasked: true,
+        failureReason: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    if (!txn || txn.collegeId !== collegeId) {
+      const err = new Error(`Transaction ${transactionId} not found`);
+      err.statusCode = 404;
+      throw err;
+    }
+
+    // 2. Authorization check
+    const isCollegeAdminOrManager =
+      caller.userRole === 'COLLEGE_ADMIN' || caller.userRole === 'MANAGER';
+
+    if (!isCollegeAdminOrManager) {
+      if (caller.userId) {
+        if (!txn.userId || txn.userId !== caller.userId) {
+          const err = new Error('Unauthorized: Transaction does not belong to the authenticated student');
+          err.statusCode = 403;
+          throw err;
+        }
+      } else if (caller.externalEmail) {
+        if (!txn.externalParticipantId) {
+          const err = new Error('Unauthorized: Transaction does not belong to an external participant');
+          err.statusCode = 403;
+          throw err;
+        }
+        const ext = await this.prisma.externalParticipant.findUnique({
+          where: { id: txn.externalParticipantId },
+          select: { email: true },
+        });
+        if (!ext || ext.email.toLowerCase() !== caller.externalEmail.toLowerCase()) {
+          const err = new Error('Unauthorized: Transaction does not belong to the authenticated external participant');
+          err.statusCode = 403;
+          throw err;
+        }
+      } else {
+        const err = new Error('Unauthorized: Invalid caller credentials');
+        err.statusCode = 403;
+        throw err;
+      }
+    }
+
+    // 3. Check for confirmed event registration
+    let registration = null;
+    if (txn.status === 'PAID') {
+      registration = await this.prisma.eventRegistration.findFirst({
+        where: { paymentTransactionId: txn.id },
+        select: {
+          id: true,
+          eventId: true,
+          status: true,
+          registeredAt: true,
+        },
+      });
+    }
+
+    return {
+      transaction: {
+        id: txn.id,
+        collegeId: txn.collegeId,
+        eventId: txn.eventId,
+        amount: txn.amount,
+        currency: txn.currency,
+        status: txn.status,
+        gatewayProvider: txn.gatewayProvider,
+        paymentMode: txn.paymentMode,
+        gatewayOrderId: txn.gatewayOrderId,
+        gatewayPaymentId: txn.gatewayPaymentId,
+        paymentMethod: txn.paymentMethod,
+        vpaMasked: txn.vpaMasked,
+        failureReason: txn.failureReason,
+        createdAt: txn.createdAt,
+        updatedAt: txn.updatedAt,
+      },
+      isRegistered: Boolean(registration),
+      registration: registration
+        ? {
+            id: registration.id,
+            eventId: registration.eventId,
+            status: registration.status,
+            registeredAt: registration.registeredAt,
+          }
+        : null,
+    };
+  }
 }
 
 const defaultPaymentVerificationService = new PaymentVerificationService();

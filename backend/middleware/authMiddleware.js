@@ -389,6 +389,89 @@ const authenticateExternalToken = (req, res, next) => {
   }
 };
 
+/**
+ * authenticateAnyParticipant
+ *
+ * Authenticates either a student user (including cross-college students)
+ * or an external participant (via external verification JWT).
+ *
+ * Sets req.user (for students) OR req.externalUser (for external participants).
+ */
+const authenticateAnyParticipant = async (req, res, next) => {
+  let token = null;
+
+  const authHeader = req.headers['authorization'];
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    token = authHeader.split(' ')[1];
+  } else if (req.cookies && (req.cookies.yuva_token || req.cookies.token)) {
+    token = req.cookies.yuva_token || req.cookies.token;
+  }
+
+  if (!token) {
+    return next(new AppError('Authentication required', 401));
+  }
+
+  const jwtSecret = process.env.JWT_SECRET || process.env.JWT_SECRET_TOKEN;
+  if (!jwtSecret && process.env.NODE_ENV === 'production') {
+    return next(new Error('JWT_SECRET configuration missing in production'));
+  }
+  const effectiveSecret = jwtSecret || 'dev_insecure_jwt_secret_fallback_do_not_use_in_prod';
+
+  try {
+    const decoded = jwt.verify(token, effectiveSecret);
+
+    if (decoded.type === 'external') {
+      if (!decoded.email) {
+        return next(new AppError('Malformed external verification token', 401));
+      }
+      if (req.collegeId && decoded.hostCollegeId && decoded.hostCollegeId !== req.collegeId) {
+        return next(new AppError('Access denied: Token issued for a different college', 403));
+      }
+      req.externalUser = {
+        email: decoded.email,
+        hostCollegeId: decoded.hostCollegeId || req.collegeId,
+      };
+      return next();
+    }
+
+    // Student or Manager token
+    const tokenCollegeId = decoded.collegeId;
+    if (!tokenCollegeId || !decoded.userId) {
+      return next(new AppError('Invalid token payload', 401));
+    }
+
+    const user = await withTenant(tokenCollegeId, async (tx) => {
+      return tx.user.findFirst({
+        where: { id: decoded.userId, collegeId: tokenCollegeId },
+        select: {
+          id: true,
+          collegeId: true,
+          name: true,
+          email: true,
+          role: true,
+          isActive: true,
+          college: { select: { name: true } },
+        },
+      });
+    });
+
+    if (!user || !user.isActive) {
+      return next(new AppError('User not found or account is deactivated', 401));
+    }
+
+    req.user = user;
+    req.homeCollegeId = tokenCollegeId;
+    req.isCrossCollege = req.collegeId ? (tokenCollegeId !== req.collegeId) : false;
+    next();
+  } catch (error) {
+    if (error instanceof AppError) return next(error);
+    if (error.name === 'TokenExpiredError') {
+      return next(new AppError('Token has expired', 401));
+    }
+    return next(new AppError('Invalid token', 401));
+  }
+};
+
 module.exports = {
   authenticateToken,
   requireAdmin,
@@ -397,4 +480,5 @@ module.exports = {
   requireAdminOrClubManager,
   crossCollegeRegisterMiddleware,
   authenticateExternalToken,
+  authenticateAnyParticipant,
 };

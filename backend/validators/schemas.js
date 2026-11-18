@@ -79,8 +79,20 @@ const createEventBody = z.object({
   registrationUrl: z.string().trim().nullable().optional(),
   capacity: z.number().int().positive('Capacity must be a positive integer').nullable().optional(),
   visibility: z.enum(['COLLEGE', 'PUBLIC']).default('COLLEGE').optional(),
+  isPaid: z.boolean().default(false).optional(),
+  is_paid: z.boolean().optional(),
+  fee: z.number().int().min(0, 'Fee must be a non-negative integer').default(0).optional(),
+  currency: z.string().trim().toUpperCase().default('INR').optional(),
 }).refine((value) => !value.endAt || value.endAt > value.startAt, {
   message: 'endAt must be after startAt', path: ['endAt'],
+}).refine((value) => {
+  const isPaid = Boolean(value.isPaid || value.is_paid);
+  if (isPaid) {
+    return typeof value.fee === 'number' && value.fee > 0;
+  }
+  return true;
+}, {
+  message: 'Paid events must specify a positive fee', path: ['fee'],
 });
 const updateEventBody = z.object({
   title: text('title', 200).optional(),
@@ -92,7 +104,20 @@ const updateEventBody = z.object({
   registrationUrl: z.string().trim().nullable().optional(),
   capacity: z.number().int().positive('Capacity must be a positive integer').nullable().optional(),
   visibility: z.enum(['COLLEGE', 'PUBLIC']).optional(),
-}).refine((value) => Object.keys(value).length > 0, 'At least one event field is required');
+  isPaid: z.boolean().optional(),
+  is_paid: z.boolean().optional(),
+  fee: z.number().int().min(0, 'Fee must be a non-negative integer').optional(),
+  currency: z.string().trim().toUpperCase().optional(),
+}).refine((value) => Object.keys(value).length > 0, 'At least one event field is required')
+  .refine((value) => {
+    const isPaid = value.isPaid !== undefined ? value.isPaid : value.is_paid;
+    if (isPaid === true && value.fee !== undefined) {
+      return value.fee > 0;
+    }
+    return true;
+  }, {
+    message: 'Paid events must specify a positive fee', path: ['fee'],
+  });
 
 const attendeeQuery = z.object({
   page: z.coerce.number().int().positive().optional(),

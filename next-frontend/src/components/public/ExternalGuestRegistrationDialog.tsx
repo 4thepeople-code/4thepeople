@@ -14,6 +14,7 @@ import {
   RefreshCw,
   ArrowRight,
   ArrowLeft,
+  CreditCard,
 } from 'lucide-react';
 import { useTheme } from '@/context/ThemeContext';
 import {
@@ -23,6 +24,8 @@ import {
   getExternalRegistrationStatus,
   ExternalRegisterInput,
 } from '@/lib/api/events';
+import { externalCheckout, externalVerifyPayment } from '@/lib/api/payment';
+import { launchPaymentCheckout } from '@/lib/payment/paymentSdk';
 import type { Event } from '@/types/models';
 
 export interface ExternalGuestRegistrationDialogProps {
@@ -239,6 +242,47 @@ export function ExternalGuestRegistrationDialog({
         formAnswers: Object.keys(formAnswers).length > 0 ? formAnswers : undefined,
       };
 
+      if (event.isPaid) {
+        const checkoutSession = await externalCheckout(
+          event.id,
+          {
+            name: name.trim(),
+            phone: phone.trim() || undefined,
+            formAnswers: Object.keys(formAnswers).length > 0 ? formAnswers : undefined,
+            returnUrl: window.location.href,
+          },
+          token
+        );
+
+        await launchPaymentCheckout({
+          session: checkoutSession,
+          participant: {
+            name: name.trim(),
+            email: email.trim().toLowerCase(),
+            phone: phone.trim() || undefined,
+          },
+          onSuccess: async (verifyPayload) => {
+            const verifyRes = await externalVerifyPayment(event.id, verifyPayload, token);
+            if (verifyRes.success && verifyRes.registration) {
+              setSuccessData(verifyRes.registration);
+              setStep('CONFIRMATION');
+              onSuccess(verifyRes.registration);
+            } else {
+              setErrorMessage(
+                verifyRes.message || 'Payment is processing. You will receive an email receipt once confirmed.'
+              );
+            }
+          },
+          onFailure: (err) => {
+            setErrorMessage(err.message);
+          },
+          onDismiss: () => {
+            setErrorMessage('Payment was cancelled. Your seat reservation will expire in 15 minutes if not completed.');
+          },
+        });
+        return;
+      }
+
       const regRes = await registerExternalParticipant(event.id, input, token);
 
       setSuccessData(regRes.registration);
@@ -350,9 +394,20 @@ export function ExternalGuestRegistrationDialog({
           {/* STEP 1: PARTICIPANT DETAILS */}
           {step === 'DETAILS' && (
             <form onSubmit={handleRequestOtp} className="space-y-4">
-              <div className="p-3 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-xs text-indigo-300">
-                <span className="font-bold">Registering for: </span>
-                <span className="font-semibold">{event.title}</span>
+              <div className="p-3 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-xs text-indigo-300 flex items-center justify-between">
+                <div>
+                  <span className="font-bold">Registering for: </span>
+                  <span className="font-semibold">{event.title}</span>
+                </div>
+                {event.isPaid ? (
+                  <span className="px-2.5 py-0.5 rounded-full bg-purple-500/20 text-purple-300 font-bold font-mono">
+                    ₹{event.fee || 0}
+                  </span>
+                ) : (
+                  <span className="px-2.5 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 font-bold">
+                    Free RSVP
+                  </span>
+                )}
               </div>
 
               <div>
@@ -583,12 +638,12 @@ export function ExternalGuestRegistrationDialog({
                   {isVerifying ? (
                     <>
                       <Loader2 className="w-4 h-4 animate-spin" />
-                      Verifying & Registering...
+                      <span>{event.isPaid ? 'Verifying & Securing Checkout...' : 'Verifying & Registering...'}</span>
                     </>
                   ) : (
                     <>
-                      Verify & Complete Registration
-                      <CheckCircle2 className="w-4 h-4" />
+                      <span>{event.isPaid ? `Verify & Pay ₹${event.fee || 0}` : 'Verify & Complete Registration'}</span>
+                      {event.isPaid ? <CreditCard className="w-4 h-4" /> : <CheckCircle2 className="w-4 h-4" />}
                     </>
                   )}
                 </button>

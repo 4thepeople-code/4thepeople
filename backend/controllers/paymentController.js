@@ -6,6 +6,7 @@ const { defaultPaymentOrderService } = require('../services/payment/paymentOrder
 const { defaultPaymentVerificationService } = require('../services/payment/paymentVerificationService');
 const { defaultPaymentWebhookService } = require('../services/payment/paymentWebhookService');
 const { defaultPaymentRefundService } = require('../services/payment/paymentRefundService');
+const { defaultPaymentConfigService } = require('../services/payment/paymentConfigService');
 
 const UUID_REGEX = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 
@@ -253,5 +254,82 @@ exports.platformRefund = asyncHandler(async (req, res) => {
     success: true,
     message: 'Platform refund processed successfully',
     data: result,
+  });
+});
+
+/**
+ * GET /api/payments/transactions/:transactionId
+ * or GET /api/events/:eventId/payment-status (with query transactionId)
+ *
+ * Authoritative, tenant-safe payment transaction status endpoint.
+ * Returns authoritative transaction and registration states.
+ * Guarantees zero sensitive gateway credential or signature leakage.
+ */
+exports.getTransactionStatus = asyncHandler(async (req, res) => {
+  const transactionId = req.params.transactionId || (req.query && req.query.transactionId);
+  validateUUID(transactionId, 'transaction ID');
+
+  const userId = req.user ? req.user.id : null;
+  const userRole = req.user ? req.user.role : null;
+  const externalEmail = req.externalUser ? req.externalUser.email : null;
+
+  if (!userId && !externalEmail) {
+    throw new AppError('Authentication required', 401);
+  }
+
+  const effectiveCollegeId = req.collegeId || (req.externalUser && req.externalUser.hostCollegeId);
+  if (!effectiveCollegeId) {
+    throw new AppError('College context required', 400);
+  }
+
+  const result = await defaultPaymentVerificationService.getTransactionStatus({
+    collegeId: effectiveCollegeId,
+    transactionId,
+    caller: {
+      userId,
+      userRole,
+      externalEmail,
+    },
+  });
+
+  res.status(200).json({
+    success: true,
+    data: result,
+  });
+});
+
+/**
+ * GET /api/payments/readiness
+ *
+ * Read-only endpoint reporting whether the college has an active, usable payment gateway.
+ * Returns only safe information: configured status, provider, environment and readiness.
+ * Never returns credentials or secrets.
+ */
+exports.getGatewayReadiness = asyncHandler(async (req, res) => {
+  if (!req.collegeId) {
+    throw new AppError('Tenant context required: request must be routed through a college subdomain', 400);
+  }
+
+  const config = await defaultPaymentConfigService.getConfig(req.collegeId);
+
+  const isReady = Boolean(
+    config.configured &&
+    config.status === 'ACTIVE' &&
+    config.hasKeyId &&
+    config.hasKeySecret
+  );
+
+  res.status(200).json({
+    success: true,
+    data: {
+      collegeId: req.collegeId,
+      configured: Boolean(config.configured),
+      status: config.status || 'NOT_CONFIGURED',
+      provider: config.provider || 'RAZORPAY',
+      mode: config.mode || 'COLLEGE_OWNED_GATEWAY',
+      isTestMode: Boolean(config.isTestMode),
+      displayMerchantName: config.displayMerchantName || null,
+      isReady,
+    },
   });
 });

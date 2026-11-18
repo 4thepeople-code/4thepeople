@@ -15,8 +15,6 @@ import {
   ExternalLink,
   Database,
   Key,
-  Layers,
-  Users,
 } from 'lucide-react';
 
 export function PlatformAdminDashboardClient() {

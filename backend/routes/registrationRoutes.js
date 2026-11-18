@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { authenticateToken, crossCollegeRegisterMiddleware } = require('../middleware/authMiddleware');
+const { authenticateToken, crossCollegeRegisterMiddleware, authenticateAnyParticipant } = require('../middleware/authMiddleware');
 const { validate } = require('../middleware/validate');
 const { eventParams } = require('../validators/schemas');
 const {
@@ -13,6 +13,7 @@ const {
 const {
   studentCheckout,
   studentVerifyPayment,
+  getTransactionStatus,
 } = require('../controllers/paymentController');
 
 // User Registration Endpoints
@@ -26,5 +27,7 @@ router.delete('/:eventId/register', validate({ params: eventParams }), crossColl
 // Paid Event Payment & Checkout
 router.post('/:eventId/checkout', validate({ params: eventParams }), crossCollegeRegisterMiddleware, studentCheckout);
 router.post('/:eventId/verify-payment', validate({ params: eventParams }), crossCollegeRegisterMiddleware, studentVerifyPayment);
+router.get('/:eventId/payment-status', validate({ params: eventParams }), authenticateAnyParticipant, getTransactionStatus);
+router.get('/:eventId/payment-status/:transactionId', validate({ params: eventParams }), authenticateAnyParticipant, getTransactionStatus);
 
 module.exports = router;

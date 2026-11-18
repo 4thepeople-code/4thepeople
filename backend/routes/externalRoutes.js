@@ -19,6 +19,7 @@ const {
 const {
   externalCheckout,
   externalVerifyPayment,
+  getTransactionStatus,
 } = require('../controllers/paymentController');
 
 // ─── OTP routes ──────────────────────────────────────────────────────────────
@@ -77,6 +78,20 @@ router.post(
   validate({ params: eventParams }),
   authenticateExternalToken,
   externalVerifyPayment
+);
+
+router.get(
+  '/events/:eventId/payment-status',
+  validate({ params: eventParams }),
+  authenticateExternalToken,
+  getTransactionStatus
+);
+
+router.get(
+  '/events/:eventId/payment-status/:transactionId',
+  validate({ params: eventParams }),
+  authenticateExternalToken,
+  getTransactionStatus
 );
 
 module.exports = router;

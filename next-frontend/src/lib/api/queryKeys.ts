@@ -82,12 +82,21 @@ export const queryKeys = {
       clubManagers: (clubId: string) => ['tenant', slug, 'admin', 'clubs', clubId, 'managers'] as const,
       departments: () => ['tenant', slug, 'admin', 'departments'] as const,
     },
+
+    payments: {
+      all: ['tenant', slug, 'payments'] as const,
+      transactionStatus: (transactionId: string) =>
+        ['tenant', slug, 'payments', 'transaction', transactionId] as const,
+      gatewayReadiness: () =>
+        ['tenant', slug, 'payments', 'gateway-readiness'] as const,
+    },
   }),
 
   // External guest queries (unauthenticated or guest-verified)
   external: {
     all: ['external'] as const,
     registrationStatus: (eventId: string) => ['external', 'registrations', 'status', eventId] as const,
+    paymentStatus: (transactionId: string) => ['external', 'payments', 'transaction', transactionId] as const,
   },
 
   // Platform administration queries (strictly isolated from college tenants)
@@ -97,5 +106,9 @@ export const queryKeys = {
     admins: () => ['platform', 'admins', 'list'] as const,
     colleges: () => ['platform', 'colleges', 'list'] as const,
     collegeDetail: (id: string) => ['platform', 'colleges', 'detail', id] as const,
+    collegePaymentConfig: (collegeId: string) =>
+      ['platform', 'colleges', collegeId, 'payment-config'] as const,
+    collegePaymentAudits: (collegeId: string) =>
+      ['platform', 'colleges', collegeId, 'payment-audits'] as const,
   },
 };

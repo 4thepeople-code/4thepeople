@@ -1035,7 +1035,7 @@ export function ManagerEventDetailClient({
                           <th className="py-3 px-4">Email</th>
                           <th className="py-3 px-4">Institution / Roll No</th>
                           <th className="py-3 px-4">Registered Date</th>
-                          <th className="py-3 px-4">Status</th>
+                          <th className="py-3 px-4">Payment & Status</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-white/5">
@@ -1107,9 +1107,27 @@ export function ManagerEventDetailClient({
                                   <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-amber-500/15 text-amber-400 border border-amber-500/20">
                                     User Deleted (Snapshot)
                                   </span>
+                                ) : reg.paymentTransaction ? (
+                                  <div className="space-y-0.5">
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                      <span className="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-purple-500/15 text-purple-400 border border-purple-500/30">
+                                        Paid ₹{reg.paymentTransaction.amount}
+                                      </span>
+                                      {reg.paymentTransaction.status === 'REFUNDED' && (
+                                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-blue-500/20 text-blue-400">
+                                          Refunded
+                                        </span>
+                                      )}
+                                    </div>
+                                    {reg.paymentTransaction.id && (
+                                      <div className="text-[9px] font-mono text-slate-400 truncate max-w-[120px]" title={reg.paymentTransaction.id}>
+                                        Txn: {reg.paymentTransaction.id.slice(0, 8)}...
+                                      </div>
+                                    )}
+                                  </div>
                                 ) : (
                                   <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-emerald-500/10 text-emerald-400">
-                                    Confirmed
+                                    Confirmed (Free)
                                   </span>
                                 )}
                               </td>

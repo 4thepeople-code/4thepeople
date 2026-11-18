@@ -2,6 +2,7 @@ const { withTenant } = require('../config/db');
 const asyncHandler = require('../utils/asyncHandler');
 const { AppError } = require('../middleware/errorHandler');
 const { deleteAssetsBestEffort } = require('../utils/cloudinaryUpload');
+const { defaultPaymentConfigService } = require('../services/payment/paymentConfigService');
 
 const UUID_REGEX = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 const eventStatuses = ['UPCOMING', 'ONGOING', 'COMPLETED', 'CANCELLED'];
@@ -69,6 +70,10 @@ const serializeEvent = (event, gallery = null) => {
           }))
         : []);
 
+  const isPaid = Boolean(event.isPaid ?? event.is_paid ?? false);
+  const fee = isPaid ? (Number(event.fee) || 0) : 0;
+  const currency = event.currency || 'INR';
+
   return {
     id: event.id,
     clubId: event.clubId,
@@ -82,6 +87,9 @@ const serializeEvent = (event, gallery = null) => {
     registeredCount: event.registeredCount ?? 0,
     status: event.status, // Computed from events_with_status view
     visibility: event.visibility || 'COLLEGE',
+    isPaid,
+    fee,
+    currency,
     coverImage,
     gallery: formattedGallery,
     registrationUrl: event.registrationUrl || null,
@@ -131,6 +139,22 @@ exports.createEvent = asyncHandler(async (req, res) => {
     visibility = body.visibility;
   }
 
+  const isPaid = Boolean(body.isPaid ?? body.is_paid ?? false);
+  let fee = 0;
+  if (isPaid) {
+    if (typeof body.fee !== 'number' || !Number.isInteger(body.fee) || body.fee <= 0) {
+      throw new AppError('Paid events must specify a positive integer fee', 400);
+    }
+    fee = body.fee;
+
+    // Verify college payment gateway readiness
+    const config = await defaultPaymentConfigService.getConfig(req.collegeId);
+    if (!config.configured || config.status !== 'ACTIVE' || !config.hasKeyId || !config.hasKeySecret) {
+      throw new AppError('Cannot create a paid event: payment gateway is not active or configured for this college', 400);
+    }
+  }
+  const currency = (body.currency ? String(body.currency).trim().toUpperCase() : 'INR') || 'INR';
+
   const eventWithStatus = await withTenant(req.collegeId, async (tx) => {
     await ensureClubExists(tx, req.collegeId, clubId);
 
@@ -145,6 +169,9 @@ exports.createEvent = asyncHandler(async (req, res) => {
         endAt,
         capacity,
         visibility,
+        isPaid,
+        fee,
+        currency,
         registrationUrl: body.registrationUrl ? body.registrationUrl.trim() : null,
         registrationMode: ['INTERNAL', 'EXTERNAL', 'NONE'].includes(body.registrationMode)
           ? body.registrationMode
@@ -187,7 +214,8 @@ exports.updateEvent = asyncHandler(async (req, res) => {
 
   const allowedFields = [
     'title', 'description', 'location', 'startAt', 'endAt', 'status',
-    'registrationUrl', 'capacity', 'registrationMode', 'customFormDefinition', 'registrationDeadline', 'visibility'
+    'registrationUrl', 'capacity', 'registrationMode', 'customFormDefinition',
+    'registrationDeadline', 'visibility', 'isPaid', 'is_paid', 'fee', 'currency'
   ];
   const fields = Object.keys(body);
   if (!fields.length) throw new AppError('At least one event field is required', 400);
@@ -218,6 +246,31 @@ exports.updateEvent = asyncHandler(async (req, res) => {
   }
   if (body.registrationDeadline !== undefined) {
     data.registrationDeadline = body.registrationDeadline ? new Date(body.registrationDeadline) : null;
+  }
+
+  let targetIsPaid = undefined;
+  if (body.isPaid !== undefined || body.is_paid !== undefined) {
+    targetIsPaid = Boolean(body.isPaid ?? body.is_paid);
+    data.isPaid = targetIsPaid;
+    if (!targetIsPaid) {
+      // Free events cannot accidentally retain stale paid-event fees
+      data.fee = 0;
+    }
+  }
+
+  if (body.fee !== undefined) {
+    if (typeof body.fee !== 'number' || !Number.isInteger(body.fee) || body.fee < 0) {
+      throw new AppError('fee must be a non-negative integer', 400);
+    }
+    if (targetIsPaid === false) {
+      data.fee = 0;
+    } else {
+      data.fee = body.fee;
+    }
+  }
+
+  if (body.currency !== undefined) {
+    data.currency = (body.currency ? String(body.currency).trim().toUpperCase() : 'INR') || 'INR';
   }
 
   if (body.capacity !== undefined) {
@@ -258,6 +311,20 @@ exports.updateEvent = asyncHandler(async (req, res) => {
       if (endAt) validDateRange(startAt, endAt);
       data.startAt = startAt;
       data.endAt = endAt;
+    }
+
+    const willBePaid = data.isPaid !== undefined ? data.isPaid : existing.isPaid;
+    if (willBePaid) {
+      const effectiveFee = data.fee !== undefined ? data.fee : existing.fee;
+      if (effectiveFee <= 0) {
+        throw new AppError('Paid events must specify a positive integer fee', 400);
+      }
+      if (data.isPaid === true || (existing.isPaid && data.fee !== undefined)) {
+        const config = await defaultPaymentConfigService.getConfig(req.collegeId);
+        if (!config.configured || config.status !== 'ACTIVE' || !config.hasKeyId || !config.hasKeySecret) {
+          throw new AppError('Cannot configure a paid event: payment gateway is not active or configured for this college', 400);
+        }
+      }
     }
 
     try {

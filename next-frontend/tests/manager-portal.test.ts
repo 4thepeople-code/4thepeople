@@ -87,7 +87,7 @@ runTest('2.1: Manager query keys are strictly tenant-scoped under college slug',
   assert.deepStrictEqual(lbrceClubEvents, ['tenant', 'lbrce', 'manager', 'club', clubId, 'events']);
 
   const lbrceAttendees = lbrceKeys.attendees(clubId, eventId, 2);
-  assert.deepStrictEqual(lbrceAttendees, ['tenant', 'lbrce', 'manager', 'club', clubId, 'event', eventId, 'attendees', 2]);
+  assert.deepStrictEqual(lbrceAttendees, ['tenant', 'lbrce', 'manager', 'club', clubId, 'event', eventId, 'attendees', 2, 'ALL']);
 });
 
 // ============================================================================

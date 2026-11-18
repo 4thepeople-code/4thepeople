@@ -36,6 +36,8 @@ import {
   Check,
   ExternalLink,
   Globe,
+  CreditCard,
+  Receipt,
 } from 'lucide-react';
 import type { EventRegistration } from '@/types/models';
 
@@ -431,11 +433,23 @@ export function StudentDashboardClient({ slug, initialTab = 'registrations' }: S
                       <div className="space-y-3">
                         <div className="flex items-start justify-between gap-3">
                           <div className="space-y-1 flex-1">
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 flex-wrap">
                               <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-[10px] font-bold uppercase tracking-wider text-emerald-400 inline-flex items-center gap-1">
                                 <CheckCircle2 className="w-3 h-3" />
                                 <span>RSVP Confirmed</span>
                               </span>
+                              {ev?.isPaid && (
+                                <span className="px-2.5 py-0.5 rounded-full bg-purple-500/15 border border-purple-500/30 text-[10px] font-bold uppercase tracking-wider text-purple-400 inline-flex items-center gap-1">
+                                  <CreditCard className="w-3 h-3" />
+                                  <span>Paid • ₹{ev.fee || 0}</span>
+                                </span>
+                              )}
+                              {reg.paymentTransaction?.status === 'REFUNDED' && (
+                                <span className="px-2.5 py-0.5 rounded-full bg-blue-500/15 border border-blue-500/30 text-[10px] font-bold uppercase tracking-wider text-blue-400 inline-flex items-center gap-1">
+                                  <Receipt className="w-3 h-3" />
+                                  <span>Refunded</span>
+                                </span>
+                              )}
                               {ev?.club?.name && (
                                 <span className={`text-[11px] font-semibold truncate ${isDark ? 'text-gray-400' : 'text-slate-500'}`}>
                                   • {ev.club.name}
@@ -470,12 +484,27 @@ export function StudentDashboardClient({ slug, initialTab = 'registrations' }: S
                         </p>
                       </div>
 
-                      <div className={`pt-3 border-t flex items-center justify-between gap-3 text-xs ${isDark ? 'border-white/10' : 'border-slate-100'}`}>
-                        <span className={`text-[10px] ${isDark ? 'text-gray-500' : 'text-slate-400'}`}>
-                          Registered: {regDate.full}
-                        </span>
+                      <div className={`pt-3 border-t flex flex-wrap items-center justify-between gap-3 text-xs ${isDark ? 'border-white/10' : 'border-slate-100'}`}>
+                        <div className="flex flex-col">
+                          <span className={`text-[10px] ${isDark ? 'text-gray-500' : 'text-slate-400'}`}>
+                            Registered: {regDate.full}
+                          </span>
+                          {reg.paymentTransactionId && (
+                            <span className="text-[9px] font-mono text-purple-400 truncate max-w-[150px]" title={reg.paymentTransactionId}>
+                              Txn: {reg.paymentTransactionId.slice(0, 8)}...
+                            </span>
+                          )}
+                        </div>
 
                         <div className="flex items-center gap-2">
+                          {(ev?.isPaid || reg.paymentTransactionId) && (
+                            <Link
+                              href={`/college/${slug}/events/${reg.eventId}/payment/status${reg.paymentTransactionId ? `?transactionId=${reg.paymentTransactionId}` : ''}`}
+                              className="px-2.5 py-1.5 rounded-lg border border-purple-500/30 text-purple-400 hover:bg-purple-500/10 font-bold text-[10px] uppercase tracking-wider transition"
+                            >
+                              Receipt
+                            </Link>
+                          )}
                           <Link
                             href={`/college/${slug}/events/${reg.eventId}`}
                             className="px-3 py-1.5 rounded-lg bg-cyan-500/10 hover:bg-cyan-500/20 text-[#00F0FF] font-bold text-[11px] uppercase tracking-wider transition"

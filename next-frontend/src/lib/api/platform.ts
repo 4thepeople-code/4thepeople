@@ -15,6 +15,12 @@ import type {
   ResendCollegeAdminInvitePayload,
   ToggleCollegeAdminStatusPayload,
 } from '@/types/platform';
+import type {
+  CollegePaymentConfigSummary,
+  UpdatePaymentConfigPayload,
+  PaymentConfigAuditEntry,
+  TestPaymentConnectionResponse,
+} from '@/types/payment';
 import type { ApiResponse } from '@/types/api';
 
 /**
@@ -271,5 +277,83 @@ export function useToggleCollegeAdminStatusMutation() {
     },
   });
 }
+
+/**
+ * Hook to fetch sanitized payment gateway configuration for a college.
+ * Calls GET /api/platform/colleges/:collegeId/payment-config.
+ */
+export function useCollegePaymentConfigQuery(collegeId: string, enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.platform.collegePaymentConfig(collegeId),
+    queryFn: async () => {
+      const response = await apiClient.get<ApiResponse<CollegePaymentConfigSummary>>(
+        `/platform/colleges/${collegeId}/payment-config`
+      );
+      return response.data.data;
+    },
+    enabled: Boolean(collegeId) && enabled,
+    staleTime: 10 * 1000,
+  });
+}
+
+/**
+ * Mutation hook to update/provision payment configuration for a college.
+ * Calls PUT /api/platform/colleges/:collegeId/payment-config.
+ */
+export function useUpdateCollegePaymentConfigMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ collegeId, ...payload }: UpdatePaymentConfigPayload) => {
+      const response = await apiClient.put<ApiResponse<CollegePaymentConfigSummary>>(
+        `/platform/colleges/${collegeId}/payment-config`,
+        payload
+      );
+      return response.data;
+    },
+    onSuccess: (_, vars) => {
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.platform.collegePaymentConfig(vars.collegeId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.platform.collegePaymentAudits(vars.collegeId),
+      });
+      queryClient.invalidateQueries({ queryKey: queryKeys.platform.colleges() });
+    },
+  });
+}
+
+/**
+ * Mutation hook to test payment gateway credentials connectivity with gateway API.
+ * Calls POST /api/platform/colleges/:collegeId/payment-config/test-connection.
+ */
+export function useTestPaymentConnectionMutation() {
+  return useMutation({
+    mutationFn: async (collegeId: string) => {
+      const response = await apiClient.post<ApiResponse<TestPaymentConnectionResponse>>(
+        `/platform/colleges/${collegeId}/payment-config/test-connection`
+      );
+      return response.data;
+    },
+  });
+}
+
+/**
+ * Hook to fetch payment configuration audit history for a college.
+ * Calls GET /api/platform/colleges/:collegeId/payment-config/audits.
+ */
+export function useCollegePaymentAuditsQuery(collegeId: string, enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.platform.collegePaymentAudits(collegeId),
+    queryFn: async () => {
+      const response = await apiClient.get<ApiResponse<PaymentConfigAuditEntry[]>>(
+        `/platform/colleges/${collegeId}/payment-config/audits`
+      );
+      return response.data.data || [];
+    },
+    enabled: Boolean(collegeId) && enabled,
+    staleTime: 30 * 1000,
+  });
+}
+
 
 

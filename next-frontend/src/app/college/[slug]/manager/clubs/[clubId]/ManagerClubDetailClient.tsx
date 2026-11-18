@@ -16,6 +16,7 @@ import {
   uploadClubCover,
   deleteClubCover,
 } from '@/lib/api/manager';
+import { useCollegeGatewayReadinessQuery } from '@/lib/api/payment';
 import ManagerLayout from '@/components/manager/ManagerLayout';
 import { ClubHeader } from '@/components/manager/ClubHeader';
 import { Modal } from '@/components/common/Modal';
@@ -41,6 +42,8 @@ import {
   Image as ImageIcon,
   ExternalLink,
   Globe,
+  CreditCard,
+  IndianRupee,
 } from 'lucide-react';
 
 export interface ManagerClubDetailClientProps {
@@ -97,6 +100,7 @@ export function ManagerClubDetailClient({ slug, clubId }: ManagerClubDetailClien
   // Mutations
   const updateClubMutation = useUpdateManagedClubMutation(slug);
   const createEventMutation = useCreateClubEventMutation(slug);
+  const { data: gatewayReadiness } = useCollegeGatewayReadinessQuery(slug);
 
   // Editable Club Info form state
   const [isEditingInfo, setIsEditingInfo] = useState(false);
@@ -139,6 +143,8 @@ export function ManagerClubDetailClient({ slug, clubId }: ManagerClubDetailClien
   const [eventEndAt, setEventEndAt] = useState('');
   const [eventUrl, setEventUrl] = useState('');
   const [eventVisibility, setEventVisibility] = useState<EventVisibility>('COLLEGE');
+  const [isPaid, setIsPaid] = useState<boolean>(false);
+  const [fee, setFee] = useState<string>('');
   const [eventError, setEventError] = useState('');
 
   // Toast State
@@ -285,6 +291,20 @@ export function ManagerClubDetailClient({ slug, clubId }: ManagerClubDetailClien
       }
     }
 
+    if (isPaid) {
+      if (gatewayReadiness && !gatewayReadiness.isReady) {
+        setEventError(
+          'Cannot create paid event: Payment gateway is not configured or active for this college. Please contact the Super Admin.'
+        );
+        return;
+      }
+      const numericFee = parseInt(fee, 10);
+      if (!fee || isNaN(numericFee) || numericFee <= 0) {
+        setEventError('Paid events require a valid positive fee in INR (e.g. ₹100).');
+        return;
+      }
+    }
+
     try {
       await createEventMutation.mutateAsync({
         clubId,
@@ -296,6 +316,9 @@ export function ManagerClubDetailClient({ slug, clubId }: ManagerClubDetailClien
           startAt: new Date(eventStartAt).toISOString(),
           endAt: eventEndAt ? new Date(eventEndAt).toISOString() : undefined,
           visibility: eventVisibility,
+          isPaid,
+          fee: isPaid ? parseInt(fee, 10) : 0,
+          currency: 'INR',
         },
       });
 
@@ -307,6 +330,8 @@ export function ManagerClubDetailClient({ slug, clubId }: ManagerClubDetailClien
       setEventEndAt('');
       setEventUrl('');
       setEventVisibility('COLLEGE');
+      setIsPaid(false);
+      setFee('');
       showToast('Event created successfully!');
       void refetchEvents();
       void refetchClub();
@@ -1249,6 +1274,166 @@ export function ManagerClubDetailClient({ slug, clubId }: ManagerClubDetailClien
                     </p>
                   </div>
                 </div>
+              </div>
+
+              {/* Payment Settings (Free vs Paid) */}
+              <div className="md:col-span-2 pt-2 border-t border-slate-800/80">
+                <label
+                  className={`block text-xs font-semibold uppercase tracking-wider mb-2 ${
+                    isDark ? 'text-slate-300' : 'text-slate-700'
+                  }`}
+                >
+                  Event Fee & Pricing *
+                </label>
+
+                {/* Gateway Unready Advisory */}
+                {gatewayReadiness && !gatewayReadiness.isReady && (
+                  <div className="mb-3 p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-300 text-xs flex items-start gap-2.5">
+                    <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-amber-500" />
+                    <div>
+                      <p className="font-bold">Payment Gateway Not Configured</p>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                        This college does not have an active payment gateway configured. Only free events can currently be published. Contact the Super Admin to configure Razorpay or Cashfree.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+                  {/* Free Event */}
+                  <div
+                    onClick={() => {
+                      setIsPaid(false);
+                      setFee('');
+                    }}
+                    className={`p-3.5 rounded-xl border-2 cursor-pointer transition-all flex flex-col justify-between ${
+                      !isPaid
+                        ? isDark
+                          ? 'border-cyan-500 bg-cyan-500/10'
+                          : 'border-cyan-600 bg-cyan-50'
+                        : isDark
+                        ? 'border-slate-800 bg-slate-950/60 hover:border-slate-700'
+                        : 'border-slate-200 bg-slate-50 hover:border-slate-300'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle2
+                          className={`w-4 h-4 ${
+                            !isPaid ? (isDark ? 'text-cyan-400' : 'text-cyan-600') : 'text-slate-400'
+                          }`}
+                        />
+                        <span
+                          className={`text-xs font-bold ${
+                            !isPaid ? (isDark ? 'text-white' : 'text-slate-900') : (isDark ? 'text-slate-300' : 'text-slate-700')
+                          }`}
+                        >
+                          Free Event
+                        </span>
+                      </div>
+                      <span
+                        className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                          !isPaid ? (isDark ? 'border-cyan-500' : 'border-cyan-600') : 'border-slate-500'
+                        }`}
+                      >
+                        {!isPaid && (
+                          <span className={`w-2 h-2 rounded-full ${isDark ? 'bg-cyan-500' : 'bg-cyan-600'}`} />
+                        )}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-400 leading-relaxed">
+                      Zero fee. Eligible participants RSVP directly with instant registration.
+                    </p>
+                  </div>
+
+                  {/* Paid Event */}
+                  <div
+                    onClick={() => {
+                      if (gatewayReadiness && !gatewayReadiness.isReady) {
+                        setEventError(
+                          'Payment gateway is not active for this college. Only free events can be published.'
+                        );
+                        return;
+                      }
+                      setIsPaid(true);
+                    }}
+                    className={`p-3.5 rounded-xl border-2 transition-all flex flex-col justify-between ${
+                      gatewayReadiness && !gatewayReadiness.isReady
+                        ? 'opacity-60 cursor-not-allowed border-slate-200 dark:border-slate-800 bg-slate-100/50 dark:bg-slate-900/30'
+                        : isPaid
+                        ? isDark
+                          ? 'border-purple-500 bg-purple-500/10 cursor-pointer'
+                          : 'border-purple-600 bg-purple-50 cursor-pointer'
+                        : isDark
+                        ? 'border-slate-800 bg-slate-950/60 hover:border-slate-700 cursor-pointer'
+                        : 'border-slate-200 bg-slate-50 hover:border-slate-300 cursor-pointer'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div className="flex items-center gap-2">
+                        <CreditCard
+                          className={`w-4 h-4 ${
+                            isPaid ? (isDark ? 'text-purple-400' : 'text-purple-600') : 'text-slate-400'
+                          }`}
+                        />
+                        <span
+                          className={`text-xs font-bold ${
+                            isPaid ? (isDark ? 'text-white' : 'text-slate-900') : (isDark ? 'text-slate-300' : 'text-slate-700')
+                          }`}
+                        >
+                          Paid Event
+                        </span>
+                      </div>
+                      <span
+                        className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                          isPaid ? (isDark ? 'border-purple-500' : 'border-purple-600') : 'border-slate-500'
+                        }`}
+                      >
+                        {isPaid && (
+                          <span className={`w-2 h-2 rounded-full ${isDark ? 'bg-purple-500' : 'bg-purple-600'}`} />
+                        )}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-400 leading-relaxed">
+                      Requires online payment checkout via college gateway (Razorpay / Cashfree) before registration confirmation.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Paid Fee Input Field */}
+                {isPaid && (
+                  <div className="p-3.5 rounded-xl bg-purple-500/5 border border-purple-500/20 space-y-2 animate-in fade-in">
+                    <label
+                      className={`block text-xs font-semibold uppercase tracking-wider ${
+                        isDark ? 'text-purple-300' : 'text-purple-700'
+                      }`}
+                    >
+                      Registration Fee (INR) *
+                    </label>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                        <IndianRupee className="w-4 h-4" />
+                      </div>
+                      <input
+                        type="number"
+                        min="1"
+                        step="1"
+                        value={fee}
+                        onChange={(e) => setFee(e.target.value)}
+                        placeholder="e.g. 150"
+                        className={`w-full pl-9 pr-4 py-2 rounded-xl text-sm border focus:outline-none transition-colors font-mono font-bold ${
+                          isDark
+                            ? 'bg-slate-950 border-purple-500/40 text-white focus:border-purple-400'
+                            : 'bg-white border-purple-300 text-slate-900 focus:border-purple-600'
+                        }`}
+                        required={isPaid}
+                      />
+                    </div>
+                    <p className="text-[11px] text-slate-400">
+                      Amount in Indian Rupees (₹). Online payments will only process if Super Admin has activated a gateway for this institution.
+                    </p>
+                  </div>
+                )}
               </div>
 
               <div className="md:col-span-2 pt-2 border-t border-slate-800/80 grid grid-cols-1 md:grid-cols-2 gap-4">
