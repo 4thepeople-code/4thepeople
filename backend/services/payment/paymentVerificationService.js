@@ -452,7 +452,6 @@ class PaymentVerificationService {
         select: {
           id: true,
           eventId: true,
-          status: true,
           registeredAt: true,
         },
       });
@@ -481,7 +480,7 @@ class PaymentVerificationService {
         ? {
             id: registration.id,
             eventId: registration.eventId,
-            status: registration.status,
+            status: 'CONFIRMED',
             registeredAt: registration.registeredAt,
           }
         : null,

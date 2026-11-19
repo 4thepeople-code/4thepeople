@@ -37,9 +37,9 @@ class PaymentRegistrationService {
             select: {
               id: true,
               title: true,
-              startDate: true,
-              endDate: true,
-              venue: true,
+              startAt: true,
+              endAt: true,
+              location: true,
               collegeId: true,
             },
           },
@@ -126,6 +126,13 @@ class PaymentRegistrationService {
 
           if (currentRes.status === 'CONFIRMED') {
             // Already confirmed by a prior attempt of this transaction (Idempotency / Retry)
+            reservationConfirmed = true;
+          } else if (currentRes.status === 'HELD' && txn.status === 'PAID' && txn.updatedAt <= currentRes.expiresAt) {
+            // Recovery: Payment was verified before reservation expired, but registration creation failed transiently
+            await tx.seatReservation.update({
+              where: { id: currentRes.id },
+              data: { status: 'CONFIRMED' },
+            });
             reservationConfirmed = true;
           } else {
             const failureReason =
@@ -272,8 +279,8 @@ class PaymentRegistrationService {
             payload: {
               participantName,
               eventTitle: txn.event.title,
-              venue: txn.event.venue,
-              startDate: txn.event.startDate,
+              venue: txn.event.location || 'Campus',
+              startDate: txn.event.startAt,
               amountPaid: txn.amount,
               currency: txn.currency,
               transactionId: txn.id,
