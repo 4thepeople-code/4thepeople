@@ -212,6 +212,54 @@ test('CashfreeAdapter: Webhook verification and order creation', async (t) => {
     assert.strictEqual(capturedHeaders['x-client-id'], 'CF_APP_123');
     assert.strictEqual(capturedHeaders['x-api-version'], '2023-08-01');
   });
+
+  await t.test('testConnection returns success when Cashfree probe returns 404 order_not_found', async () => {
+    const mockHttpClient = async (url, options) => {
+      assert.ok(url.includes('/orders/conn_probe_'));
+      assert.strictEqual(options.headers['x-client-id'], 'TEST_APP_123');
+      return {
+        ok: false,
+        status: 404,
+        json: async () => ({
+          message: 'order_id does not exist',
+          code: 'order_not_found',
+          type: 'invalid_request_error',
+        }),
+      };
+    };
+
+    const cfAdapter = new CashfreeAdapter({ httpClient: mockHttpClient });
+    const res = await cfAdapter.testConnection({
+      keyId: 'TEST_APP_123',
+      keySecret: 'cf_sec_456',
+      isTestMode: true,
+    });
+
+    assert.strictEqual(res.success, true);
+    assert.match(res.message, /verified successfully/i);
+  });
+
+  await t.test('testConnection returns failure on 401 authentication failure', async () => {
+    const mockHttpClient = async () => ({
+      ok: false,
+      status: 401,
+      json: async () => ({
+        message: 'authentication Failed',
+        code: 'request_failed',
+        type: 'authentication_error',
+      }),
+    });
+
+    const cfAdapter = new CashfreeAdapter({ httpClient: mockHttpClient });
+    const res = await cfAdapter.testConnection({
+      keyId: 'TEST_APP_123',
+      keySecret: 'wrong_secret',
+      isTestMode: true,
+    });
+
+    assert.strictEqual(res.success, false);
+    assert.match(res.message, /Invalid Cashfree App ID or Secret Key/i);
+  });
 });
 
 test('PaymentGatewayFactory: Provider Resolution', () => {

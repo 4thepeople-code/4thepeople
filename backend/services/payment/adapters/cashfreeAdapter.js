@@ -21,8 +21,19 @@ class CashfreeAdapter {
    * Resolves the base URL based on environment mode.
    */
   _getBaseUrl(credentials) {
-    const isTest = credentials && credentials.isTestMode !== false;
-    return isTest ? this.sandboxBaseUrl : this.productionBaseUrl;
+    if (credentials && credentials.isTestMode === false) {
+      return this.productionBaseUrl;
+    }
+    if (credentials && credentials.isTestMode === true) {
+      return this.sandboxBaseUrl;
+    }
+    if (credentials && credentials.keyId) {
+      const key = String(credentials.keyId).trim().toUpperCase();
+      if (!key.startsWith('TEST')) {
+        return this.productionBaseUrl;
+      }
+    }
+    return this.sandboxBaseUrl;
   }
 
   /**
@@ -364,6 +375,11 @@ class CashfreeAdapter {
 
   /**
    * Tests credentials connectivity against Cashfree API.
+   * Cashfree PG API (v2023-08-01) does not have a generic GET /orders endpoint.
+   * Probes GET /orders/{probe_order_id}:
+   * - 401/403: Invalid credentials (fails authentication before routing)
+   * - 404 with 'order_not_found': Authenticated successfully, order ID probe does not exist
+   * - 200: Authenticated successfully
    *
    * @param {Object} credentials
    * @returns {Promise<{ success: boolean, message: string }>}
@@ -371,7 +387,8 @@ class CashfreeAdapter {
   async testConnection(credentials) {
     try {
       const baseUrl = this._getBaseUrl(credentials);
-      const res = await this.httpClient(`${baseUrl}/orders?limit=1`, {
+      const probeOrderId = `conn_probe_${Date.now()}`;
+      const res = await this.httpClient(`${baseUrl}/orders/${probeOrderId}`, {
         method: 'GET',
         headers: this._getHeaders(credentials),
       });
@@ -380,11 +397,25 @@ class CashfreeAdapter {
         return { success: true, message: 'Cashfree connection verified successfully.' };
       }
 
+      const data = await res.json().catch(() => null);
+
       if (res.status === 401 || res.status === 403) {
         return { success: false, message: 'Authentication failed: Invalid Cashfree App ID or Secret Key.' };
       }
 
-      return { success: false, message: `Cashfree connection failed with HTTP status ${res.status}` };
+      // Cashfree returns 404 with code: "order_not_found" only AFTER successful authentication
+      if (
+        res.status === 404 &&
+        data &&
+        (data.code === 'order_not_found' ||
+          data.type === 'order_not_found' ||
+          (typeof data.message === 'string' && data.message.toLowerCase().includes('order_id does not exist')))
+      ) {
+        return { success: true, message: 'Cashfree connection verified successfully.' };
+      }
+
+      const errMsg = (data && data.message) || `Cashfree connection failed with HTTP status ${res.status}`;
+      return { success: false, message: errMsg };
     } catch (err) {
       return { success: false, message: `Cashfree connection check failed: ${err.message}` };
     }
