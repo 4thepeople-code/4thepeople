@@ -84,9 +84,13 @@ class CashfreeAdapter {
 
     const data = await res.json();
     if (!res.ok) {
-      const errMsg = (data && data.message) || `Cashfree order creation failed (status ${res.status})`;
+      const isAuthErr = res.status === 401 || res.status === 403;
+      const errMsg = isAuthErr
+        ? 'Payment gateway rejected credentials. Please verify your Cashfree App ID and Secret in College Payment Configuration.'
+        : ((data && data.message) || `Cashfree order creation failed (status ${res.status})`);
       const err = new Error(errMsg);
-      err.statusCode = res.status;
+      err.statusCode = isAuthErr ? 502 : res.status;
+      err.isOperational = true;
       err.gatewayError = data;
       throw err;
     }

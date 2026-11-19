@@ -580,7 +580,7 @@ export function TemplateGenerationModal({
                           }
                           onChange={(e) => {
                             if (e.target.checked) {
-                              setSelectedStudentIds(eligibleCandidates.filter((s) => s.user?.id).map((s) => s.user.id));
+                              setSelectedStudentIds(eligibleCandidates.filter((s) => s.user?.id).map((s) => s.user?.id || s.registrationId));
                             } else {
                               setSelectedStudentIds([]);
                             }

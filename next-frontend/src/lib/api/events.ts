@@ -499,7 +499,7 @@ export function useCancelExternalMutation(slug?: string) {
  * Fetches a single public event by ID.
  */
 export async function fetchPublicEventById(eventId: string): Promise<Event> {
-  const response = await apiClient.get(`/public/events/${eventId}`);
+  const response = await apiClient.get(`/events/${eventId}`);
   const res = response.data;
   return res?.event || res?.data?.event || res;
 }

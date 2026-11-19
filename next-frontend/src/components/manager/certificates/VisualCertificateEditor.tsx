@@ -447,7 +447,7 @@ export function VisualCertificateEditor({
               students
                 .filter((st) => Boolean(st?.user?.id))
                 .map((st) => (
-                  <option key={st.user.id} value={st.user.id}>
+                  <option key={st.user?.id || st.registrationId} value={st.user?.id || st.registrationId}>
                     {st.user?.name || 'Student'} ({st.user?.rollNumber || 'No ID'})
                   </option>
                 ))

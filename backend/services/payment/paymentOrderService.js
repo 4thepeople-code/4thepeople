@@ -387,6 +387,9 @@ class PaymentOrderService {
       } catch (cleanupErr) {
         // Log cleanup error if any
       }
+      if (gatewayErr && gatewayErr.isOperational === undefined) {
+        gatewayErr.isOperational = true;
+      }
       throw gatewayErr;
     }
 

@@ -268,7 +268,7 @@ export function EventCertificatesSection({
                           {cert.user?.avatar?.url ? (
                             <img
                               src={cert.user.avatar.url}
-                              alt={cert.user.name || 'User'}
+                              alt={cert.user?.name || 'User'}
                               className="w-8 h-8 rounded-full object-cover border border-white/10"
                             />
                           ) : (

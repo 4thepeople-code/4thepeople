@@ -22,7 +22,7 @@ const { clubParams, departmentParams, clubEventParams, eventParams } = require('
 // These routes are intentionally public: do not add authentication middleware.
 router.get('/events', discoverPublicEvents);
 router.get('/events/upcoming', listAllUpcomingEvents);
-router.get('/events/:eventId', validate({ params: eventParams }), getPublicEventById);
+router.get(['/events/:eventId', '/public/events/:eventId'], validate({ params: eventParams }), getPublicEventById);
 router.get('/clubs', listPublicClubs);
 router.get('/departments', listDepartments);
 router.get('/departments/:departmentId', validate({ params: departmentParams }), getDepartment);
