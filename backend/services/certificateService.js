@@ -1162,13 +1162,24 @@ async function getEligibleStudents({ collegeId, eventId }) {
       activeCertMap.set(cert.userId, cert);
     }
 
-    return registrations.map((reg) => ({
-      registrationId: reg.id,
-      registeredAt: reg.registeredAt,
-      user: reg.user,
-      certificate: activeCertMap.get(reg.userId) || null,
-      hasActiveCertificate: activeCertMap.has(reg.userId),
-    }));
+    return registrations.map((reg) => {
+      const user = reg.user || {
+        id: reg.userId || reg.id,
+        name: reg.participantName || 'Registered Attendee',
+        email: reg.participantEmail || '—',
+        rollNumber: reg.participantRollNumber || null,
+        department: null,
+      };
+      const certKey = reg.userId || user.id;
+
+      return {
+        registrationId: reg.id,
+        registeredAt: reg.registeredAt,
+        user,
+        certificate: (certKey ? activeCertMap.get(certKey) : null) || null,
+        hasActiveCertificate: certKey ? activeCertMap.has(certKey) : false,
+      };
+    });
   });
 }
 

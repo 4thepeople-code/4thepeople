@@ -433,7 +433,7 @@ export function VisualCertificateEditor({
           <select
             value={selectedStudent?.user?.id || ''}
             onChange={(e) => {
-              const student = students.find((s) => s.user.id === e.target.value) || null;
+              const student = students.find((s) => s?.user?.id === e.target.value) || null;
               setSelectedStudent(student);
               if (viewMode === 'pdf') {
                 setTimeout(() => void handleGeneratePdfPreview(), 10);
@@ -444,11 +444,13 @@ export function VisualCertificateEditor({
             {students.length === 0 ? (
               <option value="">Sample: Alex Mercer (23761A0599)</option>
             ) : (
-              students.map((st) => (
-                <option key={st.user.id} value={st.user.id}>
-                  {st.user?.name || 'Student'} ({st.user?.rollNumber || 'No ID'})
-                </option>
-              ))
+              students
+                .filter((st) => Boolean(st?.user?.id))
+                .map((st) => (
+                  <option key={st.user.id} value={st.user.id}>
+                    {st.user?.name || 'Student'} ({st.user?.rollNumber || 'No ID'})
+                  </option>
+                ))
             )}
           </select>
         </div>

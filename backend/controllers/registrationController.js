@@ -417,6 +417,14 @@ exports.getEventAttendees = asyncHandler(async (req, res) => {
               avatarUrl: true,
             },
           },
+          paymentTransaction: {
+            select: {
+              id: true,
+              amount: true,
+              currency: true,
+              status: true,
+            },
+          },
         },
       }),
     ]);
@@ -441,6 +449,7 @@ exports.getEventAttendees = asyncHandler(async (req, res) => {
         isUserDeleted: r.isUserDeleted,
         formAnswers: r.formAnswers || null,
         user: r.user || null,
+        paymentTransaction: r.paymentTransaction || null,
       })),
     };
   });

@@ -54,13 +54,14 @@ export function IndividualUploadModal({
 
   // Filter students based on search
   const filteredStudents = useMemo(() => {
-    if (!searchQuery.trim()) return students;
+    const list = Array.isArray(students) ? students.filter((s) => Boolean(s && s.user)) : [];
+    if (!searchQuery.trim()) return list;
     const q = searchQuery.toLowerCase();
-    return students.filter(
+    return list.filter(
       (s) =>
-        s.user.name?.toLowerCase().includes(q) ||
-        s.user.rollNumber?.toLowerCase().includes(q) ||
-        s.user.email?.toLowerCase().includes(q)
+        (s.user?.name && s.user.name.toLowerCase().includes(q)) ||
+        (s.user?.rollNumber && s.user.rollNumber.toLowerCase().includes(q)) ||
+        (s.user?.email && s.user.email.toLowerCase().includes(q))
     );
   }, [students, searchQuery]);
 
@@ -84,8 +85,12 @@ export function IndividualUploadModal({
 
   const handleSelectStudent = (student: EligibleStudentItem) => {
     setFormError(null);
+    if (!student || !student.user) {
+      setFormError('Invalid student selected.');
+      return;
+    }
     if (student.hasActiveCertificate) {
-      setFormError(`Student '${student.user.name}' already has an active certificate. Reissue or revoke first.`);
+      setFormError(`Student '${student.user?.name || 'Selected'}' already has an active certificate. Reissue or revoke first.`);
       return;
     }
     setSelectedStudent(student);
@@ -95,8 +100,8 @@ export function IndividualUploadModal({
     e.preventDefault();
     setFormError(null);
 
-    if (!selectedStudent) {
-      setFormError('Please select a registered student.');
+    if (!selectedStudent || !selectedStudent.user?.id) {
+      setFormError('Please select a registered student with a valid account.');
       return;
     }
 
@@ -165,12 +170,12 @@ export function IndividualUploadModal({
             >
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-full bg-cyan-500/20 text-cyan-400 flex items-center justify-center font-bold text-xs uppercase">
-                  {(selectedStudent.user.name || 'S').slice(0, 2)}
+                  {(selectedStudent.user?.name || 'S').slice(0, 2)}
                 </div>
                 <div>
-                  <div className="font-bold text-sm">{selectedStudent.user.name}</div>
+                  <div className="font-bold text-sm">{selectedStudent.user?.name || 'Student'}</div>
                   <div className="text-xs text-slate-400">
-                    Roll: {selectedStudent.user.rollNumber || 'N/A'} • {selectedStudent.user.email}
+                    Roll: {selectedStudent.user?.rollNumber || 'N/A'} • {selectedStudent.user?.email || '—'}
                   </div>
                 </div>
               </div>
@@ -224,9 +229,9 @@ export function IndividualUploadModal({
                       }`}
                     >
                       <div>
-                        <div className="font-bold">{item.user.name}</div>
+                        <div className="font-bold">{item.user?.name || 'Anonymous Student'}</div>
                         <div className="text-[11px] text-slate-400">
-                          {item.user.rollNumber || 'No Roll #'} • {item.user.email}
+                          {item.user?.rollNumber || 'No Roll #'} • {item.user?.email || '—'}
                         </div>
                       </div>
                       {item.hasActiveCertificate ? (

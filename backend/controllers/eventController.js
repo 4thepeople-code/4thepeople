@@ -76,6 +76,7 @@ const serializeEvent = (event, gallery = null) => {
 
   return {
     id: event.id,
+    collegeId: event.collegeId || null,
     clubId: event.clubId,
     title: event.title,
     description: event.description,

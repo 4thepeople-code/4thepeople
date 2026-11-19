@@ -245,8 +245,22 @@ async function runTests() {
     // Register Alice and Bob (Charlie remains unregistered)
     await platformPrisma.eventRegistration.createMany({
       data: [
-        { collegeId: testCollege.id, eventId: testEvent.id, userId: testStudent1.id },
-        { collegeId: testCollege.id, eventId: testEvent.id, userId: testStudent2.id },
+        {
+          collegeId: testCollege.id,
+          eventId: testEvent.id,
+          userId: testStudent1.id,
+          participantName: testStudent1.name,
+          participantEmail: testStudent1.email,
+          participantRollNumber: testStudent1.rollNumber,
+        },
+        {
+          collegeId: testCollege.id,
+          eventId: testEvent.id,
+          userId: testStudent2.id,
+          participantName: testStudent2.name,
+          participantEmail: testStudent2.email,
+          participantRollNumber: testStudent2.rollNumber,
+        },
       ],
     });
 

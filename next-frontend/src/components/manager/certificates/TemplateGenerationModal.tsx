@@ -144,7 +144,9 @@ export function TemplateGenerationModal({
   }, [predefinedTemplates, selectedPredefined]);
 
   // Eligible candidates without active certificates
-  const eligibleCandidates = students.filter((s) => !s.hasActiveCertificate);
+  const eligibleCandidates = (Array.isArray(students) ? students : []).filter(
+    (s) => Boolean(s && s.user?.id && !s.hasActiveCertificate)
+  );
 
   // Reset state on modal open
   useEffect(() => {
@@ -578,7 +580,7 @@ export function TemplateGenerationModal({
                           }
                           onChange={(e) => {
                             if (e.target.checked) {
-                              setSelectedStudentIds(eligibleCandidates.map((s) => s.user.id));
+                              setSelectedStudentIds(eligibleCandidates.filter((s) => s.user?.id).map((s) => s.user.id));
                             } else {
                               setSelectedStudentIds([]);
                             }
@@ -593,13 +595,14 @@ export function TemplateGenerationModal({
                   </thead>
                   <tbody className="divide-y divide-[#F2F0EC] dark:divide-[#2D3139]">
                     {eligibleCandidates.map((c) => {
-                      const isChecked = selectedStudentIds.includes(c.user.id);
+                      const studentId = c.user?.id || c.registrationId;
+                      const isChecked = selectedStudentIds.includes(studentId);
                       return (
                         <tr
-                          key={c.registrationId || c.user.id}
+                          key={c.registrationId || studentId}
                           onClick={() => {
                             setSelectedStudentIds((prev) =>
-                              isChecked ? prev.filter((id) => id !== c.user.id) : [...prev, c.user.id]
+                              isChecked ? prev.filter((id) => id !== studentId) : [...prev, studentId]
                             );
                           }}
                           className="hover:bg-[#FAF9F7] dark:hover:bg-[#252830] cursor-pointer"
@@ -612,9 +615,9 @@ export function TemplateGenerationModal({
                               className="rounded accent-[#B08D57]"
                             />
                           </td>
-                          <td className="p-3 font-medium text-[#1C1B1F] dark:text-[#F5F3EF]">{c.user.name}</td>
-                          <td className="p-3 font-mono text-[#6B6966]">{c.user.rollNumber || 'N/A'}</td>
-                          <td className="p-3 text-[#6B6966]">{c.user.email}</td>
+                          <td className="p-3 font-medium text-[#1C1B1F] dark:text-[#F5F3EF]">{c.user?.name || 'Student'}</td>
+                          <td className="p-3 font-mono text-[#6B6966]">{c.user?.rollNumber || 'N/A'}</td>
+                          <td className="p-3 text-[#6B6966]">{c.user?.email || '—'}</td>
                         </tr>
                       );
                     })}

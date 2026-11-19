@@ -1040,7 +1040,11 @@ export function ManagerEventDetailClient({
                       </thead>
                       <tbody className="divide-y divide-white/5">
                         {attendeesData.registrations.map((reg) => {
-                          const displayName = reg.participantName || reg.user?.name || 'Anonymous Attendee';
+                          const displayName =
+                            (typeof reg.participantName === 'string' && reg.participantName.trim()) ||
+                            (typeof reg.user?.name === 'string' && reg.user.name.trim()) ||
+                            'Anonymous Attendee';
+                          const displayInitials = displayName.slice(0, 2).toUpperCase();
                           const displayEmail = reg.participantEmail || reg.user?.email || '—';
                           const isExternal = reg.participantType === 'EXTERNAL';
                           const isCross = Boolean(reg.homeCollegeId && event?.collegeId && reg.homeCollegeId !== event.collegeId);
@@ -1048,6 +1052,19 @@ export function ManagerEventDetailClient({
                             reg.participantCollegeName ||
                             reg.participantRollNumber ||
                             (isExternal ? 'Guest / External' : 'Campus Student');
+
+                          const formatRegisteredDate = (dateStr?: string | null) => {
+                            if (!dateStr) return '—';
+                            const d = new Date(dateStr);
+                            if (isNaN(d.getTime())) return '—';
+                            return d.toLocaleDateString('en-US', {
+                              month: 'short',
+                              day: 'numeric',
+                              year: 'numeric',
+                              hour: 'numeric',
+                              minute: '2-digit',
+                            });
+                          };
 
                           return (
                             <tr
@@ -1071,7 +1088,7 @@ export function ManagerEventDetailClient({
                                       isExternal ? 'bg-orange-500 text-white' : 'bg-[#FF5733] text-white'
                                     }`}
                                   >
-                                    {displayName.slice(0, 2)}
+                                    {displayInitials}
                                   </div>
                                 )}
                                 <span className="font-bold">{displayName}</span>
@@ -1094,13 +1111,7 @@ export function ManagerEventDetailClient({
                               <td className="py-3 px-4 text-slate-400">{displayEmail}</td>
                               <td className="py-3 px-4 text-slate-400">{institutionOrRoll}</td>
                               <td className="py-3 px-4 text-slate-400">
-                                {new Date(reg.registeredAt).toLocaleDateString('en-US', {
-                                  month: 'short',
-                                  day: 'numeric',
-                                  year: 'numeric',
-                                  hour: 'numeric',
-                                  minute: '2-digit',
-                                })}
+                                {formatRegisteredDate(reg.registeredAt)}
                               </td>
                               <td className="py-3 px-4">
                                 {reg.isUserDeleted ? (
@@ -1111,7 +1122,7 @@ export function ManagerEventDetailClient({
                                   <div className="space-y-0.5">
                                     <div className="flex items-center gap-1.5 flex-wrap">
                                       <span className="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-purple-500/15 text-purple-400 border border-purple-500/30">
-                                        Paid ₹{reg.paymentTransaction.amount}
+                                        Paid ₹{Number(reg.paymentTransaction.amount) || 0}
                                       </span>
                                       {reg.paymentTransaction.status === 'REFUNDED' && (
                                         <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-blue-500/20 text-blue-400">
@@ -1119,7 +1130,7 @@ export function ManagerEventDetailClient({
                                         </span>
                                       )}
                                     </div>
-                                    {reg.paymentTransaction.id && (
+                                    {typeof reg.paymentTransaction.id === 'string' && (
                                       <div className="text-[9px] font-mono text-slate-400 truncate max-w-[120px]" title={reg.paymentTransaction.id}>
                                         Txn: {reg.paymentTransaction.id.slice(0, 8)}...
                                       </div>

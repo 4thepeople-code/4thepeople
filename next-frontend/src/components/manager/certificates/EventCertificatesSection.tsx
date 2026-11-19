@@ -68,7 +68,8 @@ export function EventCertificatesSection({
   const certificates = certsData?.certificates || [];
   const pagination = certsData?.pagination || { total: 0, page: 1, limit: 20, totalPages: 1 };
 
-  const handleCopyNumber = (certNumber: string) => {
+  const handleCopyNumber = (certNumber?: string) => {
+    if (!certNumber) return;
     navigator.clipboard.writeText(certNumber);
     setCopiedCertId(certNumber);
     setTimeout(() => setCopiedCertId(null), 2000);
@@ -160,8 +161,12 @@ export function EventCertificatesSection({
           </span>
           <div className="flex items-baseline gap-2 mt-1">
             <span className="text-2xl font-black text-emerald-400">
-              {eligibleStudents.length > 0
-                ? Math.round((eligibleStudents.filter((s) => s.hasActiveCertificate).length / eligibleStudents.length) * 100)
+              {Array.isArray(eligibleStudents) && eligibleStudents.length > 0
+                ? Math.round(
+                    (eligibleStudents.filter((s) => Boolean(s?.hasActiveCertificate)).length /
+                      eligibleStudents.length) *
+                      100
+                  )
                 : 0}
               %
             </span>
@@ -268,7 +273,7 @@ export function EventCertificatesSection({
                             />
                           ) : (
                             <div className="w-8 h-8 rounded-full bg-cyan-500/20 text-cyan-400 flex items-center justify-center font-bold text-xs uppercase">
-                              {(cert.user?.name || 'S').slice(0, 2)}
+                              {(cert.user?.name || 'Student').slice(0, 2)}
                             </div>
                           )}
                           <div>
@@ -283,19 +288,21 @@ export function EventCertificatesSection({
                       {/* Certificate Number */}
                       <td className="py-3 px-4 font-mono font-medium text-slate-300">
                         <div className="inline-flex items-center gap-1.5">
-                          <span>{cert.certificateNumber}</span>
-                          <button
-                            type="button"
-                            onClick={() => handleCopyNumber(cert.certificateNumber)}
-                            className="p-1 rounded-md hover:bg-white/10 text-slate-400 hover:text-white transition"
-                            title="Copy Certificate Number"
-                          >
-                            {copiedCertId === cert.certificateNumber ? (
-                              <Check className="w-3.5 h-3.5 text-emerald-400" />
-                            ) : (
-                              <Copy className="w-3.5 h-3.5" />
-                            )}
-                          </button>
+                          <span>{cert.certificateNumber || '—'}</span>
+                          {cert.certificateNumber && (
+                            <button
+                              type="button"
+                              onClick={() => handleCopyNumber(cert.certificateNumber)}
+                              className="p-1 rounded-md hover:bg-white/10 text-slate-400 hover:text-white transition"
+                              title="Copy Certificate Number"
+                            >
+                              {copiedCertId === cert.certificateNumber ? (
+                                <Check className="w-3.5 h-3.5 text-emerald-400" />
+                              ) : (
+                                <Copy className="w-3.5 h-3.5" />
+                              )}
+                            </button>
+                          )}
                         </div>
                       </td>
 
@@ -328,11 +335,17 @@ export function EventCertificatesSection({
 
                       {/* Issued Date */}
                       <td className="py-3 px-4 text-slate-400 text-[11px]">
-                        {new Date(cert.issuedAt).toLocaleDateString('en-US', {
-                          month: 'short',
-                          day: 'numeric',
-                          year: 'numeric',
-                        })}
+                        {(() => {
+                          if (!cert.issuedAt) return '—';
+                          const d = new Date(cert.issuedAt);
+                          return isNaN(d.getTime())
+                            ? '—'
+                            : d.toLocaleDateString('en-US', {
+                                month: 'short',
+                                day: 'numeric',
+                                year: 'numeric',
+                              });
+                        })()}
                       </td>
 
                       {/* Action Menu */}
