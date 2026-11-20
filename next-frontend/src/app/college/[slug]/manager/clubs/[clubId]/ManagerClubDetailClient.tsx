@@ -454,13 +454,13 @@ export function ManagerClubDetailClient({ slug, clubId }: ManagerClubDetailClien
                     <Edit3 className="h-4 w-4 text-[var(--primary)]" />
                     <span>{isEditingInfo ? 'Cancel Edit' : 'Edit Info'}</span>
                   </button>
-                  <button
-                    onClick={() => setIsCreateEventModalOpen(true)}
+                  <Link
+                    href={`/college/${slug}/manager/clubs/${clubId}/events/create`}
                     className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[var(--primary)] hover:bg-[var(--primary-strong)] text-white text-xs font-bold transition-colors shadow-xs cursor-pointer px-5 py-2"
                   >
                     <Plus className="h-4 w-4" />
                     <span>Create Event</span>
-                  </button>
+                  </Link>
                 </div>
               </ClubHeader>
 
@@ -810,13 +810,13 @@ export function ManagerClubDetailClient({ slug, clubId }: ManagerClubDetailClien
                   <p className="mx-auto mt-2 max-w-md text-sm text-[var(--ink-soft)]">
                     Create an event for this club to start sharing schedules, locations, and photo galleries.
                   </p>
-                  <button
-                    onClick={() => setIsCreateEventModalOpen(true)}
+                  <Link
+                    href={`/college/${slug}/manager/clubs/${clubId}/events/create`}
                     className="mt-4 inline-flex min-h-11 items-center gap-2 px-5 py-2.5 bg-[var(--primary)] hover:bg-[var(--primary-strong)] text-white text-xs font-bold rounded-xl shadow-xs transition-colors cursor-pointer"
                   >
                     <Plus className="w-4 h-4" />
                     <span>Create Event</span>
-                  </button>
+                  </Link>
                 </div>
               )}
 

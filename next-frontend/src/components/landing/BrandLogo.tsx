@@ -9,17 +9,17 @@ interface BrandLogoProps {
 const SIZES = {
   sm: {
     container: 'gap-1',
-    number: 'text-[19px] font-black leading-none',
+    number: 'text-[19px] font-extrabold leading-none',
     textWrapper: 'text-[8px] leading-[0.85] tracking-tight font-extrabold',
   },
   md: {
     container: 'gap-1.5',
-    number: 'text-2xl font-black leading-none',
+    number: 'text-2xl font-extrabold leading-none',
     textWrapper: 'text-[9px] leading-[0.85] tracking-tight font-extrabold',
   },
   lg: {
     container: 'gap-2',
-    number: 'text-4xl font-black leading-none',
+    number: 'text-4xl font-extrabold leading-none',
     textWrapper: 'text-[13px] leading-[0.85] tracking-tight font-extrabold',
   },
 };

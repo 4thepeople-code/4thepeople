@@ -198,19 +198,19 @@ export function StudentDashboardClient({ slug, initialTab = 'registrations' }: S
             <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
               <div className="space-y-3">
                 <div className="flex flex-wrap items-center gap-2.5">
-                  <div className="inline-flex items-center gap-2 rounded-2xl border-2 border-[var(--border-strong)] bg-[var(--surface-card)] px-3 py-1.5 shadow-brutal-xs">
-                    <BrandLogo size="sm" variant="dark" />
-                    <span className="h-5 w-px bg-[var(--border-strong)]" />
-                    <div className="flex items-center gap-1.5">
+                  <div className="inline-flex items-center gap-3 rounded-2xl border-2 border-[var(--border-strong)] bg-[var(--surface-card)] px-3.5 py-2 shadow-brutal-xs">
+                    <BrandLogo size="md" variant="dark" />
+                    <span className="h-9 w-px bg-[var(--border-strong)] opacity-70" />
+                    <div className="flex flex-col items-center justify-center shrink-0">
                       <img
                         src={LBRCE_LOGO_URL}
                         alt={`${collegeDisplay} Logo`}
-                        className="h-6 w-6 rounded-full object-contain bg-white border border-[var(--border-strong)]"
+                        className="h-10 w-10 rounded-full object-contain bg-white border border-[var(--border-strong)] p-0.5 shadow-xs"
                         onError={(e) => {
                           (e.currentTarget as HTMLElement).style.display = 'none';
                         }}
                       />
-                      <span className="font-display text-[10px] font-black uppercase text-[var(--accent-strong)]">
+                      <span className="font-display text-[10px] font-black uppercase tracking-wider text-[var(--accent-strong)] mt-0.5 text-center leading-none">
                         {collegeDisplay}
                       </span>
                     </div>

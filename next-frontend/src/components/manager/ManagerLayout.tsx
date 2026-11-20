@@ -61,6 +61,7 @@ export function ManagerLayout({ slug, children }: ManagerLayoutProps) {
 
   const getBreadcrumb = () => {
     if (pathname.includes('/manager/profile')) return 'Profile Settings';
+    if (pathname.includes('/events/create')) return 'Create Event';
     if (pathname.includes('/events/')) return 'Event Management';
     if (pathname.includes('/manager/clubs/') && pathname.split('/').length > 5) return 'Club Management';
     if (pathname.includes('/manager/clubs')) return 'My clubs';
@@ -398,7 +399,7 @@ export function ManagerLayout({ slug, children }: ManagerLayoutProps) {
               <div className="flex items-center gap-2">
                 <Link
                   href={
-                    myClubs.length === 1
+                    myClubs.length > 0
                       ? `/college/${slug}/manager/clubs/${myClubs[0].id}/events/create`
                       : clubsHref
                   }
