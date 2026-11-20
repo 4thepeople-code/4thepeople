@@ -92,8 +92,8 @@ export function VisualCertificateEditor({
     return students.length > 0 ? students[0] : null;
   });
 
-  // Canvas View Controls
-  const [zoom, setZoom] = useState<number>(1.0);
+  // Canvas View Controls (default 0.85 zoom fits landscape certificate comfortably)
+  const [zoom, setZoom] = useState<number>(0.85);
   const [pan, setPan] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
 
   // Custom File Preview Asset URL (if PNG/JPEG)
@@ -374,6 +374,60 @@ export function VisualCertificateEditor({
       );
     }
 
+    if (id === 'tpl-regal-emerald') {
+      return (
+        <div className="absolute inset-0 bg-[#FAFDFB] overflow-hidden pointer-events-none select-none">
+          {/* Outer Emerald Border */}
+          <div className="absolute inset-4 border-[6px] border-[#064E3B] pointer-events-none" />
+          {/* Inner Gold Border */}
+          <div className="absolute inset-6 border border-[#D4AF37] pointer-events-none" />
+          {/* Corner Ornaments */}
+          <div className="absolute top-7 left-7 w-6 h-6 border-t-2 border-l-2 border-[#D4AF37]" />
+          <div className="absolute top-7 right-7 w-6 h-6 border-t-2 border-r-2 border-[#D4AF37]" />
+          <div className="absolute bottom-7 left-7 w-6 h-6 border-b-2 border-l-2 border-[#D4AF37]" />
+          <div className="absolute bottom-7 right-7 w-6 h-6 border-b-2 border-r-2 border-[#D4AF37]" />
+          {/* Header watermark */}
+          <div className="absolute top-12 left-0 right-0 text-center">
+            <span className="text-[10px] tracking-[0.3em] font-serif font-bold text-[#D4AF37] uppercase">
+              Certificate of Excellence & Merit
+            </span>
+          </div>
+          {/* Footer Signatures */}
+          <div className="absolute bottom-16 left-16 w-36 border-b border-[#064E3B]/40" />
+          <div className="absolute bottom-16 right-16 w-36 border-b border-[#064E3B]/40" />
+          <div className="absolute bottom-11 left-16 text-[9px] text-[#064E3B]/70 font-serif">Club Coordinator</div>
+          <div className="absolute bottom-11 right-16 text-[9px] text-[#064E3B]/70 font-serif">Principal / Dean</div>
+        </div>
+      );
+    }
+
+    if (id === 'tpl-creative-violet') {
+      return (
+        <div className="absolute inset-0 bg-gradient-to-br from-[#FDFBFE] via-[#FAF5FF] to-[#FDFBFE] overflow-hidden pointer-events-none select-none">
+          {/* Outer Violet Border */}
+          <div className="absolute inset-4 border-[4px] border-[#6D28D9] pointer-events-none" />
+          {/* Inner Rose Border */}
+          <div className="absolute inset-6 border-[1.5px] border-[#E11D48] pointer-events-none" />
+          {/* Corner Accents */}
+          <div className="absolute top-6 left-6 w-5 h-5 border-t-2 border-l-2 border-[#7C3AED]" />
+          <div className="absolute top-6 right-6 w-5 h-5 border-t-2 border-r-2 border-[#7C3AED]" />
+          <div className="absolute bottom-6 left-6 w-5 h-5 border-b-2 border-l-2 border-[#7C3AED]" />
+          <div className="absolute bottom-6 right-6 w-5 h-5 border-b-2 border-r-2 border-[#7C3AED]" />
+          {/* Badge */}
+          <div className="absolute top-11 left-0 right-0 text-center">
+            <span className="px-3 py-0.5 rounded-full bg-[#7C3AED]/10 border border-[#7C3AED]/30 text-[9.5px] tracking-[0.25em] font-sans font-bold text-[#6D28D9] uppercase">
+              Creative Arts & Design Distinction
+            </span>
+          </div>
+          {/* Signatures */}
+          <div className="absolute bottom-16 left-16 w-36 border-b border-[#6D28D9]/40" />
+          <div className="absolute bottom-16 right-16 w-36 border-b border-[#6D28D9]/40" />
+          <div className="absolute bottom-11 left-16 text-[9px] text-[#6D28D9]/70 font-sans">Club President</div>
+          <div className="absolute bottom-11 right-16 text-[9px] text-[#6D28D9]/70 font-sans">Faculty In-Charge</div>
+        </div>
+      );
+    }
+
     // Default: Formal Gold
     return (
       <div className="absolute inset-0 bg-[#FCFBF7] overflow-hidden pointer-events-none select-none">
@@ -392,9 +446,9 @@ export function VisualCertificateEditor({
   };
 
   return (
-    <div className="flex flex-col h-full bg-[#FAF9F7] dark:bg-[#12141A] font-sans">
+    <div className="flex flex-col h-full flex-1 min-h-0 bg-[#FAF9F7] dark:bg-[#12141A] font-sans overflow-hidden">
       {/* Top Action Bar: View Switcher, Attendee Switcher, Zoom Controls */}
-      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 bg-white dark:bg-[#1A1D24] border-b border-[#E7E5E4] dark:border-[#2D3139] z-20">
+      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 bg-white dark:bg-[#1A1D24] border-b border-[#E7E5E4] dark:border-[#2D3139] z-20 shrink-0">
         {/* Left: View Mode Toggle */}
         <div className="flex items-center gap-1.5 p-1 bg-[#F2F0EC] dark:bg-[#252830] rounded-lg">
           <button
@@ -490,20 +544,20 @@ export function VisualCertificateEditor({
       </div>
 
       {/* Main Workspace: Canvas + Properties Sidebar */}
-      <div className="flex-1 flex flex-col md:flex-row overflow-hidden relative">
+      <div className="flex-1 min-h-0 flex flex-col md:flex-row overflow-hidden relative">
         {/* Workspace Canvas Area */}
         <div
-          className="flex-1 overflow-auto p-4 sm:p-8 flex items-center justify-center bg-[#EFECE6] dark:bg-[#0B0D12] relative cursor-default"
+          className="flex-1 min-h-0 overflow-y-auto overflow-x-auto p-4 sm:p-6 pb-40 flex flex-col items-center justify-start bg-[#EFECE6] dark:bg-[#0B0D12] relative cursor-default overscroll-contain"
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
         >
           {viewMode === 'editor' ? (
             /* Visual Canvas Editor */
             <div
-              className="relative transition-transform duration-75 select-none"
+              className="relative transition-transform duration-75 select-none my-2 shrink-0"
               style={{
                 transform: `scale(${zoom}) translate(${pan.x}px, ${pan.y}px)`,
-                transformOrigin: 'center center',
+                transformOrigin: 'top center',
               }}
             >
               {/* Certificate Sheet (A4 Landscape aspect ratio) */}
@@ -513,6 +567,7 @@ export function VisualCertificateEditor({
                 style={{
                   width: '740px',
                   height: `${740 / aspectRatio}px`,
+                  marginBottom: '80px',
                 }}
               >
                 {/* Background Design */}
@@ -676,7 +731,7 @@ export function VisualCertificateEditor({
         </div>
 
         {/* Right Properties Panel (Configures selected placeholder) */}
-        <div className="w-full md:w-80 bg-white dark:bg-[#1A1D24] border-t md:border-t-0 md:border-l border-[#E7E5E4] dark:border-[#2D3139] flex flex-col p-4 overflow-y-auto z-10 font-sans space-y-5">
+        <div className="w-full md:w-80 h-full max-h-full bg-white dark:bg-[#1A1D24] border-t md:border-t-0 md:border-l border-[#E7E5E4] dark:border-[#2D3139] flex flex-col p-4 pb-14 overflow-y-auto z-10 font-sans space-y-5 shrink-0 min-h-0 overscroll-contain [scrollbar-gutter:stable]">
           <div className="flex items-center justify-between border-b border-[#E7E5E4] dark:border-[#2D3139] pb-3">
             <div className="flex items-center gap-2">
               <Settings2 className="w-4 h-4 text-[#B08D57]" />

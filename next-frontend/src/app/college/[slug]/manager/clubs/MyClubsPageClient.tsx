@@ -2,7 +2,6 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { useTheme } from '@/context/ThemeContext';
 import { useMyClubsQuery } from '@/lib/api/manager';
 import ManagerLayout from '@/components/manager/ManagerLayout';
 import {
@@ -11,7 +10,8 @@ import {
   AlertCircle,
   RefreshCw,
   Search,
-  ChevronRight,
+  ArrowRight,
+  Plus,
 } from 'lucide-react';
 
 export interface MyClubsPageClientProps {
@@ -19,7 +19,6 @@ export interface MyClubsPageClientProps {
 }
 
 export function MyClubsPageClient({ slug }: MyClubsPageClientProps) {
-  const { isDark } = useTheme();
   const [searchQuery, setSearchQuery] = useState('');
 
   const getPath = (subPath: string) => `/college/${slug}${subPath}`;
@@ -40,54 +39,47 @@ export function MyClubsPageClient({ slug }: MyClubsPageClientProps) {
 
   return (
     <ManagerLayout slug={slug}>
-      <div className="space-y-8 animate-in fade-in duration-300">
+      <div className="space-y-6">
         {/* Header Banner */}
-        <div
-          className={`rounded-3xl p-6 sm:p-8 border shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6 transition-colors ${
-            isDark ? 'bg-[#12141C] border-white/10' : 'bg-white border-slate-200'
-          }`}
-        >
-          <div className="space-y-2">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#00F0FF]/15 text-[#00F0FF] text-[10px] font-black uppercase tracking-wider border border-[#00F0FF]/25">
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>Club Portfolio</span>
+        <section className="rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-6 shadow-xs">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--primary-soft)] px-2.5 py-0.5 text-xs font-semibold text-[var(--primary)]">
+                  <span className="h-1.5 w-1.5 rounded-full bg-[var(--primary)]" />
+                  Club Portfolio
+                </span>
+                <span className="text-xs uppercase tracking-wider text-[var(--ink-soft)]">
+                  {slug ? slug.toUpperCase() : 'CAMPUS'}
+                </span>
+              </div>
+              <h1 className="font-display text-2xl font-bold tracking-tight text-[var(--ink)] sm:text-3xl">
+                My Managed Clubs
+              </h1>
+              <p className="mt-1 text-xs text-[var(--ink-soft)] max-w-xl">
+                Select a club to edit details, upload logos & cover photos, manage campus events, and organize photo galleries.
+              </p>
             </div>
 
-            <h1
-              className={`font-['Syne',sans-serif] text-3xl sm:text-4xl font-black uppercase tracking-tight ${
-                isDark ? 'text-white' : 'text-[#0F172A]'
-              }`}
-            >
-              My Managed <span className="text-[#00F0FF]">Clubs</span>
-            </h1>
-
-            <p className={`text-xs font-medium max-w-xl ${isDark ? 'text-gray-400' : 'text-slate-600'}`}>
-              Select a club to edit details, upload logos & cover photos, manage campus events, and organize photo galleries.
-            </p>
+            {/* Search Input */}
+            <div className="relative w-full md:w-72">
+              <Search className="h-4 w-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--ink-soft)]" />
+              <input
+                type="text"
+                placeholder="Filter clubs..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full rounded-xl border border-[var(--line)] bg-[var(--bg)] pl-10 pr-4 py-2 text-xs font-medium text-[var(--ink)] placeholder-[var(--ink-soft)] focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-[var(--primary)] transition-all"
+              />
+            </div>
           </div>
-
-          {/* Search Bar */}
-          <div className="relative w-full md:w-72">
-            <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Filter clubs..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className={`w-full pl-10 pr-4 py-2.5 rounded-full border text-xs font-medium focus:outline-hidden focus:border-[#00F0FF] transition-all ${
-                isDark
-                  ? 'bg-[#0B0C10] border-white/10 text-white placeholder-gray-500'
-                  : 'bg-slate-50 border-slate-200 text-slate-900 placeholder-slate-400'
-              }`}
-            />
-          </div>
-        </div>
+        </section>
 
         {/* Error Alert */}
         {isError && (
-          <div className="p-4 rounded-2xl border flex items-center justify-between text-xs font-bold bg-rose-500/10 border-rose-500/30 text-rose-300">
+          <div className="rounded-xl border border-rose-300 bg-rose-50 dark:bg-rose-950/20 dark:border-rose-800 p-4 flex items-center justify-between text-xs font-medium text-rose-800 dark:text-rose-300">
             <div className="flex items-center gap-3">
-              <AlertCircle className="w-5 h-5 shrink-0 text-rose-400" />
+              <AlertCircle className="h-5 w-5 shrink-0 text-rose-600 dark:text-rose-400" />
               <span>
                 {(errObj as { response?: { data?: { message?: string } } })?.response?.data?.message ||
                   'Failed to load your assigned clubs.'}
@@ -96,9 +88,9 @@ export function MyClubsPageClient({ slug }: MyClubsPageClientProps) {
             <button
               type="button"
               onClick={() => refetch()}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 text-[11px] font-black uppercase rounded-xl transition"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-rose-100 hover:bg-rose-200 dark:bg-rose-900/40 dark:hover:bg-rose-900/60 text-rose-800 dark:text-rose-200 text-xs font-bold uppercase rounded-lg transition-colors"
             >
-              <RefreshCw className="w-3.5 h-3.5" />
+              <RefreshCw className="h-3.5 w-3.5" />
               <span>Retry</span>
             </button>
           </div>
@@ -106,28 +98,32 @@ export function MyClubsPageClient({ slug }: MyClubsPageClientProps) {
 
         {/* Loading Skeletons */}
         {loading && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {[1, 2, 3].map((i) => (
               <div
                 key={i}
-                className={`h-48 rounded-3xl animate-pulse border ${
-                  isDark ? 'bg-white/5 border-white/5' : 'bg-slate-100 border-slate-200'
-                }`}
-              />
+                className="h-48 rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-5 animate-pulse flex flex-col justify-between"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="h-12 w-12 rounded-xl bg-[var(--line)]" />
+                  <div className="space-y-2 flex-1">
+                    <div className="h-4 w-28 rounded bg-[var(--line)]" />
+                    <div className="h-3 w-16 rounded bg-[var(--line)]" />
+                  </div>
+                </div>
+                <div className="h-3 w-3/4 rounded bg-[var(--line)]" />
+                <div className="h-8 rounded-xl bg-[var(--line)]" />
+              </div>
             ))}
           </div>
         )}
 
         {/* Empty State */}
         {!loading && !isError && clubs.length === 0 && (
-          <div
-            className={`text-center py-16 rounded-3xl border space-y-3 ${
-              isDark ? 'bg-[#12141C] border-white/10' : 'bg-white border-slate-200'
-            }`}
-          >
-            <Building2 className="w-12 h-12 text-gray-500 mx-auto" />
-            <h3 className="font-['Syne',sans-serif] text-lg font-bold uppercase">No Managed Clubs Assigned</h3>
-            <p className="text-xs text-gray-400 max-w-sm mx-auto">
+          <div className="text-center py-16 rounded-2xl border border-[var(--line)] bg-[var(--surface)] space-y-3">
+            <Building2 className="h-12 w-12 text-[var(--ink-soft)] mx-auto opacity-60" />
+            <h3 className="font-display text-lg font-bold text-[var(--ink)]">No Managed Clubs Assigned</h3>
+            <p className="text-xs text-[var(--ink-soft)] max-w-sm mx-auto">
               You haven&apos;t been assigned to manage any clubs yet — please contact your college administrator.
             </p>
           </div>
@@ -135,77 +131,83 @@ export function MyClubsPageClient({ slug }: MyClubsPageClientProps) {
 
         {/* Filtered Empty State */}
         {!loading && !isError && clubs.length > 0 && filteredClubs.length === 0 && (
-          <div
-            className={`text-center py-12 rounded-3xl border space-y-2 ${
-              isDark ? 'bg-[#12141C] border-white/10' : 'bg-white border-slate-200'
-            }`}
-          >
-            <Search className="w-8 h-8 text-gray-400 mx-auto" />
-            <p className="text-xs font-semibold text-gray-400">No managed clubs match your search filter.</p>
+          <div className="text-center py-12 rounded-2xl border border-[var(--line)] bg-[var(--surface)] space-y-2">
+            <Search className="h-8 w-8 text-[var(--ink-soft)] mx-auto opacity-50" />
+            <p className="text-xs font-semibold text-[var(--ink-soft)]">
+              No managed clubs match your search filter &quot;{searchQuery}&quot;.
+            </p>
           </div>
         )}
 
         {/* Clubs Grid */}
         {!loading && !isError && filteredClubs.length > 0 && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredClubs.map((club) => {
               const logoUrl = club.logoUrl || club.logo?.url;
               const initials = club.name ? club.name.slice(0, 2).toUpperCase() : 'CL';
               const clubHref = getPath(`/manager/clubs/${club.id}`);
+              const createEventHref = getPath(`/manager/clubs/${club.id}/events/create`);
 
               return (
-                <Link
+                <div
                   key={club.id}
-                  href={clubHref}
-                  className={`group border rounded-3xl p-6 shadow-sm hover:shadow-2xl transition-all duration-300 flex flex-col justify-between cursor-pointer ${
-                    isDark
-                      ? 'bg-[#12141C] hover:bg-[#161922] border-white/10 hover:border-cyan-500/50'
-                      : 'bg-white hover:bg-slate-50 border-slate-200 hover:border-cyan-400'
-                  }`}
+                  className="rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-5 shadow-xs hover:border-[var(--primary)] hover:shadow-md transition-all flex flex-col justify-between"
                 >
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-4">
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-3">
                       {logoUrl ? (
                         <img
                           src={logoUrl}
                           alt={club.name}
-                          className="w-14 h-14 rounded-2xl object-cover border border-white/10 shadow-xs group-hover:scale-105 transition-transform"
+                          className="h-12 w-12 rounded-xl object-cover border border-[var(--line)] shrink-0"
                         />
                       ) : (
-                        <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-[#00F0FF] to-blue-600 flex items-center justify-center text-black font-['Syne',sans-serif] font-black text-xl shadow-md group-hover:scale-105 transition-transform">
+                        <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-[var(--primary-soft)] font-display text-base font-bold text-[var(--primary)]">
                           {initials}
                         </div>
                       )}
 
-                      <div className="flex-1 min-w-0">
-                        <h3
-                          className={`font-['Syne',sans-serif] text-xl font-black group-hover:text-[#00F0FF] transition truncate ${
-                            isDark ? 'text-white' : 'text-[#0F172A]'
-                          }`}
+                      <div className="min-w-0 flex-1">
+                        <Link
+                          href={clubHref}
+                          className="font-display font-bold text-base text-[var(--ink)] hover:text-[var(--primary)] transition-colors truncate block"
                         >
                           {club.name}
-                        </h3>
-                        <span className="text-[10px] text-[#00F0FF] font-black uppercase tracking-wider bg-[#00F0FF]/10 px-2.5 py-0.5 rounded-full inline-block mt-0.5 border border-[#00F0FF]/25">
+                        </Link>
+                        <span className="text-[10px] font-semibold text-[var(--primary)] bg-[var(--primary-soft)] px-2 py-0.5 rounded-full inline-block mt-0.5">
                           Manager Access
                         </span>
                       </div>
                     </div>
 
-                    <p className={`text-xs line-clamp-3 leading-relaxed font-medium ${isDark ? 'text-gray-400' : 'text-slate-600'}`}>
+                    <p className="text-xs text-[var(--ink-soft)] line-clamp-2 leading-relaxed">
                       {club.description || 'No description provided for this campus club.'}
                     </p>
                   </div>
 
-                  <div className={`pt-4 mt-6 border-t flex items-center justify-between text-xs ${isDark ? 'border-white/10' : 'border-slate-100'}`}>
-                    <span className={`text-[11px] font-bold uppercase tracking-wider ${isDark ? 'text-gray-400' : 'text-slate-500'}`}>
-                      {club.members ? `${club.members.length} Members` : 'Manage Details'}
+                  <div className="pt-4 mt-4 border-t border-[var(--line)] flex items-center justify-between gap-2">
+                    <span className="text-[11px] font-semibold text-[var(--ink-soft)]">
+                      {club.members ? `${club.members.length} members` : 'Active'}
                     </span>
-                    <div className="flex items-center gap-1 font-extrabold text-[#00F0FF] group-hover:translate-x-1 transition-transform uppercase text-[11px] tracking-wider">
-                      <span>Manage Club</span>
-                      <ChevronRight className="w-3.5 h-3.5" />
+                    <div className="flex items-center gap-1.5">
+                      <Link
+                        href={createEventHref}
+                        className="inline-flex items-center gap-1 rounded-lg border border-[var(--line)] px-2.5 py-1 text-xs font-semibold text-[var(--ink)] hover:border-[var(--primary)] hover:bg-[var(--primary-soft)]/50 transition-colors"
+                        title="Create event for this club"
+                      >
+                        <Plus className="h-3 w-3" />
+                        <span>Event</span>
+                      </Link>
+                      <Link
+                        href={clubHref}
+                        className="inline-flex items-center gap-1 rounded-lg bg-[var(--primary)] px-2.5 py-1 text-xs font-semibold text-[var(--on-primary)] hover:bg-[var(--primary-strong)] transition-colors"
+                      >
+                        <span>Manage</span>
+                        <ArrowRight className="h-3 w-3" />
+                      </Link>
                     </div>
                   </div>
-                </Link>
+                </div>
               );
             })}
           </div>
@@ -216,4 +218,3 @@ export function MyClubsPageClient({ slug }: MyClubsPageClientProps) {
 }
 
 export default MyClubsPageClient;
-

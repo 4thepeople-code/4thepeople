@@ -4,18 +4,25 @@ import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useTheme } from '@/context/ThemeContext';
+import BrandLogo from '@/components/landing/BrandLogo';
+
+import { LBRCE_LOGO_URL } from './PublicNavbar';
 
 export interface PublicFooterProps {
   collegeSlug?: string;
   collegeName?: string;
+  collegeLogo?: string;
 }
 
-export function PublicFooter({ collegeSlug, collegeName }: PublicFooterProps) {
+export function PublicFooter({ collegeSlug, collegeName, collegeLogo }: PublicFooterProps) {
   const { isDark } = useTheme();
   const pathname = usePathname();
 
+  const isLbrce = collegeSlug?.toLowerCase() === 'lbrce';
+  const logoUrl = collegeLogo || (isLbrce ? LBRCE_LOGO_URL : undefined);
+
   const getPath = (subPath: string) => {
-    if (pathname.startsWith(`/college/${collegeSlug}`)) {
+    if (collegeSlug && pathname.startsWith(`/college/${collegeSlug}`)) {
       return `/college/${collegeSlug}${subPath === '/' ? '' : subPath}`;
     }
     return subPath;
@@ -23,8 +30,126 @@ export function PublicFooter({ collegeSlug, collegeName }: PublicFooterProps) {
 
   const homeHref = getPath('/');
   const clubsHref = getPath('/clubs');
+  const departmentsHref = getPath('/departments');
   const loginHref = getPath('/login');
+  const studentHref = getPath('/student');
+  const managerHref = getPath('/manager');
 
+  // College-specific brutalist reference footer
+  if (collegeSlug) {
+    const displayCollege = collegeName || collegeSlug.toUpperCase();
+    return (
+      <footer className="mt-auto border-t-2 border-dashed border-[var(--border-soft)] bg-[var(--surface-page)] py-12">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 gap-10 pb-10 md:grid-cols-12">
+            {/* Brand Info */}
+            <div className="space-y-4 md:col-span-6">
+              <div className="flex flex-wrap items-center gap-3">
+                <BrandLogo size="md" variant="dark" />
+                <span className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-soft)] bg-[var(--surface-card)] px-3 py-1 font-display text-xs font-bold uppercase tracking-wide text-[var(--text-secondary)]">
+                  {logoUrl && (
+                    <img
+                      src={logoUrl}
+                      alt={`${displayCollege} Logo`}
+                      className="h-4 w-4 rounded-full object-contain bg-white"
+                      onError={(e) => {
+                        (e.currentTarget as HTMLElement).style.display = 'none';
+                      }}
+                    />
+                  )}
+                  <span>{displayCollege}</span>
+                </span>
+              </div>
+              <p className="max-w-sm text-sm leading-relaxed text-[var(--text-secondary)]">
+                Discover campus clubs, manage vibrant events, and empower student leadership with 4 THE PEOPLE.
+              </p>
+            </div>
+
+            {/* Nav Links */}
+            <div className="space-y-2 md:col-span-3">
+              <h4 className="font-display text-xs font-bold uppercase tracking-widest text-[var(--text-primary)]">
+                Navigation
+              </h4>
+              <ul className="space-y-1">
+                <li>
+                  <Link
+                    href={homeHref}
+                    className="inline-flex min-h-11 items-center text-xs font-semibold text-[var(--text-secondary)] transition-colors hover:text-[var(--accent-strong)]"
+                  >
+                    Home
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    href={clubsHref}
+                    className="inline-flex min-h-11 items-center text-xs font-semibold text-[var(--text-secondary)] transition-colors hover:text-[var(--accent-strong)]"
+                  >
+                    Clubs Directory
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    href={departmentsHref}
+                    className="inline-flex min-h-11 items-center text-xs font-semibold text-[var(--text-secondary)] transition-colors hover:text-[var(--accent-strong)]"
+                  >
+                    Departments
+                  </Link>
+                </li>
+              </ul>
+            </div>
+
+            {/* Portals Access */}
+            <div className="space-y-2 md:col-span-3">
+              <h4 className="font-display text-xs font-bold uppercase tracking-widest text-[var(--text-primary)]">
+                Portals
+              </h4>
+              <ul className="space-y-1">
+                <li>
+                  <Link
+                    href={studentHref}
+                    className="inline-flex min-h-11 items-center text-xs font-semibold text-[var(--text-secondary)] transition-colors hover:text-[var(--accent-strong)]"
+                  >
+                    Student Portal
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    href={managerHref}
+                    className="inline-flex min-h-11 items-center text-xs font-semibold text-[var(--text-secondary)] transition-colors hover:text-[var(--accent-strong)]"
+                  >
+                    Club Manager Portal
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    href={loginHref}
+                    className="inline-flex min-h-11 items-center text-xs font-semibold text-[var(--text-secondary)] transition-colors hover:text-[var(--accent-strong)]"
+                  >
+                    Manager Portal Login
+                  </Link>
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          {/* Bottom Bar */}
+          <div className="flex flex-col items-center justify-between gap-4 border-t border-[var(--border-soft)] pt-8 text-xs font-medium text-[var(--text-muted)] sm:flex-row">
+            <p>© {new Date().getFullYear()} 4 THE PEOPLE. All rights reserved.</p>
+            <div className="flex items-center gap-6">
+              <Link href="/privacy" className="transition-colors hover:text-[var(--text-primary)]">
+                Privacy Policy
+              </Link>
+              <Link href="/terms" className="transition-colors hover:text-[var(--text-primary)]">
+                Terms of Service
+              </Link>
+            </div>
+          </div>
+        </div>
+      </footer>
+    );
+  }
+
+  // Global generic fallback footer
   return (
     <footer
       className={`mt-auto py-16 border-t relative transition-colors duration-300 ${
@@ -54,11 +179,6 @@ export function PublicFooter({ collegeSlug, collegeName }: PublicFooterProps) {
                 <span className="text-xl font-black tracking-tight leading-none">
                   PEOPLE<span className="text-[#00F0FF]">.</span>
                 </span>
-                {collegeName && (
-                  <span className="text-[9px] font-bold text-cyan-400 uppercase tracking-widest mt-0.5">
-                    {collegeName}
-                  </span>
-                )}
               </div>
             </div>
 
@@ -127,4 +247,3 @@ export function PublicFooter({ collegeSlug, collegeName }: PublicFooterProps) {
 }
 
 export default PublicFooter;
-

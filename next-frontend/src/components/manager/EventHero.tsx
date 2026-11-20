@@ -49,7 +49,7 @@ export function EventHero({ event, children, className = '' }: EventHeroProps) {
 
   return (
     <div
-      className={`relative w-full rounded-3xl overflow-hidden bg-slate-900 border border-white/10 shadow-2xl ${className}`}
+      className={`relative w-full rounded-3xl overflow-hidden bg-slate-950 border border-[var(--line)] shadow-xl ${className}`}
     >
       <div className="relative w-full min-h-[300px] sm:min-h-[360px] flex flex-col justify-between p-6 sm:p-8">
         {/* Cover or Gradient Background */}
@@ -61,7 +61,7 @@ export function EventHero({ event, children, className = '' }: EventHeroProps) {
             onError={() => setCoverFailed(true)}
           />
         ) : (
-          <div className="absolute inset-0 bg-gradient-to-br from-cyan-950 via-slate-950 to-indigo-950" />
+          <div className="absolute inset-0 bg-gradient-to-br from-indigo-950 via-slate-900 to-purple-950" />
         )}
 
         {/* Dark Gradient Overlay */}
@@ -70,27 +70,27 @@ export function EventHero({ event, children, className = '' }: EventHeroProps) {
         {/* Top Badges */}
         <div className="relative z-10 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            <span className="px-3 py-1 rounded-full bg-[#00F0FF] text-black font-extrabold text-[10px] uppercase tracking-wider shadow-md">
+            <span className="px-3 py-1 rounded-full bg-[var(--primary)] text-white font-bold text-[10px] uppercase tracking-wider shadow-sm">
               {category}
             </span>
             <span
-              className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border ${
+              className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border ${
                 status === 'CANCELLED'
                   ? 'bg-rose-500/20 text-rose-300 border-rose-500/40'
                   : status === 'COMPLETED'
-                    ? 'bg-slate-500/20 text-slate-300 border-slate-500/40'
+                    ? 'bg-white/10 text-slate-300 border-white/20'
                     : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
               }`}
             >
               {status}
             </span>
             {event.visibility === 'PUBLIC' ? (
-              <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border bg-emerald-500/20 text-emerald-300 border-emerald-500/40">
+              <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border bg-emerald-500/20 text-emerald-300 border-emerald-500/40">
                 <Globe className="w-3 h-3" />
                 <span>Public Event</span>
               </span>
             ) : (
-              <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border bg-slate-500/20 text-slate-300 border-slate-500/40">
+              <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border bg-white/10 text-slate-300 border-white/20">
                 <Building2 className="w-3 h-3" />
                 <span>College Only</span>
               </span>
@@ -102,19 +102,19 @@ export function EventHero({ event, children, className = '' }: EventHeroProps) {
 
         {/* Bottom Event Details */}
         <div className="relative z-10 space-y-3 mt-12">
-          <h1 className="font-['Syne',sans-serif] text-2xl sm:text-4xl font-black text-white uppercase tracking-tight">
+          <h1 className="font-display text-2xl sm:text-4xl font-bold text-white tracking-tight">
             {event.title}
           </h1>
 
-          <div className="flex flex-wrap items-center gap-4 text-xs font-semibold text-gray-300">
+          <div className="flex flex-wrap items-center gap-4 text-xs sm:text-sm font-semibold text-slate-200">
             <div className="flex items-center gap-1.5">
-              <Calendar className="w-4 h-4 text-[#00F0FF]" />
+              <Calendar className="w-4 h-4 text-indigo-400" />
               <span>{formatEventDate(event.startAt)}</span>
             </div>
 
             {event.startAt && (
               <div className="flex items-center gap-1.5">
-                <Clock className="w-4 h-4 text-cyan-400" />
+                <Clock className="w-4 h-4 text-indigo-400" />
                 <span>{formatEventTime(event.startAt, event.endAt)}</span>
               </div>
             )}

@@ -416,11 +416,267 @@ async function generateFormalGoldTemplate() {
   console.log('✔ Generated tpl-formal-gold.pdf');
 }
 
+/**
+ * 4. Template: Executive Leadership & Merit (Forest Emerald & Warm Gold, A4 Landscape: 841.89 x 595.28 pt)
+ */
+async function generateRegalEmeraldTemplate() {
+  const pdfDoc = await PDFDocument.create();
+  const width = 841.89;
+  const height = 595.28;
+  const page = pdfDoc.addPage([width, height]);
+
+  const timesBold = await pdfDoc.embedFont(StandardFonts.TimesRomanBold);
+  const times = await pdfDoc.embedFont(StandardFonts.TimesRoman);
+  const helvetica = await pdfDoc.embedFont(StandardFonts.Helvetica);
+
+  // Background Fill (Soft pristine ivory-mint)
+  page.drawRectangle({
+    x: 0,
+    y: 0,
+    width,
+    height,
+    color: hexToRgb('#FAFDFB'),
+  });
+
+  // Outer Border: Deep Forest Emerald (7pt)
+  page.drawRectangle({
+    x: 20,
+    y: 20,
+    width: width - 40,
+    height: height - 40,
+    borderColor: hexToRgb('#064E3B'),
+    borderWidth: 7,
+  });
+
+  // Inner Border: Refined Gold (1.5pt)
+  page.drawRectangle({
+    x: 28,
+    y: 28,
+    width: width - 56,
+    height: height - 56,
+    borderColor: hexToRgb('#D4AF37'),
+    borderWidth: 1.5,
+  });
+
+  // Corner decorative squares
+  const corners = [
+    [24, 24],
+    [width - 32, 24],
+    [24, height - 32],
+    [width - 32, height - 32],
+  ];
+  for (const [cx, cy] of corners) {
+    page.drawRectangle({
+      x: cx,
+      y: cy,
+      width: 8,
+      height: 8,
+      color: hexToRgb('#D4AF37'),
+    });
+  }
+
+  // Header Title
+  const titleText = 'CERTIFICATE OF EXCELLENCE';
+  const titleWidth = timesBold.widthOfTextAtSize(titleText, 26);
+  page.drawText(titleText, {
+    x: (width - titleWidth) / 2,
+    y: height - 120,
+    size: 26,
+    font: timesBold,
+    color: hexToRgb('#064E3B'),
+  });
+
+  // Gold header divider
+  page.drawLine({
+    start: { x: (width - 240) / 2, y: height - 132 },
+    end: { x: (width + 240) / 2, y: height - 132 },
+    thickness: 1.5,
+    color: hexToRgb('#D4AF37'),
+  });
+
+  // Subtitle
+  const subText = 'THIS IS PROUDLY PRESENTED TO';
+  const subWidth = helvetica.widthOfTextAtSize(subText, 10);
+  page.drawText(subText, {
+    x: (width - subWidth) / 2,
+    y: height - 165,
+    size: 10,
+    font: helvetica,
+    color: hexToRgb('#047857'),
+  });
+
+  // Line for Student Name
+  page.drawLine({
+    start: { x: (width - 440) / 2, y: height - 238 },
+    end: { x: (width + 440) / 2, y: height - 238 },
+    thickness: 1,
+    color: hexToRgb('#E2E8F0'),
+  });
+
+  // Secondary text
+  const forText = 'for distinguished leadership, exemplary dedication, and outstanding merit in';
+  const forWidth = times.widthOfTextAtSize(forText, 12);
+  page.drawText(forText, {
+    x: (width - forWidth) / 2,
+    y: height - 275,
+    size: 12,
+    font: times,
+    color: hexToRgb('#475569'),
+  });
+
+  // Line for Event Title
+  page.drawLine({
+    start: { x: (width - 380) / 2, y: height - 338 },
+    end: { x: (width + 380) / 2, y: height - 338 },
+    thickness: 1,
+    color: hexToRgb('#E2E8F0'),
+  });
+
+  // Signatures
+  page.drawLine({ start: { x: 100, y: 130 }, end: { x: 280, y: 130 }, thickness: 1, color: hexToRgb('#94A3B8') });
+  const sig1 = 'Club Coordinator';
+  const sig1Width = helvetica.widthOfTextAtSize(sig1, 9);
+  page.drawText(sig1, { x: 190 - sig1Width / 2, y: 114, size: 9, font: helvetica, color: hexToRgb('#64748B') });
+
+  page.drawLine({ start: { x: width - 280, y: 130 }, end: { x: width - 100, y: 130 }, thickness: 1, color: hexToRgb('#94A3B8') });
+  const sig2 = 'Principal / Dean';
+  const sig2Width = helvetica.widthOfTextAtSize(sig2, 9);
+  page.drawText(sig2, { x: (width - 190) - sig2Width / 2, y: 114, size: 9, font: helvetica, color: hexToRgb('#64748B') });
+
+  const pdfBytes = await pdfDoc.save();
+  fs.writeFileSync(path.join(TEMPLATES_DIR, 'tpl-regal-emerald.pdf'), Buffer.from(pdfBytes));
+  console.log('✔ Generated tpl-regal-emerald.pdf');
+}
+
+/**
+ * 5. Template: Creative Arts & Design Distinction (Royal Violet & Rose Gold, A4 Landscape: 841.89 x 595.28 pt)
+ */
+async function generateCreativeVioletTemplate() {
+  const pdfDoc = await PDFDocument.create();
+  const width = 841.89;
+  const height = 595.28;
+  const page = pdfDoc.addPage([width, height]);
+
+  const helveticaBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+  const helvetica = await pdfDoc.embedFont(StandardFonts.Helvetica);
+  const times = await pdfDoc.embedFont(StandardFonts.TimesRoman);
+
+  // Background Fill (Soft Lavender Studio White)
+  page.drawRectangle({
+    x: 0,
+    y: 0,
+    width,
+    height,
+    color: hexToRgb('#FDFBFE'),
+  });
+
+  // Outer Border: Royal Violet (4pt)
+  page.drawRectangle({
+    x: 22,
+    y: 22,
+    width: width - 44,
+    height: height - 44,
+    borderColor: hexToRgb('#6D28D9'),
+    borderWidth: 4,
+  });
+
+  // Inner Border: Rose Pink (1.5pt)
+  page.drawRectangle({
+    x: 30,
+    y: 30,
+    width: width - 60,
+    height: height - 60,
+    borderColor: hexToRgb('#E11D48'),
+    borderWidth: 1.5,
+  });
+
+  // Modern Corner Accents
+  const bracketLen = 18;
+  page.drawLine({ start: { x: 26, y: height - 26 }, end: { x: 26 + bracketLen, y: height - 26 }, thickness: 3, color: hexToRgb('#7C3AED') });
+  page.drawLine({ start: { x: 26, y: height - 26 }, end: { x: 26, y: height - 26 - bracketLen }, thickness: 3, color: hexToRgb('#7C3AED') });
+  page.drawLine({ start: { x: width - 26, y: height - 26 }, end: { x: width - 26 - bracketLen, y: height - 26 }, thickness: 3, color: hexToRgb('#7C3AED') });
+  page.drawLine({ start: { x: width - 26, y: height - 26 }, end: { x: width - 26, y: height - 26 - bracketLen }, thickness: 3, color: hexToRgb('#7C3AED') });
+
+  // Header Title
+  const titleText = 'CERTIFICATE OF RECOGNITION';
+  const titleWidth = helveticaBold.widthOfTextAtSize(titleText, 25);
+  page.drawText(titleText, {
+    x: (width - titleWidth) / 2,
+    y: height - 120,
+    size: 25,
+    font: helveticaBold,
+    color: hexToRgb('#6D28D9'),
+  });
+
+  // Rose Gold Divider
+  page.drawLine({
+    start: { x: (width - 250) / 2, y: height - 132 },
+    end: { x: (width + 250) / 2, y: height - 132 },
+    thickness: 2,
+    color: hexToRgb('#E11D48'),
+  });
+
+  // Subtitle
+  const subText = 'THIS DISTINCTION IS PROUDLY CONFERRED UPON';
+  const subWidth = helvetica.widthOfTextAtSize(subText, 9.5);
+  page.drawText(subText, {
+    x: (width - subWidth) / 2,
+    y: height - 165,
+    size: 9.5,
+    font: helvetica,
+    color: hexToRgb('#6B7280'),
+  });
+
+  // Line for Student Name
+  page.drawLine({
+    start: { x: (width - 440) / 2, y: height - 238 },
+    end: { x: (width + 440) / 2, y: height - 238 },
+    thickness: 1,
+    color: hexToRgb('#E5E7EB'),
+  });
+
+  // Secondary text
+  const forText = 'for exceptional creativity, innovation, and outstanding performance in';
+  const forWidth = times.widthOfTextAtSize(forText, 12);
+  page.drawText(forText, {
+    x: (width - forWidth) / 2,
+    y: height - 275,
+    size: 12,
+    font: times,
+    color: hexToRgb('#475569'),
+  });
+
+  // Line for Event Title
+  page.drawLine({
+    start: { x: (width - 380) / 2, y: height - 338 },
+    end: { x: (width + 380) / 2, y: height - 338 },
+    thickness: 1,
+    color: hexToRgb('#E5E7EB'),
+  });
+
+  // Signatures
+  page.drawLine({ start: { x: 100, y: 130 }, end: { x: 280, y: 130 }, thickness: 1, color: hexToRgb('#94A3B8') });
+  const sig1 = 'Club President';
+  const sig1Width = helvetica.widthOfTextAtSize(sig1, 9);
+  page.drawText(sig1, { x: 190 - sig1Width / 2, y: 114, size: 9, font: helvetica, color: hexToRgb('#64748B') });
+
+  page.drawLine({ start: { x: width - 280, y: 130 }, end: { x: width - 100, y: 130 }, thickness: 1, color: hexToRgb('#94A3B8') });
+  const sig2 = 'Faculty In-Charge';
+  const sig2Width = helvetica.widthOfTextAtSize(sig2, 9);
+  page.drawText(sig2, { x: (width - 190) - sig2Width / 2, y: 114, size: 9, font: helvetica, color: hexToRgb('#64748B') });
+
+  const pdfBytes = await pdfDoc.save();
+  fs.writeFileSync(path.join(TEMPLATES_DIR, 'tpl-creative-violet.pdf'), Buffer.from(pdfBytes));
+  console.log('✔ Generated tpl-creative-violet.pdf');
+}
+
 async function main() {
   await generateAcademicNavyTemplate();
   await generateModernCyberTemplate();
   await generateFormalGoldTemplate();
-  console.log('🎉 All 3 predefined PDF templates successfully generated!');
+  await generateRegalEmeraldTemplate();
+  await generateCreativeVioletTemplate();
+  console.log('🎉 All 5 predefined PDF templates successfully generated!');
 }
 
 main().catch(console.error);

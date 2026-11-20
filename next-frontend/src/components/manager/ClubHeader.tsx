@@ -37,12 +37,10 @@ export function ClubHeader({ club, children, className = '', isDark = false }: C
 
   return (
     <div
-      className={`relative w-full rounded-3xl overflow-hidden border shadow-sm transition-colors ${
-        isDark ? 'bg-[#12141C] border-white/10' : 'bg-white border-slate-200'
-      } ${className}`}
+      className={`relative w-full rounded-3xl overflow-hidden border border-[var(--line)] bg-[var(--surface)] shadow-xs transition-colors ${className}`}
     >
       {/* Cover Banner */}
-      <div className="relative w-full h-56 sm:h-64 md:h-72 bg-gradient-to-r from-cyan-950 via-slate-900 to-indigo-950">
+      <div className="relative w-full h-56 sm:h-64 md:h-72 bg-gradient-to-r from-slate-900 via-indigo-950 to-purple-950">
         {showCover ? (
           <img
             src={rawCoverUrl!}
@@ -52,9 +50,9 @@ export function ClubHeader({ club, children, className = '', isDark = false }: C
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center relative select-none">
-            <div className="text-center p-6 space-y-2 opacity-30">
-              <Building2 className="w-16 h-16 text-[#00F0FF] mx-auto" />
-              <p className="font-['Syne',sans-serif] text-xs uppercase font-black tracking-widest text-white">
+            <div className="text-center p-6 space-y-2 opacity-40">
+              <Building2 className="w-16 h-16 text-[var(--primary)] mx-auto" />
+              <p className="font-display text-xs uppercase font-bold tracking-widest text-white">
                 {club.name || 'Campus Club'}
               </p>
             </div>
@@ -66,19 +64,13 @@ export function ClubHeader({ club, children, className = '', isDark = false }: C
 
         {/* Category & Members Badge */}
         <div className="absolute bottom-4 right-6 z-10 flex flex-wrap items-center gap-2">
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#00F0FF] text-black text-[10px] font-black uppercase tracking-wider shadow-md">
-            <Tag className="w-3.5 h-3.5 text-black" />
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[var(--primary)] text-white text-[10px] font-bold uppercase tracking-wider shadow-sm">
+            <Tag className="w-3.5 h-3.5 text-white" />
             <span>{category}</span>
           </span>
 
-          <span
-            className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider backdrop-blur-md shadow-md ${
-              isDark
-                ? 'bg-black/60 border border-white/10 text-white'
-                : 'bg-white/90 border border-slate-200 text-slate-900'
-            }`}
-          >
-            <Users className="w-3.5 h-3.5 text-cyan-500" />
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider backdrop-blur-md shadow-sm bg-[var(--surface)]/90 border border-[var(--line)] text-[var(--ink)]">
+            <Users className="w-3.5 h-3.5 text-[var(--primary)]" />
             <span>
               {memberCount} {memberCount === 1 ? 'member' : 'members'}
             </span>
@@ -87,11 +79,7 @@ export function ClubHeader({ club, children, className = '', isDark = false }: C
 
         {/* Square Overlapping Logo */}
         <div className="absolute -bottom-10 sm:-bottom-12 left-6 sm:left-8 z-20">
-          <div
-            className={`w-20 h-20 sm:w-24 sm:h-24 rounded-3xl border-4 shadow-xl overflow-hidden shrink-0 relative ${
-              isDark ? 'border-[#12141C] bg-[#0B0C10]' : 'border-white bg-slate-100'
-            }`}
-          >
+          <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-3xl border-4 border-[var(--surface)] bg-[var(--surface)] shadow-xl overflow-hidden shrink-0 relative">
             {showLogo ? (
               <img
                 src={rawLogoUrl!}
@@ -100,7 +88,7 @@ export function ClubHeader({ club, children, className = '', isDark = false }: C
                 onError={() => setLogoFailed(true)}
               />
             ) : (
-              <div className="w-full h-full bg-gradient-to-tr from-[#00F0FF] to-blue-600 flex items-center justify-center text-black font-['Syne',sans-serif] font-black text-2xl sm:text-3xl uppercase">
+              <div className="w-full h-full bg-gradient-to-tr from-[var(--primary)] to-indigo-600 flex items-center justify-center text-white font-display font-black text-2xl sm:text-3xl uppercase">
                 {initials}
               </div>
             )}
@@ -112,14 +100,10 @@ export function ClubHeader({ club, children, className = '', isDark = false }: C
       <div className="px-6 sm:px-8 pb-6 pt-14 sm:pt-16 relative">
         <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
           <div className="space-y-1.5 max-w-3xl">
-            <h1
-              className={`font-['Syne',sans-serif] text-2xl sm:text-3xl font-black uppercase tracking-tight ${
-                isDark ? 'text-white' : 'text-[#0F172A]'
-              }`}
-            >
+            <h1 className="font-display text-2xl sm:text-3xl font-bold tracking-tight text-[var(--ink)]">
               {club.name}
             </h1>
-            <p className={`text-xs font-medium leading-relaxed ${isDark ? 'text-gray-300' : 'text-slate-600'}`}>
+            <p className="text-xs sm:text-sm font-medium leading-relaxed text-[var(--ink-soft)]">
               {club.description || 'No description provided for this campus club.'}
             </p>
           </div>

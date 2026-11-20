@@ -400,40 +400,28 @@ export function ManagerEventDetailClient({
         <div>
           <Link
             href={getPath(`/manager/clubs/${clubId}`)}
-            className={`inline-flex items-center gap-2 text-xs font-extrabold uppercase tracking-wider px-4 py-2 rounded-full border transition-all shadow-xs ${
-              isDark
-                ? 'bg-[#12141C] border-white/10 text-white hover:border-[#FF5733] hover:text-[#FF5733]'
-                : 'bg-white border-[#E2E0D5] text-[#0F172A] hover:border-[#FF5733] hover:text-[#FF5733]'
-            }`}
+            className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-[var(--line)] bg-[var(--surface)] px-4 py-2 text-xs font-bold text-[var(--ink)] transition-colors hover:bg-[var(--primary-soft)]/60 cursor-pointer shadow-xs"
           >
-            <ArrowLeft className="w-4 h-4 text-[#FF5733]" />
+            <ArrowLeft className="h-4 w-4 text-[var(--primary)]" />
             <span>Back to Club Management</span>
           </Link>
         </div>
 
         {/* Loading Skeleton */}
         {loading ? (
-          <div
-            className={`rounded-3xl p-8 animate-pulse space-y-4 border ${
-              isDark ? 'bg-[#12141C] border-white/10' : 'bg-white border-[#E2E0D5]'
-            }`}
-          >
-            <div className="h-8 bg-slate-500/20 rounded w-1/3" />
-            <div className="h-4 bg-slate-500/20 rounded w-2/3" />
+          <div className="rounded-3xl border border-[var(--line)] bg-[var(--surface)] p-8 animate-dashboard-skeleton space-y-4">
+            <div className="h-8 bg-[var(--line)]/50 rounded-xl w-1/3" />
+            <div className="h-4 bg-[var(--line)]/30 rounded-xl w-2/3" />
           </div>
         ) : isError || !event ? (
-          <div
-            className={`p-6 rounded-2xl flex items-center justify-between text-rose-300 text-sm border ${
-              isDark ? 'bg-rose-500/10 border-rose-500/30' : 'bg-rose-50 border-rose-200'
-            }`}
-          >
+          <div className="rounded-3xl border border-rose-200 dark:border-rose-900/50 bg-rose-50 dark:bg-rose-950/30 p-6 flex items-center justify-between text-rose-700 dark:text-rose-300 text-sm shadow-xs">
             <div className="flex items-center gap-3">
-              <AlertCircle className="w-5 h-5 shrink-0 text-rose-400" />
-              <span>Failed to load event details.</span>
+              <AlertCircle className="w-5 h-5 shrink-0 text-rose-500" />
+              <span className="font-medium">Failed to load event details.</span>
             </div>
             <button
               onClick={() => refetchEvent()}
-              className="underline text-xs font-bold hover:text-white"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-rose-200/60 dark:bg-rose-900/50 px-3 py-1 text-xs font-bold uppercase transition hover:bg-rose-200 dark:hover:bg-rose-900 cursor-pointer"
             >
               Retry
             </button>
@@ -442,45 +430,46 @@ export function ManagerEventDetailClient({
           <div className="space-y-8">
             {/* Magazine Hero Banner for Event */}
             <EventHero event={event}>
-              <div className="flex items-center gap-3 flex-wrap">
+              <div className="flex items-center gap-2.5 flex-wrap">
                 {!isCancelledOrCompleted && (
                   <button
                     onClick={() => setIsCancelModalOpen(true)}
-                    className="inline-flex items-center gap-2 px-4 py-2 bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border border-amber-500/40 text-xs font-bold uppercase tracking-wider rounded-xl backdrop-blur-md transition cursor-pointer"
+                    className="inline-flex min-h-9 items-center gap-1.5 px-3.5 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border border-amber-500/40 text-xs font-bold rounded-xl backdrop-blur-md transition-colors cursor-pointer shadow-xs"
                   >
-                    <Ban className="w-4 h-4" />
+                    <Ban className="w-3.5 h-3.5" />
                     <span>Cancel Event</span>
                   </button>
                 )}
 
                 <button
                   onClick={() => setIsDeleteModalOpen(true)}
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 border border-rose-500/40 text-xs font-bold uppercase tracking-wider rounded-xl backdrop-blur-md transition cursor-pointer"
+                  className="inline-flex min-h-9 items-center gap-1.5 px-3.5 py-1.5 bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 border border-rose-500/40 text-xs font-bold rounded-xl backdrop-blur-md transition-colors cursor-pointer shadow-xs"
                 >
-                  <Trash2 className="w-4 h-4" />
+                  <Trash2 className="w-3.5 h-3.5" />
                   <span>Delete Event</span>
                 </button>
               </div>
             </EventHero>
 
             {/* Section 1: Edit Event Details Form */}
-            <div
-              className={`rounded-3xl p-6 lg:p-8 shadow-sm space-y-6 border ${
-                isDark ? 'bg-[#12141C] border-white/10' : 'bg-white border-[#E2E0D5]'
-              }`}
-            >
-              <h2
-                className={`font-['Syne',sans-serif] text-xl font-black uppercase tracking-tight flex items-center gap-2 ${
-                  isDark ? 'text-white' : 'text-[#0F172A]'
-                }`}
-              >
-                <Calendar className="w-5 h-5 text-[#FF5733]" />
-                <span>Edit Event Details</span>
-              </h2>
+            <div className="rounded-3xl border border-[var(--line)] bg-[var(--surface)] p-6 lg:p-8 space-y-6 shadow-xs">
+              <div className="flex items-center gap-3 border-b border-[var(--line)] pb-4">
+                <div className="grid h-10 w-10 place-items-center rounded-xl bg-[var(--primary-soft)] text-[var(--primary)]">
+                  <Calendar className="h-5 w-5" />
+                </div>
+                <div>
+                  <h2 className="font-display text-lg font-bold tracking-tight text-[var(--ink)]">
+                    Edit Event Details
+                  </h2>
+                  <p className="text-xs text-[var(--ink-soft)]">
+                    Update schedule, venue, registration URL, and visibility settings
+                  </p>
+                </div>
+              </div>
 
               {formError && (
-                <div className="p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl text-rose-400 text-xs font-bold flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4 shrink-0" />
+                <div className="p-3 bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/50 rounded-xl text-rose-700 dark:text-rose-300 text-xs font-bold flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0 text-rose-500" />
                   <span>{formError}</span>
                 </div>
               )}
@@ -489,56 +478,36 @@ export function ManagerEventDetailClient({
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* Event Title */}
                   <div className="md:col-span-2">
-                    <label
-                      className={`block text-xs font-extrabold uppercase tracking-wider mb-1 ${
-                        isDark ? 'text-slate-300' : 'text-[#0F172A]'
-                      }`}
-                    >
+                    <label className="block text-xs font-bold uppercase tracking-wider text-[var(--ink-soft)] mb-1.5">
                       Event Title *
                     </label>
                     <input
                       type="text"
                       value={title}
                       onChange={(e) => setCustomTitle(e.target.value)}
-                      className={`w-full px-4 py-2.5 rounded-2xl text-xs font-medium focus:outline-none focus:border-[#FF5733] border ${
-                        isDark
-                          ? 'bg-slate-900 border-slate-700 text-white'
-                          : 'bg-[#FAF9F5] border-[#E2E0D5] text-[#0F172A]'
-                      }`}
+                      className="w-full px-4 py-2.5 rounded-xl text-sm font-medium border border-[var(--line)] bg-[var(--surface)] text-[var(--ink)] placeholder-[var(--ink-soft)]/60 focus:outline-hidden focus:ring-2 focus:ring-[var(--primary)] transition-all"
                       required
                     />
                   </div>
 
                   {/* Location */}
                   <div>
-                    <label
-                      className={`block text-xs font-extrabold uppercase tracking-wider mb-1 ${
-                        isDark ? 'text-slate-300' : 'text-[#0F172A]'
-                      }`}
-                    >
+                    <label className="block text-xs font-bold uppercase tracking-wider text-[var(--ink-soft)] mb-1.5">
                       Location *
                     </label>
                     <input
                       type="text"
                       value={location}
                       onChange={(e) => setCustomLocation(e.target.value)}
-                      className={`w-full px-4 py-2.5 rounded-2xl text-xs font-medium focus:outline-none focus:border-[#FF5733] border ${
-                        isDark
-                          ? 'bg-slate-900 border-slate-700 text-white'
-                          : 'bg-[#FAF9F5] border-[#E2E0D5] text-[#0F172A]'
-                      }`}
+                      className="w-full px-4 py-2.5 rounded-xl text-sm font-medium border border-[var(--line)] bg-[var(--surface)] text-[var(--ink)] placeholder-[var(--ink-soft)]/60 focus:outline-hidden focus:ring-2 focus:ring-[var(--primary)] transition-all"
                       required
                     />
                   </div>
 
                   {/* Registration URL */}
                   <div>
-                    <label
-                      className={`block text-xs font-extrabold uppercase tracking-wider mb-1 flex items-center gap-1.5 ${
-                        isDark ? 'text-slate-300' : 'text-[#0F172A]'
-                      }`}
-                    >
-                      <ExternalLink className="w-3.5 h-3.5 text-[#2563EB]" />
+                    <label className="block text-xs font-bold uppercase tracking-wider text-[var(--ink-soft)] mb-1.5 flex items-center gap-1.5">
+                      <ExternalLink className="w-3.5 h-3.5 text-[var(--primary)]" />
                       <span>Registration / Redirect URL</span>
                     </label>
                     <input
@@ -546,56 +515,36 @@ export function ManagerEventDetailClient({
                       value={registrationUrl}
                       onChange={(e) => setCustomRegistrationUrl(e.target.value)}
                       placeholder="e.g. https://forms.google.com/your-form"
-                      className={`w-full px-4 py-2.5 rounded-2xl text-xs font-medium focus:outline-none focus:border-[#FF5733] border ${
-                        isDark
-                          ? 'bg-slate-900 border-slate-700 text-white'
-                          : 'bg-[#FAF9F5] border-[#E2E0D5] text-[#0F172A]'
-                      }`}
+                      className="w-full px-4 py-2.5 rounded-xl text-sm font-medium border border-[var(--line)] bg-[var(--surface)] text-[var(--ink)] placeholder-[var(--ink-soft)]/60 focus:outline-hidden focus:ring-2 focus:ring-[var(--primary)] transition-all"
                     />
                   </div>
 
                   {/* Description */}
                   <div className="md:col-span-2">
-                    <label
-                      className={`block text-xs font-extrabold uppercase tracking-wider mb-1 ${
-                        isDark ? 'text-slate-300' : 'text-[#0F172A]'
-                      }`}
-                    >
+                    <label className="block text-xs font-bold uppercase tracking-wider text-[var(--ink-soft)] mb-1.5">
                       Description *
                     </label>
                     <textarea
                       rows={3}
                       value={description}
                       onChange={(e) => setCustomDescription(e.target.value)}
-                      className={`w-full px-4 py-2.5 rounded-2xl text-xs font-medium focus:outline-none focus:border-[#FF5733] resize-none border ${
-                        isDark
-                          ? 'bg-slate-900 border-slate-700 text-white'
-                          : 'bg-[#FAF9F5] border-[#E2E0D5] text-[#0F172A]'
-                      }`}
+                      className="w-full px-4 py-2.5 rounded-xl text-sm font-medium border border-[var(--line)] bg-[var(--surface)] text-[var(--ink)] placeholder-[var(--ink-soft)]/60 focus:outline-hidden focus:ring-2 focus:ring-[var(--primary)] resize-none transition-all"
                       required
                     />
                   </div>
 
                   {/* Event Visibility Selector */}
-                  <div
-                    className={`md:col-span-2 pt-2 border-t ${
-                      isDark ? 'border-white/10' : 'border-[#E8E6DF]'
-                    }`}
-                  >
+                  <div className="md:col-span-2 pt-2 border-t border-[var(--line)]">
                     <div className="flex items-center justify-between mb-2">
-                      <label
-                        className={`block text-xs font-extrabold uppercase tracking-wider ${
-                          isDark ? 'text-slate-300' : 'text-[#0F172A]'
-                        }`}
-                      >
+                      <label className="block text-xs font-bold uppercase tracking-wider text-[var(--ink-soft)]">
                         Event Visibility *
                       </label>
                       <div className="flex items-center gap-1.5 text-[11px] font-bold">
-                        <span className="text-slate-400">Current Setting:</span>
+                        <span className="text-[var(--ink-soft)]">Current Setting:</span>
                         {currentVisibility === 'PUBLIC' ? (
-                          <span className="text-emerald-400 uppercase">Public Event</span>
+                          <span className="text-emerald-500 uppercase">Public Event</span>
                         ) : (
-                          <span className="text-slate-300 uppercase">College Only</span>
+                          <span className="text-[var(--primary)] uppercase">College Only</span>
                         )}
                       </div>
                     </div>
@@ -606,24 +555,20 @@ export function ManagerEventDetailClient({
                         onClick={() => setCustomVisibility('COLLEGE')}
                         className={`p-3.5 rounded-2xl border-2 cursor-pointer transition-all flex flex-col justify-between ${
                           visibility === 'COLLEGE'
-                            ? 'border-[#FF5733] bg-[#FF5733]/5 dark:bg-[#FF5733]/10'
-                            : isDark
-                            ? 'border-slate-800 bg-slate-900/60 hover:border-slate-700'
-                            : 'border-[#E2E0D5] bg-[#FAF9F5] hover:border-[#E8E6DF]'
+                            ? 'border-[var(--primary)] bg-[var(--primary-soft)]'
+                            : 'border-[var(--line)] bg-[var(--bg)]/50 hover:border-[var(--primary)]/40'
                         }`}
                       >
                         <div className="flex items-center justify-between mb-1.5">
                           <div className="flex items-center gap-2">
                             <Building2
                               className={`w-4 h-4 ${
-                                visibility === 'COLLEGE' ? 'text-[#FF5733]' : 'text-slate-400'
+                                visibility === 'COLLEGE' ? 'text-[var(--primary)]' : 'text-[var(--ink-soft)]'
                               }`}
                             />
                             <span
                               className={`text-xs font-bold ${
-                                visibility === 'COLLEGE'
-                                  ? isDark ? 'text-white' : 'text-[#0F172A]'
-                                  : isDark ? 'text-slate-300' : 'text-slate-700'
+                                visibility === 'COLLEGE' ? 'text-[var(--ink)]' : 'text-[var(--ink-soft)]'
                               }`}
                             >
                               College Only
@@ -631,15 +576,15 @@ export function ManagerEventDetailClient({
                           </div>
                           <span
                             className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
-                              visibility === 'COLLEGE' ? 'border-[#FF5733]' : 'border-slate-500'
+                              visibility === 'COLLEGE' ? 'border-[var(--primary)]' : 'border-[var(--line)]'
                             }`}
                           >
                             {visibility === 'COLLEGE' && (
-                              <span className="w-2 h-2 rounded-full bg-[#FF5733]" />
+                              <span className="w-2 h-2 rounded-full bg-[var(--primary)]" />
                             )}
                           </span>
                         </div>
-                        <p className="text-[11px] text-slate-400 leading-relaxed">
+                        <p className="text-[11px] text-[var(--ink-soft)] leading-relaxed">
                           Only students belonging to this college can register. External guest and cross-college registrations are unavailable.
                         </p>
                       </div>
@@ -649,24 +594,20 @@ export function ManagerEventDetailClient({
                         onClick={() => setCustomVisibility('PUBLIC')}
                         className={`p-3.5 rounded-2xl border-2 cursor-pointer transition-all flex flex-col justify-between ${
                           visibility === 'PUBLIC'
-                            ? 'border-emerald-500 bg-emerald-500/5 dark:bg-emerald-500/10'
-                            : isDark
-                            ? 'border-slate-800 bg-slate-900/60 hover:border-slate-700'
-                            : 'border-[#E2E0D5] bg-[#FAF9F5] hover:border-[#E8E6DF]'
+                            ? 'border-emerald-500 bg-emerald-500/10'
+                            : 'border-[var(--line)] bg-[var(--bg)]/50 hover:border-emerald-500/40'
                         }`}
                       >
                         <div className="flex items-center justify-between mb-1.5">
                           <div className="flex items-center gap-2">
                             <Globe
                               className={`w-4 h-4 ${
-                                visibility === 'PUBLIC' ? 'text-emerald-500' : 'text-slate-400'
+                                visibility === 'PUBLIC' ? 'text-emerald-500' : 'text-[var(--ink-soft)]'
                               }`}
                             />
                             <span
                               className={`text-xs font-bold ${
-                                visibility === 'PUBLIC'
-                                  ? isDark ? 'text-white' : 'text-[#0F172A]'
-                                  : isDark ? 'text-slate-300' : 'text-slate-700'
+                                visibility === 'PUBLIC' ? 'text-[var(--ink)]' : 'text-[var(--ink-soft)]'
                               }`}
                             >
                               Public Event
@@ -674,7 +615,7 @@ export function ManagerEventDetailClient({
                           </div>
                           <span
                             className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
-                              visibility === 'PUBLIC' ? 'border-emerald-500' : 'border-slate-500'
+                              visibility === 'PUBLIC' ? 'border-emerald-500' : 'border-[var(--line)]'
                             }`}
                           >
                             {visibility === 'PUBLIC' && (
@@ -682,7 +623,7 @@ export function ManagerEventDetailClient({
                             )}
                           </span>
                         </div>
-                        <p className="text-[11px] text-slate-400 leading-relaxed">
+                        <p className="text-[11px] text-[var(--ink-soft)] leading-relaxed">
                           Platform-wide discovery. Students from other colleges and external guests (via email OTP) can discover and register.
                         </p>
                       </div>
@@ -690,11 +631,7 @@ export function ManagerEventDetailClient({
                   </div>
 
                   {/* Date Pickers */}
-                  <div
-                    className={`md:col-span-2 pt-2 border-t grid grid-cols-1 md:grid-cols-2 gap-4 ${
-                      isDark ? 'border-white/10' : 'border-[#E8E6DF]'
-                    }`}
-                  >
+                  <div className="md:col-span-2 pt-2 border-t border-[var(--line)] grid grid-cols-1 md:grid-cols-2 gap-4">
                     <DateTimePicker
                       label="Start Date & Time"
                       value={startAt}
@@ -715,7 +652,7 @@ export function ManagerEventDetailClient({
                   <button
                     type="submit"
                     disabled={updateEventMutation.isPending}
-                    className="inline-flex items-center gap-2 px-6 py-2.5 bg-[#FF5733] hover:bg-[#E64A26] text-white font-extrabold text-xs uppercase tracking-wider rounded-full shadow-md transition disabled:opacity-50 cursor-pointer"
+                    className="inline-flex min-h-11 items-center gap-2 px-6 py-2.5 bg-[var(--primary)] hover:bg-[var(--primary-strong)] text-white font-bold text-xs uppercase tracking-wider rounded-xl shadow-xs transition-colors disabled:opacity-50 cursor-pointer"
                   >
                     {updateEventMutation.isPending ? (
                       <Loader2 className="w-4 h-4 animate-spin" />
@@ -729,26 +666,23 @@ export function ManagerEventDetailClient({
             </div>
 
             {/* Section 2: Cover Image Section */}
-            <div
-              className={`rounded-3xl p-6 lg:p-8 shadow-sm space-y-6 border ${
-                isDark ? 'bg-[#12141C] border-white/10' : 'bg-white border-[#E2E0D5]'
-              }`}
-            >
-              <h2
-                className={`font-['Syne',sans-serif] text-xl font-black uppercase tracking-tight flex items-center gap-2 ${
-                  isDark ? 'text-white' : 'text-[#0F172A]'
-                }`}
-              >
-                <ImageIcon className="w-5 h-5 text-[#FF5733]" />
-                <span>Event Cover Image</span>
-              </h2>
+            <div className="rounded-3xl border border-[var(--line)] bg-[var(--surface)] p-6 lg:p-8 space-y-6 shadow-xs">
+              <div className="flex items-center gap-3 border-b border-[var(--line)] pb-4">
+                <div className="grid h-10 w-10 place-items-center rounded-xl bg-[var(--primary-soft)] text-[var(--primary)]">
+                  <ImageIcon className="h-5 w-5" />
+                </div>
+                <div>
+                  <h2 className="font-display text-lg font-bold tracking-tight text-[var(--ink)]">
+                    Event Cover Image
+                  </h2>
+                  <p className="text-xs text-[var(--ink-soft)]">
+                    Upload a high-resolution cover image to showcase on the campus event feed
+                  </p>
+                </div>
+              </div>
 
               <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
-                <div
-                  className={`relative w-full md:w-80 h-44 rounded-2xl border overflow-hidden shrink-0 ${
-                    isDark ? 'bg-slate-900 border-white/10' : 'bg-[#FAF9F5] border-[#E2E0D5]'
-                  }`}
-                >
+                <div className="relative w-full md:w-80 h-44 rounded-2xl border border-[var(--line)] bg-[var(--bg)]/50 overflow-hidden shrink-0 shadow-xs">
                   {event.coverImage?.url ? (
                     <img
                       src={event.coverImage.url}
@@ -756,9 +690,9 @@ export function ManagerEventDetailClient({
                       className="w-full h-full object-cover"
                     />
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center p-4 text-center text-slate-400">
+                    <div className="w-full h-full flex items-center justify-center p-4 text-center text-[var(--ink-soft)]">
                       <div className="space-y-1">
-                        <Sparkles className="w-6 h-6 text-[#FF5733]/60 mx-auto" />
+                        <Sparkles className="w-6 h-6 text-[var(--primary)]/60 mx-auto" />
                         <p className="text-xs font-semibold">No cover image uploaded</p>
                       </div>
                     </div>
@@ -766,12 +700,12 @@ export function ManagerEventDetailClient({
                 </div>
 
                 <div className="space-y-3">
-                  <p className="text-xs text-slate-400 font-medium leading-relaxed">
-                    Upload a high-resolution cover image to showcase on the campus event feed.
+                  <p className="text-xs text-[var(--ink-soft)] font-medium leading-relaxed">
+                    Recommended ratio 16:9. Displayed full-bleed across student portal feeds, RSVPs, and certificates.
                   </p>
 
                   <div className="flex items-center gap-3">
-                    <label className="cursor-pointer inline-flex items-center gap-2 px-4 py-2.5 bg-[#FF5733] hover:bg-[#E64A26] text-white text-xs font-extrabold uppercase tracking-wider rounded-full shadow-md transition">
+                    <label className="cursor-pointer inline-flex min-h-10 items-center gap-2 px-4 py-2 bg-[var(--primary)] hover:bg-[var(--primary-strong)] text-white text-xs font-bold rounded-xl shadow-xs transition-colors">
                       {coverUploading ? (
                         <Loader2 className="w-4 h-4 animate-spin" />
                       ) : (
@@ -793,7 +727,7 @@ export function ManagerEventDetailClient({
                       <button
                         onClick={handleCoverDelete}
                         disabled={coverUploading || coverDeleting}
-                        className="inline-flex items-center gap-1.5 px-3 py-2.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 border border-rose-500/30 text-xs font-extrabold uppercase tracking-wider rounded-full transition cursor-pointer"
+                        className="inline-flex min-h-10 items-center gap-1.5 px-3 py-2 border border-rose-200 dark:border-rose-900/50 bg-rose-50 dark:bg-rose-950/30 text-rose-700 dark:text-rose-300 hover:bg-rose-100 dark:hover:bg-rose-900/50 text-xs font-bold rounded-xl transition-colors cursor-pointer"
                       >
                         {coverDeleting ? (
                           <Loader2 className="w-4 h-4 animate-spin" />
@@ -809,31 +743,23 @@ export function ManagerEventDetailClient({
             </div>
 
             {/* Section 3: Event Photo Gallery */}
-            <div
-              className={`rounded-3xl p-6 lg:p-8 shadow-sm space-y-6 border ${
-                isDark ? 'bg-[#12141C] border-white/10' : 'bg-white border-[#E2E0D5]'
-              }`}
-            >
-              <div
-                className={`flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-4 ${
-                  isDark ? 'border-white/10' : 'border-[#E8E6DF]'
-                }`}
-              >
-                <div>
-                  <h2
-                    className={`font-['Syne',sans-serif] text-xl font-black uppercase tracking-tight flex items-center gap-2 ${
-                      isDark ? 'text-white' : 'text-[#2563EB]'
-                    }`}
-                  >
-                    <ImageIcon className="w-5 h-5 text-[#2563EB]" />
-                    <span>Photo Gallery</span>
-                  </h2>
-                  <p className="text-xs text-slate-400 font-medium">
-                    Upload photos captured during or after the event
-                  </p>
+            <div className="rounded-3xl border border-[var(--line)] bg-[var(--surface)] p-6 lg:p-8 space-y-6 shadow-xs">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[var(--line)] pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="grid h-10 w-10 place-items-center rounded-xl bg-[var(--primary-soft)] text-[var(--primary)]">
+                    <ImageIcon className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h2 className="font-display text-lg font-bold tracking-tight text-[var(--ink)]">
+                      Photo Gallery
+                    </h2>
+                    <p className="text-xs text-[var(--ink-soft)]">
+                      Upload photos captured during or after the event
+                    </p>
+                  </div>
                 </div>
 
-                <label className="cursor-pointer inline-flex items-center gap-2 px-4 py-2 bg-[#2563EB] hover:bg-blue-700 text-white text-xs font-extrabold uppercase tracking-wider rounded-full shadow-md transition">
+                <label className="cursor-pointer inline-flex min-h-10 items-center gap-2 px-4 py-2 bg-[var(--primary)] hover:bg-[var(--primary-strong)] text-white text-xs font-bold rounded-xl shadow-xs transition-colors">
                   {galleryUploading ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
                   ) : (
@@ -852,21 +778,13 @@ export function ManagerEventDetailClient({
               </div>
 
               {gallery.length === 0 ? (
-                <div
-                  className={`p-8 text-center rounded-2xl border ${
-                    isDark ? 'bg-slate-900 border-white/10' : 'bg-[#FAF9F5] border-[#E2E0D5]'
-                  }`}
-                >
-                  <ImageIcon className="w-8 h-8 text-slate-500 mx-auto mb-2" />
-                  <p
-                    className={`text-sm font-semibold ${
-                      isDark ? 'text-slate-300' : 'text-[#0F172A]'
-                    }`}
-                  >
+                <div className="rounded-2xl border border-dashed border-[var(--line)] bg-[var(--bg)]/50 p-8 text-center">
+                  <ImageIcon className="w-8 h-8 text-[var(--ink-soft)]/50 mx-auto mb-2" />
+                  <p className="text-sm font-bold text-[var(--ink)] font-display">
                     No photos in gallery yet
                   </p>
-                  <p className="text-xs text-slate-400 mt-1">
-                    Upload event photos to allow campus visitors to view the gallery.
+                  <p className="text-xs text-[var(--ink-soft)] mt-1">
+                    Upload event photos to allow campus visitors to view the gallery on public event pages.
                   </p>
                 </div>
               ) : (
@@ -874,18 +792,18 @@ export function ManagerEventDetailClient({
                   {gallery.map((img, idx) => (
                     <div
                       key={img.publicId || idx}
-                      className="relative group rounded-2xl overflow-hidden border border-slate-700/50 aspect-square bg-slate-950"
+                      className="relative group rounded-2xl overflow-hidden border border-[var(--line)] aspect-square bg-[var(--bg)] shadow-xs"
                     >
                       <img
                         src={img.url}
                         alt={`Gallery ${idx + 1}`}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                       />
 
                       <button
                         onClick={() => img.publicId && handleGalleryImageDelete(img.publicId)}
                         disabled={deletingPublicId === img.publicId}
-                        className="absolute top-2 right-2 p-2 bg-rose-950/80 hover:bg-rose-600 text-white rounded-full border border-rose-500/40 transition opacity-90 group-hover:opacity-100 shadow-lg cursor-pointer"
+                        className="absolute top-2 right-2 p-2 bg-rose-600/90 hover:bg-rose-600 text-white rounded-full transition opacity-90 group-hover:opacity-100 shadow-md cursor-pointer"
                         title="Delete Photo"
                       >
                         {deletingPublicId === img.publicId ? (
@@ -901,29 +819,17 @@ export function ManagerEventDetailClient({
             </div>
 
             {/* Section 4: Attendees / Registrations Section */}
-            <div
-              className={`rounded-3xl p-6 lg:p-8 shadow-sm space-y-6 border ${
-                isDark ? 'bg-[#12141C] border-white/10' : 'bg-white border-[#E2E0D5]'
-              }`}
-            >
-              <div
-                className={`flex flex-col md:flex-row md:items-center justify-between gap-4 border-b pb-4 ${
-                  isDark ? 'border-white/10' : 'border-[#E8E6DF]'
-                }`}
-              >
+            <div className="rounded-3xl border border-[var(--line)] bg-[var(--surface)] p-6 lg:p-8 space-y-6 shadow-xs">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-[var(--line)] pb-4">
                 <div className="flex items-center gap-3">
-                  <div className="p-2.5 bg-emerald-500/10 text-emerald-500 rounded-xl">
-                    <Users className="w-5 h-5" />
+                  <div className="grid h-10 w-10 place-items-center rounded-xl bg-[var(--primary-soft)] text-[var(--primary)]">
+                    <Users className="h-5 w-5" />
                   </div>
                   <div>
-                    <h2
-                      className={`font-['Syne',sans-serif] text-xl font-black uppercase tracking-tight ${
-                        isDark ? 'text-white' : 'text-[#0F172A]'
-                      }`}
-                    >
+                    <h2 className="font-display text-lg font-bold tracking-tight text-[var(--ink)]">
                       Event Attendees
                     </h2>
-                    <p className="text-xs text-slate-400 font-medium">
+                    <p className="text-xs text-[var(--ink-soft)]">
                       Registered campus students, cross-college attendees, and external guests
                     </p>
                   </div>
@@ -934,23 +840,13 @@ export function ManagerEventDetailClient({
                     type="button"
                     onClick={handleExportCsv}
                     disabled={isExporting}
-                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition cursor-pointer ${
-                      isDark
-                        ? 'border-white/10 hover:bg-white/5 text-slate-300'
-                        : 'border-slate-200 hover:bg-slate-100 text-slate-700'
-                    }`}
+                    className="inline-flex min-h-9 items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold border border-[var(--line)] bg-[var(--surface)] text-[var(--ink)] hover:bg-[var(--primary-soft)]/60 transition-colors cursor-pointer shadow-xs"
                   >
                     <Download className={`w-3.5 h-3.5 ${isExporting ? 'animate-bounce' : ''}`} />
                     <span>{isExporting ? 'Exporting...' : 'Export CSV'}</span>
                   </button>
 
-                  <span
-                    className={`px-3 py-1.5 rounded-full text-xs font-black uppercase tracking-wider border ${
-                      isDark
-                        ? 'bg-slate-800 text-slate-300 border-slate-700'
-                        : 'bg-[#FAF9F5] text-[#0F172A] border-[#E2E0D5]'
-                    }`}
-                  >
+                  <span className="px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider border border-[var(--line)] bg-[var(--bg)] text-[var(--ink-soft)]">
                     {attendeesData?.total || 0} Registered
                     {event.capacity ? ` / ${event.capacity} Capacity` : ''}
                   </span>
@@ -959,77 +855,56 @@ export function ManagerEventDetailClient({
 
               {/* Participant Type Filters */}
               <div className="flex flex-wrap items-center gap-2 pt-1">
-                <span className="text-xs font-bold text-slate-400 flex items-center gap-1 mr-1">
+                <span className="text-xs font-bold text-[var(--ink-soft)] flex items-center gap-1 mr-1">
                   <Filter className="w-3.5 h-3.5" /> Filter:
                 </span>
-                <button
-                  type="button"
-                  onClick={() => { setParticipantTypeFilter('ALL'); setAttendeePage(1); }}
-                  className={`px-3 py-1 rounded-xl text-xs font-bold transition cursor-pointer ${
-                    participantTypeFilter === 'ALL'
-                      ? 'bg-[#FF5733] text-white shadow-sm'
-                      : isDark ? 'bg-white/5 text-slate-400 hover:text-white' : 'bg-slate-100 text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  All
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { setParticipantTypeFilter('STUDENT'); setAttendeePage(1); }}
-                  className={`px-3 py-1 rounded-xl text-xs font-bold transition cursor-pointer ${
-                    participantTypeFilter === 'STUDENT'
-                      ? 'bg-[#FF5733] text-white shadow-sm'
-                      : isDark ? 'bg-white/5 text-slate-400 hover:text-white' : 'bg-slate-100 text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  Students
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { setParticipantTypeFilter('EXTERNAL'); setAttendeePage(1); }}
-                  className={`px-3 py-1 rounded-xl text-xs font-bold transition cursor-pointer ${
-                    participantTypeFilter === 'EXTERNAL'
-                      ? 'bg-[#FF5733] text-white shadow-sm'
-                      : isDark ? 'bg-white/5 text-slate-400 hover:text-white' : 'bg-slate-100 text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  External Guests
-                </button>
+                {(['ALL', 'STUDENT', 'EXTERNAL'] as const).map((type) => {
+                  const isActive = participantTypeFilter === type;
+                  const label = type === 'ALL' ? 'All' : type === 'STUDENT' ? 'Students' : 'External Guests';
+                  return (
+                    <button
+                      key={type}
+                      type="button"
+                      onClick={() => { setParticipantTypeFilter(type); setAttendeePage(1); }}
+                      className={`px-3 py-1 rounded-xl text-xs font-bold transition-colors cursor-pointer ${
+                        isActive
+                          ? 'bg-[var(--primary)] text-white shadow-xs'
+                          : 'border border-[var(--line)] bg-[var(--surface)] text-[var(--ink-soft)] hover:bg-[var(--primary-soft)] hover:text-[var(--ink)]'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
               </div>
 
               {attendeesLoading ? (
-                <div className="py-8 text-center text-slate-400">
-                  <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2 text-[#FF5733]" />
+                <div className="py-8 text-center text-[var(--ink-soft)]">
+                  <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2 text-[var(--primary)]" />
                   <p className="text-xs font-semibold">Loading attendee list...</p>
                 </div>
               ) : attendeesError ? (
-                <div className="p-4 bg-rose-500/10 border border-rose-500/30 rounded-2xl flex items-center justify-between text-rose-300 text-xs">
+                <div className="p-4 bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/50 rounded-2xl flex items-center justify-between text-rose-700 dark:text-rose-300 text-xs">
                   <span>Failed to load attendee registrations.</span>
                   <button
                     onClick={() => refetchAttendees()}
-                    className="underline font-bold"
+                    className="underline font-bold cursor-pointer"
                   >
                     Retry
                   </button>
                 </div>
               ) : !attendeesData?.registrations || attendeesData.registrations.length === 0 ? (
-                <div className="py-8 text-center text-slate-400 text-xs font-medium">
+                <div className="py-8 text-center text-[var(--ink-soft)] text-xs font-medium">
                   {participantTypeFilter === 'ALL'
                     ? 'No attendees have registered for this event yet.'
                     : `No ${participantTypeFilter.toLowerCase()} attendees found.`}
                 </div>
               ) : (
                 <div className="space-y-4">
-                  <div className="overflow-x-auto">
+                  <div className="overflow-x-auto rounded-2xl border border-[var(--line)]">
                     <table className="w-full text-left text-xs">
                       <thead>
-                        <tr
-                          className={`border-b text-[10px] font-black uppercase tracking-wider ${
-                            isDark
-                              ? 'border-white/10 text-slate-400'
-                              : 'border-[#E8E6DF] text-[#64748B]'
-                          }`}
-                        >
+                        <tr className="border-b border-[var(--line)] bg-[var(--bg)]/50 text-[10px] font-bold uppercase tracking-wider text-[var(--ink-soft)]">
                           <th className="py-3 px-4">Attendee</th>
                           <th className="py-3 px-4">Type</th>
                           <th className="py-3 px-4">Email</th>
@@ -1038,7 +913,7 @@ export function ManagerEventDetailClient({
                           <th className="py-3 px-4">Payment & Status</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-white/5">
+                      <tbody className="divide-y divide-[var(--line)]/50">
                         {attendeesData.registrations.map((reg) => {
                           const displayName =
                             (typeof reg.participantName === 'string' && reg.participantName.trim()) ||
@@ -1069,25 +944,17 @@ export function ManagerEventDetailClient({
                           return (
                             <tr
                               key={reg.id}
-                              className={`transition-colors ${
-                                isDark
-                                  ? 'hover:bg-white/5 text-slate-200'
-                                  : 'hover:bg-slate-50 text-[#0F172A]'
-                              }`}
+                              className="transition-colors hover:bg-[var(--primary-soft)]/20 text-[var(--ink)]"
                             >
                               <td className="py-3 px-4 flex items-center gap-3">
                                 {reg.user?.avatarUrl ? (
                                   <img
                                     src={reg.user.avatarUrl}
                                     alt={displayName}
-                                    className="w-8 h-8 rounded-full object-cover border border-white/10"
+                                    className="w-8 h-8 rounded-full object-cover border border-[var(--line)]"
                                   />
                                 ) : (
-                                  <div
-                                    className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs uppercase ${
-                                      isExternal ? 'bg-orange-500 text-white' : 'bg-[#FF5733] text-white'
-                                    }`}
-                                  >
+                                  <div className="w-8 h-8 rounded-xl flex items-center justify-center font-display font-bold text-xs uppercase bg-[var(--primary-soft)] text-[var(--primary)] border border-[var(--primary)]/20 shadow-xs">
                                     {displayInitials}
                                   </div>
                                 )}
@@ -1095,49 +962,49 @@ export function ManagerEventDetailClient({
                               </td>
                               <td className="py-3 px-4">
                                 {isExternal ? (
-                                  <span className="px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-orange-500/15 text-orange-400 border border-orange-500/30">
+                                  <span className="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
                                     External Guest
                                   </span>
                                 ) : isCross ? (
-                                  <span className="px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-indigo-500/15 text-indigo-400 border border-indigo-500/30">
+                                  <span className="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-[var(--primary-soft)] text-[var(--primary)] border border-[var(--primary)]/20">
                                     Cross-College
                                   </span>
                                 ) : (
-                                  <span className="px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                                  <span className="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
                                     Student
                                   </span>
                                 )}
                               </td>
-                              <td className="py-3 px-4 text-slate-400">{displayEmail}</td>
-                              <td className="py-3 px-4 text-slate-400">{institutionOrRoll}</td>
-                              <td className="py-3 px-4 text-slate-400">
+                              <td className="py-3 px-4 text-[var(--ink-soft)]">{displayEmail}</td>
+                              <td className="py-3 px-4 text-[var(--ink-soft)]">{institutionOrRoll}</td>
+                              <td className="py-3 px-4 text-[var(--ink-soft)]">
                                 {formatRegisteredDate(reg.registeredAt)}
                               </td>
                               <td className="py-3 px-4">
                                 {reg.isUserDeleted ? (
-                                  <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-amber-500/15 text-amber-400 border border-amber-500/20">
+                                  <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/20">
                                     User Deleted (Snapshot)
                                   </span>
                                 ) : reg.paymentTransaction ? (
                                   <div className="space-y-0.5">
                                     <div className="flex items-center gap-1.5 flex-wrap">
-                                      <span className="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-purple-500/15 text-purple-400 border border-purple-500/30">
+                                      <span className="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-[var(--primary-soft)] text-[var(--primary)] border border-[var(--primary)]/20">
                                         Paid ₹{Number(reg.paymentTransaction.amount) || 0}
                                       </span>
                                       {reg.paymentTransaction.status === 'REFUNDED' && (
-                                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-blue-500/20 text-blue-400">
+                                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-blue-500/20 text-blue-500">
                                           Refunded
                                         </span>
                                       )}
                                     </div>
                                     {typeof reg.paymentTransaction.id === 'string' && (
-                                      <div className="text-[9px] font-mono text-slate-400 truncate max-w-[120px]" title={reg.paymentTransaction.id}>
+                                      <div className="text-[9px] font-mono text-[var(--ink-soft)] truncate max-w-[120px]" title={reg.paymentTransaction.id}>
                                         Txn: {reg.paymentTransaction.id.slice(0, 8)}...
                                       </div>
                                     )}
                                   </div>
                                 ) : (
-                                  <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-emerald-500/10 text-emerald-400">
+                                  <span className="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
                                     Confirmed (Free)
                                   </span>
                                 )}
@@ -1151,22 +1018,22 @@ export function ManagerEventDetailClient({
 
                   {/* Attendees Pagination */}
                   {(attendeesData.totalPages || 1) > 1 && (
-                    <div className="flex items-center justify-between pt-3 border-t border-white/10">
-                      <span className="text-xs text-slate-400">
+                    <div className="flex items-center justify-between pt-3 border-t border-[var(--line)]">
+                      <span className="text-xs text-[var(--ink-soft)]">
                         Page {attendeePage} of {attendeesData.totalPages}
                       </span>
                       <div className="flex items-center gap-2">
                         <button
                           disabled={attendeePage <= 1}
                           onClick={() => setAttendeePage((p) => Math.max(1, p - 1))}
-                          className="p-2 rounded-xl border border-white/10 text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-white/5"
+                          className="p-2 rounded-xl border border-[var(--line)] bg-[var(--surface)] text-[var(--ink)] hover:bg-[var(--primary-soft)]/60 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
                         >
                           <ChevronLeft className="w-4 h-4" />
                         </button>
                         <button
                           disabled={attendeePage >= (attendeesData.totalPages || 1)}
                           onClick={() => setAttendeePage((p) => p + 1)}
-                          className="p-2 rounded-xl border border-white/10 text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-white/5"
+                          className="p-2 rounded-xl border border-[var(--line)] bg-[var(--surface)] text-[var(--ink)] hover:bg-[var(--primary-soft)]/60 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
                         >
                           <ChevronRight className="w-4 h-4" />
                         </button>
@@ -1194,8 +1061,8 @@ export function ManagerEventDetailClient({
           title="Cancel Event"
         >
           <div className="space-y-4">
-            <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-2xl flex items-start gap-3 text-amber-300 text-xs">
-              <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5" />
+            <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-2xl flex items-start gap-3 text-amber-700 dark:text-amber-300 text-xs">
+              <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5 text-amber-500" />
               <span>
                 Are you sure you want to cancel &quot;{event?.title}&quot;? The event status will change to CANCELLED on public listings.
               </span>
@@ -1206,7 +1073,7 @@ export function ManagerEventDetailClient({
                 type="button"
                 disabled={cancelEventMutation.isPending}
                 onClick={() => setIsCancelModalOpen(false)}
-                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium rounded-xl transition cursor-pointer"
+                className="px-4 py-2 bg-[var(--surface)] border border-[var(--line)] hover:bg-[var(--primary-soft)]/60 text-[var(--ink-soft)] text-xs font-bold rounded-xl transition-colors cursor-pointer"
               >
                 No, Keep Event
               </button>
@@ -1214,7 +1081,7 @@ export function ManagerEventDetailClient({
                 type="button"
                 disabled={cancelEventMutation.isPending}
                 onClick={handleCancelEvent}
-                className="inline-flex items-center gap-2 px-5 py-2 bg-amber-600 hover:bg-amber-500 text-white text-sm font-semibold rounded-xl shadow-md transition disabled:opacity-50 cursor-pointer"
+                className="inline-flex min-h-10 items-center gap-2 px-5 py-2 bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold uppercase tracking-wider rounded-xl shadow-xs transition-colors disabled:opacity-50 cursor-pointer"
               >
                 {cancelEventMutation.isPending ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
@@ -1233,10 +1100,10 @@ export function ManagerEventDetailClient({
           title="Permanently Delete Event"
         >
           <div className="space-y-4">
-            <div className="p-4 bg-rose-500/10 border border-rose-500/30 rounded-2xl flex items-start gap-3 text-rose-300 text-xs">
-              <AlertCircle className="w-5 h-5 shrink-0 text-rose-400 mt-0.5" />
+            <div className="p-4 bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/50 rounded-2xl flex items-start gap-3 text-rose-700 dark:text-rose-300 text-xs">
+              <AlertCircle className="w-5 h-5 shrink-0 text-rose-500 mt-0.5" />
               <div>
-                <p className="font-bold text-sm text-rose-200 mb-1">
+                <p className="font-bold text-sm text-rose-800 dark:text-rose-200 mb-1">
                   Warning: Permanent Deletion
                 </p>
                 <p>
@@ -1250,7 +1117,7 @@ export function ManagerEventDetailClient({
                 type="button"
                 disabled={deleteEventMutation.isPending}
                 onClick={() => setIsDeleteModalOpen(false)}
-                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium rounded-xl transition cursor-pointer"
+                className="px-4 py-2 bg-[var(--surface)] border border-[var(--line)] hover:bg-[var(--primary-soft)]/60 text-[var(--ink-soft)] text-xs font-bold rounded-xl transition-colors cursor-pointer"
               >
                 Cancel
               </button>
@@ -1258,7 +1125,7 @@ export function ManagerEventDetailClient({
                 type="button"
                 disabled={deleteEventMutation.isPending}
                 onClick={handleDeleteEvent}
-                className="inline-flex items-center gap-2 px-5 py-2 bg-rose-600 hover:bg-rose-500 text-white text-sm font-semibold rounded-xl shadow-md transition disabled:opacity-50 cursor-pointer"
+                className="inline-flex min-h-10 items-center gap-2 px-5 py-2 bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold uppercase tracking-wider rounded-xl shadow-xs transition-colors disabled:opacity-50 cursor-pointer"
               >
                 {deleteEventMutation.isPending ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
@@ -1284,13 +1151,13 @@ export function ManagerEventDetailClient({
             <div
               className={`p-4 rounded-2xl flex items-start gap-3 text-xs border ${
                 visibility === 'PUBLIC'
-                  ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
-                  : 'bg-amber-500/10 border-amber-500/30 text-amber-300'
+                  ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-800 dark:text-emerald-300'
+                  : 'bg-amber-500/10 border-amber-500/30 text-amber-800 dark:text-amber-300'
               }`}
             >
               <AlertTriangle
                 className={`w-5 h-5 shrink-0 mt-0.5 ${
-                  visibility === 'PUBLIC' ? 'text-emerald-400' : 'text-amber-400'
+                  visibility === 'PUBLIC' ? 'text-emerald-500' : 'text-amber-500'
                 }`}
               />
               <div className="space-y-2">
@@ -1318,7 +1185,7 @@ export function ManagerEventDetailClient({
                 type="button"
                 disabled={updateEventMutation.isPending}
                 onClick={() => setIsVisibilityConfirmOpen(false)}
-                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium rounded-xl transition cursor-pointer"
+                className="px-4 py-2 bg-[var(--surface)] border border-[var(--line)] hover:bg-[var(--primary-soft)]/60 text-[var(--ink-soft)] text-xs font-bold rounded-xl transition-colors cursor-pointer"
               >
                 Cancel
               </button>
@@ -1326,7 +1193,7 @@ export function ManagerEventDetailClient({
                 type="button"
                 disabled={updateEventMutation.isPending}
                 onClick={doSaveEvent}
-                className={`inline-flex items-center gap-2 px-5 py-2 text-white text-sm font-semibold rounded-xl shadow-md transition disabled:opacity-50 cursor-pointer ${
+                className={`inline-flex min-h-10 items-center gap-2 px-5 py-2 text-white text-xs font-bold uppercase tracking-wider rounded-xl shadow-xs transition-colors disabled:opacity-50 cursor-pointer ${
                   visibility === 'PUBLIC'
                     ? 'bg-emerald-600 hover:bg-emerald-500'
                     : 'bg-amber-600 hover:bg-amber-500'

@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import type { AuthUser } from '@/types/auth';
 import { useAuth } from '@/context/AuthContext';
-import { useTheme } from '@/context/ThemeContext';
 import { useStudentLoginMutation } from '@/lib/api/auth';
 import PublicLayout from '@/components/public/PublicLayout';
 import {
@@ -37,7 +36,6 @@ export function LoginPageClient({
 }: LoginPageClientProps) {
   const router = useRouter();
   const { user: currentUser, login } = useAuth();
-  const { isDark } = useTheme();
 
   // If college admin is already logged in, redirect them to admin workspace
   React.useEffect(() => {
@@ -109,33 +107,31 @@ export function LoginPageClient({
 
   return (
     <PublicLayout collegeSlug={slug} collegeName={collegeDisplay}>
-      <div className="min-h-[calc(100vh-200px)] flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+      <div className="college-scope min-h-[calc(100vh-200px)] bg-[var(--surface-page)] text-[var(--text-primary)] flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
         <div className="w-full max-w-md space-y-6">
           {/* Header Card */}
           <div className="text-center space-y-2">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/10 text-cyan-600 dark:text-[#00F0FF] text-xs font-bold uppercase tracking-wider mb-2">
+            <div className="inline-flex items-center gap-1.5 rounded-full border-2 border-[var(--border-strong)] bg-[var(--surface-card)] px-3.5 py-1 text-xs font-bold uppercase tracking-wider text-[var(--accent-strong)] shadow-brutal-xs mb-2">
               <GraduationCap className="w-3.5 h-3.5" />
               <span>Student Portal</span>
             </div>
-            <h1
-              className={`font-['Syne',sans-serif] text-3xl sm:text-4xl font-extrabold uppercase tracking-tight ${
-                isDark ? 'text-white' : 'text-[#0F172A]'
-              }`}
-            >
-              STUDENT <span className="text-[#00F0FF]">LOGIN.</span>
+
+            <h1 className="font-campus text-4xl sm:text-5xl uppercase leading-[0.95] tracking-wide text-[var(--text-primary)]">
+              STUDENT <span className="text-[var(--accent-strong)]">LOGIN.</span>
             </h1>
-            <p className={`text-xs max-w-sm mx-auto ${isDark ? 'text-gray-400' : 'text-slate-600'}`}>
+
+            <p className="text-xs max-w-sm mx-auto text-[var(--text-secondary)] font-medium">
               Access your {collegeDisplay} event RSVPs, registrations, and campus clubs.
             </p>
           </div>
 
           {/* Activation Success Banner */}
           {activated && (
-            <div className="p-4 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 flex items-start gap-3 text-emerald-300">
-              <CheckCircle2 className="w-5 h-5 shrink-0 text-emerald-400 mt-0.5" />
+            <div className="p-4 rounded-2xl border-2 border-emerald-500/40 bg-emerald-500/10 flex items-start gap-3 text-emerald-800 dark:text-emerald-200 shadow-brutal-xs">
+              <CheckCircle2 className="w-5 h-5 shrink-0 text-emerald-500 mt-0.5" />
               <div className="text-xs">
                 <p className="font-bold">Account Activated!</p>
-                <p className="mt-0.5 text-emerald-200/90">
+                <p className="mt-0.5 text-emerald-700 dark:text-emerald-300">
                   Your password has been configured. Log in below to access your student account.
                 </p>
               </div>
@@ -143,22 +139,16 @@ export function LoginPageClient({
           )}
 
           {/* Form Container */}
-          <div
-            className={`p-6 sm:p-8 rounded-3xl border shadow-xl transition-all ${
-              isDark
-                ? 'bg-[#12141C] border-white/10 shadow-black/40'
-                : 'bg-white border-slate-200 shadow-slate-200/50'
-            }`}
-          >
+          <div className="p-6 sm:p-8 rounded-3xl border-2 border-[var(--border-strong)] bg-[var(--surface-card)] shadow-brutal-md space-y-5">
             {errorMsg && (
-              <div className="mb-6 p-4 rounded-2xl bg-red-500/10 border border-red-500/30 flex items-start gap-3 text-red-300">
-                <AlertCircle className="w-5 h-5 shrink-0 text-red-400 mt-0.5" />
+              <div className="p-4 rounded-2xl border-2 border-red-500/40 bg-red-500/10 flex items-start gap-3 text-red-700 dark:text-red-300 shadow-brutal-xs">
+                <AlertCircle className="w-5 h-5 shrink-0 text-red-500 mt-0.5" />
                 <div className="text-xs flex-1">
-                  <p className="font-semibold">{errorMsg}</p>
+                  <p className="font-bold">{errorMsg}</p>
                   {errorMsg.toLowerCase().includes('not yet activated') && (
                     <Link
                       href={`/college/${slug}/activate`}
-                      className="mt-2 inline-flex items-center gap-1 font-bold text-cyan-400 hover:text-cyan-300 underline"
+                      className="mt-2 inline-flex items-center gap-1 font-bold text-[var(--accent-strong)] hover:underline"
                     >
                       <span>Activate your student account now</span>
                       <ArrowRight className="w-3 h-3" />
@@ -167,9 +157,9 @@ export function LoginPageClient({
                   {errorMsg.toLowerCase().includes('admin') && (
                     <Link
                       href={`/college/${slug}/login/admin`}
-                      className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/20 text-red-200 hover:bg-red-500/30 font-bold tracking-wide"
+                      className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border-2 border-[var(--border-strong)] bg-[var(--surface-tile)] text-[var(--text-primary)] font-bold tracking-wide shadow-brutal-xs"
                     >
-                      <Shield className="w-3.5 h-3.5 text-red-400" />
+                      <Shield className="w-3.5 h-3.5 text-[var(--accent-strong)]" />
                       <span>Go to College Admin Portal</span>
                       <ArrowRight className="w-3 h-3" />
                     </Link>
@@ -183,29 +173,19 @@ export function LoginPageClient({
               <div className="space-y-1.5">
                 <label
                   htmlFor="identifier"
-                  className={`block text-[11px] font-bold uppercase tracking-wider ${
-                    isDark ? 'text-gray-300' : 'text-slate-700'
-                  }`}
+                  className="block text-xs font-bold uppercase tracking-wider text-[var(--text-secondary)]"
                 >
                   Roll Number or Email
                 </label>
                 <div className="relative">
-                  <User
-                    className={`w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 ${
-                      isDark ? 'text-gray-500' : 'text-slate-400'
-                    }`}
-                  />
+                  <User className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
                   <input
                     id="identifier"
                     type="text"
                     value={identifier}
                     onChange={(e) => setIdentifier(e.target.value)}
                     placeholder="e.g. 21A91A0501 or user@lbrce.ac.in"
-                    className={`w-full pl-10 pr-4 py-3 rounded-xl border text-sm transition-all focus:outline-hidden focus:border-[#00F0FF] ${
-                      isDark
-                        ? 'bg-[#0B0C10] border-white/10 text-white placeholder-gray-600'
-                        : 'bg-slate-50 border-slate-200 text-slate-900 placeholder-slate-400'
-                    }`}
+                    className="w-full pl-10 pr-4 py-3 rounded-xl border-2 border-[var(--border-strong)] bg-[var(--surface-tile)] text-sm font-semibold text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-hidden focus:border-[var(--accent-strong)] shadow-brutal-xs"
                     autoComplete="username"
                     required
                   />
@@ -216,36 +196,26 @@ export function LoginPageClient({
               <div className="space-y-1.5">
                 <label
                   htmlFor="password"
-                  className={`block text-[11px] font-bold uppercase tracking-wider ${
-                    isDark ? 'text-gray-300' : 'text-slate-700'
-                  }`}
+                  className="block text-xs font-bold uppercase tracking-wider text-[var(--text-secondary)]"
                 >
                   Password
                 </label>
                 <div className="relative">
-                  <Lock
-                    className={`w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 ${
-                      isDark ? 'text-gray-500' : 'text-slate-400'
-                    }`}
-                  />
+                  <Lock className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
                   <input
                     id="password"
                     type={showPassword ? 'text' : 'password'}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••••••"
-                    className={`w-full pl-10 pr-11 py-3 rounded-xl border text-sm transition-all focus:outline-hidden focus:border-[#00F0FF] ${
-                      isDark
-                        ? 'bg-[#0B0C10] border-white/10 text-white placeholder-gray-600'
-                        : 'bg-slate-50 border-slate-200 text-slate-900 placeholder-slate-400'
-                    }`}
+                    className="w-full pl-10 pr-11 py-3 rounded-xl border-2 border-[var(--border-strong)] bg-[var(--surface-tile)] text-sm font-semibold text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-hidden focus:border-[var(--accent-strong)] shadow-brutal-xs"
                     autoComplete="current-password"
                     required
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className={`absolute right-3.5 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-white transition-colors cursor-pointer`}
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 p-1 text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors cursor-pointer"
                     aria-label={showPassword ? 'Hide password' : 'Show password'}
                   >
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -258,7 +228,7 @@ export function LoginPageClient({
                 <button
                   type="submit"
                   disabled={studentLoginMutation.isPending}
-                  className="w-full py-3.5 px-4 rounded-xl bg-[#00F0FF] hover:bg-[#38f2ff] disabled:opacity-50 text-black font-extrabold text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-md shadow-cyan-500/20 active:scale-[0.99] cursor-pointer"
+                  className="w-full py-3.5 px-4 rounded-xl bg-[var(--accent-strong)] hover:opacity-95 disabled:opacity-50 text-white font-extrabold text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-transform hover:-translate-y-0.5 shadow-brutal-sm cursor-pointer"
                 >
                   {studentLoginMutation.isPending ? (
                     <>
@@ -276,12 +246,12 @@ export function LoginPageClient({
             </form>
 
             {/* Quick Links & Switchers */}
-            <div className={`mt-6 pt-6 border-t space-y-3 ${isDark ? 'border-white/10' : 'border-slate-100'}`}>
+            <div className="mt-6 pt-5 border-t-2 border-[var(--border-soft)] space-y-3">
               <div className="flex items-center justify-between text-xs">
-                <span className={isDark ? 'text-gray-400' : 'text-slate-500'}>First time student?</span>
+                <span className="text-[var(--text-secondary)] font-medium">First time student?</span>
                 <Link
                   href={`/college/${slug}/activate`}
-                  className="font-bold text-[#00F0FF] hover:underline inline-flex items-center gap-1"
+                  className="font-bold text-[var(--accent-strong)] hover:underline inline-flex items-center gap-1"
                 >
                   <Sparkles className="w-3.5 h-3.5" />
                   <span>Activate Account</span>
@@ -289,18 +259,18 @@ export function LoginPageClient({
               </div>
 
               <div className="flex items-center justify-between text-xs pt-1">
-                <span className={isDark ? 'text-gray-400' : 'text-slate-500'}>Club Manager or Staff?</span>
+                <span className="text-[var(--text-secondary)] font-medium">Club Manager or Staff?</span>
                 <Link
                   href={`/college/${slug}/manager/login`}
-                  className="font-semibold text-gray-300 hover:text-white inline-flex items-center gap-1"
+                  className="font-semibold text-[var(--text-primary)] hover:text-[var(--accent-strong)] inline-flex items-center gap-1"
                 >
-                  <Shield className="w-3.5 h-3.5 text-purple-400" />
+                  <Shield className="w-3.5 h-3.5 text-purple-500" />
                   <span>Manager Portal</span>
                 </Link>
               </div>
 
               <div className="flex items-center justify-between text-xs pt-1">
-                <span className={isDark ? 'text-gray-400' : 'text-slate-500'}>College Administrator?</span>
+                <span className="text-[var(--text-secondary)] font-medium">College Administrator?</span>
                 <Link
                   href={`/college/${slug}/login/admin`}
                   className="font-semibold text-[#B08D57] hover:underline inline-flex items-center gap-1"

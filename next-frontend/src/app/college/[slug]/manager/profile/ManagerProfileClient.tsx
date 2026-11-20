@@ -19,7 +19,7 @@ import {
   Shield,
   Key,
   Save,
-  CheckCircle,
+  CheckCircle2,
   AlertCircle,
   Building2,
   Camera,
@@ -31,6 +31,7 @@ import {
   EyeOff,
   Calendar,
   ShieldCheck,
+  ChevronRight,
 } from 'lucide-react';
 
 export interface ManagerProfileClientProps {
@@ -199,11 +200,53 @@ export function ManagerProfileClient({ slug }: ManagerProfileClientProps) {
   return (
     <ManagerLayout slug={slug}>
       <div className="space-y-8 max-w-5xl mx-auto animate-in fade-in duration-300">
-        {/* Header Banner */}
-        <div
-          className={`rounded-3xl p-6 sm:p-8 border shadow-sm flex flex-col md:flex-row items-center md:items-start gap-6 transition-colors ${
-            isDark ? 'bg-[#12141C] border-white/10' : 'bg-white border-[#E2E0D5]'
-          }`}
+        {/* Header Navigation & Title */}
+        <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--primary)] px-2.5 py-0.5 rounded-full bg-[var(--primary-soft)] border border-[var(--primary)]/20">
+                {slug ? slug.toUpperCase() : 'CAMPUS'}
+              </span>
+              <span className="text-xs font-semibold text-[var(--ink-soft)]">Manager Account</span>
+            </div>
+            <h1 className="font-display text-2xl sm:text-3xl font-bold tracking-tight text-[var(--ink)]">
+              Profile & Security Settings
+            </h1>
+            <p className="text-xs text-[var(--ink-soft)] leading-relaxed">
+              Manage your personal details, manager credentials, password security, and active club assignments.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <Link
+              href={getPath('/manager')}
+              className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[var(--line)] bg-[var(--surface)] px-4 py-2 text-xs font-bold text-[var(--ink)] transition-colors hover:bg-[var(--primary-soft)]/60 cursor-pointer shadow-xs"
+            >
+              <Building2 className="h-4 w-4" />
+              <span>Dashboard</span>
+            </Link>
+          </div>
+        </header>
+
+        {/* Global Success / Error Alerts */}
+        {successMessage && (
+          <div className="flex items-center gap-2.5 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+            <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-500" />
+            <span>{successMessage}</span>
+          </div>
+        )}
+
+        {errorMessage && (
+          <div className="flex items-center gap-2.5 rounded-2xl border border-rose-500/30 bg-rose-500/10 p-4 text-xs font-semibold text-rose-600 dark:text-rose-400">
+            <AlertCircle className="h-5 w-5 shrink-0 text-rose-500" />
+            <span>{errorMessage}</span>
+          </div>
+        )}
+
+        {/* Profile Hero Card */}
+        <section
+          aria-label="Profile Banner"
+          className="rounded-3xl border border-[var(--line)] bg-[var(--surface)] p-6 sm:p-8 shadow-xs flex flex-col md:flex-row items-center md:items-start gap-6 transition-colors"
         >
           {/* Avatar Container with Hover Upload Overlay */}
           <div className="relative group shrink-0">
@@ -211,17 +254,17 @@ export function ManagerProfileClient({ slug }: ManagerProfileClientProps) {
               <img
                 src={avatarUrl}
                 alt={displayName}
-                className="w-28 h-28 rounded-3xl object-cover border-4 border-[#FAF9F5] shadow-md group-hover:opacity-90 transition"
+                className="w-28 h-28 rounded-2xl object-cover border-2 border-[var(--line)] shadow-xs group-hover:opacity-90 transition"
               />
             ) : (
-              <div className="w-28 h-28 rounded-3xl bg-[#FF5733] flex items-center justify-center text-white font-['Syne',sans-serif] font-black text-3xl shadow-md shadow-[#FF5733]/25">
+              <div className="w-28 h-28 rounded-2xl bg-[var(--primary-soft)] text-[var(--primary)] font-display font-bold text-3xl flex items-center justify-center border border-[var(--primary)]/20 shadow-xs">
                 {initials}
               </div>
             )}
 
             {/* Upload Label / Overlay */}
-            <label className="absolute inset-0 bg-black/60 rounded-3xl opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center text-white text-xs font-bold cursor-pointer transition-opacity backdrop-blur-xs">
-              <Camera className="w-6 h-6 mb-1" />
+            <label className="absolute inset-0 bg-black/60 rounded-2xl opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center text-white text-xs font-bold cursor-pointer transition-opacity backdrop-blur-xs">
+              <Camera className="w-6 h-6 mb-1 text-white" />
               <span>Change Photo</span>
               <input
                 type="file"
@@ -233,7 +276,7 @@ export function ManagerProfileClient({ slug }: ManagerProfileClientProps) {
             </label>
 
             {avatarUploading && (
-              <div className="absolute inset-0 bg-black/80 rounded-3xl flex items-center justify-center text-[#FF5733]">
+              <div className="absolute inset-0 bg-black/80 rounded-2xl flex items-center justify-center text-[var(--primary)]">
                 <Loader2 className="w-8 h-8 animate-spin" />
               </div>
             )}
@@ -241,34 +284,31 @@ export function ManagerProfileClient({ slug }: ManagerProfileClientProps) {
 
           {/* User Info Header */}
           <div className="flex-1 text-center md:text-left space-y-2">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#2563EB]/10 text-[#2563EB] text-[10px] font-black uppercase tracking-wider">
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>Manager Profile Settings</span>
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[var(--primary-soft)] text-[var(--primary)] text-[10px] font-bold uppercase tracking-wider border border-[var(--primary)]/20">
+              <ShieldCheck className="w-3.5 h-3.5" />
+              <span>Event & Club Manager Workspace</span>
             </div>
-            <h1
-              className={`font-['Syne',sans-serif] text-3xl font-black uppercase tracking-tight ${
-                isDark ? 'text-white' : 'text-[#0F172A]'
-              }`}
-            >
-              {displayName}
-            </h1>
 
-            <div className="flex flex-wrap items-center justify-center md:justify-start gap-4 text-xs font-semibold text-slate-400 pt-1">
+            <h2 className="font-display text-2xl sm:text-3xl font-bold tracking-tight text-[var(--ink)]">
+              {displayName}
+            </h2>
+
+            <div className="flex flex-wrap items-center justify-center md:justify-start gap-4 text-xs font-semibold text-[var(--ink-soft)] pt-1">
               <div className="flex items-center gap-1.5">
-                <Mail className="w-4 h-4 text-slate-400" />
+                <Mail className="w-4 h-4 text-[var(--ink-soft)]" />
                 <span>{displayEmail}</span>
               </div>
-              <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#FF5733]/10 text-[#FF5733] text-[10px] font-black uppercase tracking-wider">
-                <ShieldCheck className="w-3.5 h-3.5" />
-                <span>Club Manager Access</span>
+              <div className="flex items-center gap-1.5">
+                <Calendar className="w-4 h-4 text-[var(--ink-soft)]" />
+                <span>Manager since {formattedJoinedDate}</span>
               </div>
             </div>
 
             {/* Photo Action Buttons */}
-            <div className="flex items-center justify-center md:justify-start gap-3 pt-3">
-              <label className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#FF5733] hover:bg-[#E64A26] text-white font-extrabold text-xs uppercase tracking-wider rounded-full shadow-md cursor-pointer transition">
+            <div className="flex flex-wrap items-center justify-center md:justify-start gap-2.5 pt-3">
+              <label className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[var(--primary)] px-4 py-2 text-xs font-bold text-white transition-colors hover:bg-[var(--primary-strong)] shadow-xs cursor-pointer">
                 <Camera className="w-4 h-4" />
-                <span>Upload New Picture</span>
+                <span>{avatarUrl ? 'Update Picture' : 'Upload Picture'}</span>
                 <input
                   type="file"
                   accept="image/*"
@@ -283,116 +323,69 @@ export function ManagerProfileClient({ slug }: ManagerProfileClientProps) {
                   type="button"
                   onClick={handleAvatarDelete}
                   disabled={avatarDeleting}
-                  className={`inline-flex items-center gap-2 px-4 py-2.5 border text-xs font-extrabold uppercase tracking-wider rounded-full transition cursor-pointer ${
-                    isDark
-                      ? 'bg-slate-800 hover:bg-rose-500 hover:text-white border-slate-700 text-slate-300'
-                      : 'bg-[#FAF9F5] hover:bg-rose-500 hover:text-white border-[#E2E0D5] text-[#64748B]'
-                  }`}
+                  className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[var(--line)] bg-[var(--bg)] px-4 py-2 text-xs font-bold text-rose-500 hover:bg-rose-500/10 hover:border-rose-300 transition-colors cursor-pointer disabled:opacity-50"
                 >
                   <Trash2 className="w-4 h-4" />
-                  <span>Remove Picture</span>
+                  <span>{avatarDeleting ? 'Removing...' : 'Remove Picture'}</span>
                 </button>
               )}
             </div>
           </div>
-        </div>
+        </section>
 
-        {/* Global Success / Error Banners */}
-        {successMessage && (
-          <div className="p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-2xl flex items-center gap-3 text-emerald-400 text-xs font-bold">
-            <CheckCircle className="w-5 h-5 shrink-0 text-emerald-500" />
-            <span>{successMessage}</span>
-          </div>
-        )}
-
-        {errorMessage && (
-          <div className="p-4 bg-rose-500/10 border border-rose-500/30 rounded-2xl flex items-center gap-3 text-rose-400 text-xs font-bold">
-            <AlertCircle className="w-5 h-5 shrink-0 text-rose-500" />
-            <span>{errorMessage}</span>
-          </div>
-        )}
-
-        {/* Main Settings Grid */}
+        {/* Main 2-Column Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Left 2 Columns: Forms */}
           <div className="lg:col-span-2 space-y-8">
             {/* Personal Information Form */}
-            <div
-              className={`rounded-3xl p-6 lg:p-8 shadow-sm space-y-6 border ${
-                isDark ? 'bg-[#12141C] border-white/10' : 'bg-white border-[#E2E0D5]'
-              }`}
-            >
-              <div
-                className={`flex items-center gap-3 border-b pb-4 ${
-                  isDark ? 'border-white/10' : 'border-[#E8E6DF]'
-                }`}
-              >
-                <div className="p-2 bg-[#FF5733]/10 text-[#FF5733] rounded-xl">
+            <div className="rounded-3xl border border-[var(--line)] bg-[var(--surface)] p-6 lg:p-8 shadow-xs space-y-6">
+              <div className="flex items-center gap-3 border-b border-[var(--line)] pb-4">
+                <div className="p-2.5 bg-[var(--primary-soft)] text-[var(--primary)] rounded-xl">
                   <User className="w-5 h-5" />
                 </div>
                 <div>
-                  <h2
-                    className={`font-['Syne',sans-serif] text-lg font-black uppercase tracking-tight ${
-                      isDark ? 'text-white' : 'text-[#0F172A]'
-                    }`}
-                  >
+                  <h3 className="font-display text-lg font-bold tracking-tight text-[var(--ink)]">
                     Personal Information
-                  </h2>
-                  <p className="text-xs text-slate-400 font-medium">
-                    Update your display name
+                  </h3>
+                  <p className="text-xs text-[var(--ink-soft)]">
+                    Update your display name visible across your managed clubs and events
                   </p>
                 </div>
               </div>
 
               <form onSubmit={handleUpdateName} className="space-y-5">
                 <div>
-                  <label
-                    className={`block text-xs font-extrabold uppercase tracking-wider mb-2 ${
-                      isDark ? 'text-slate-300' : 'text-[#0F172A]'
-                    }`}
-                  >
+                  <label className="block text-xs font-bold uppercase tracking-wider text-[var(--ink-soft)] mb-2">
                     Full Name
                   </label>
                   <div className="relative">
-                    <User className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <User className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--ink-soft)]" />
                     <input
                       type="text"
                       value={name}
                       onChange={(e) => setCustomName(e.target.value)}
                       placeholder="Enter your full name"
-                      className={`w-full pl-10 pr-4 py-3 rounded-2xl text-xs font-medium focus:outline-none focus:border-[#FF5733] border ${
-                        isDark
-                          ? 'bg-slate-900 border-slate-700 text-white placeholder-slate-500'
-                          : 'bg-[#FAF9F5] border-[#E2E0D5] text-[#0F172A] placeholder-slate-400'
-                      }`}
+                      className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-[var(--line)] bg-[var(--bg)] text-xs font-medium text-[var(--ink)] placeholder-[var(--ink-soft)]/50 focus:border-[var(--primary)] focus:outline-hidden focus:ring-1 focus:ring-[var(--primary)] transition-colors"
                       required
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label
-                    className={`block text-xs font-extrabold uppercase tracking-wider mb-2 ${
-                      isDark ? 'text-slate-300' : 'text-[#0F172A]'
-                    }`}
-                  >
+                  <label className="block text-xs font-bold uppercase tracking-wider text-[var(--ink-soft)] mb-2">
                     Email Address
                   </label>
                   <div className="relative">
-                    <Mail className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <Mail className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--ink-soft)]" />
                     <input
                       type="email"
                       value={displayEmail}
                       disabled
-                      className={`w-full pl-10 pr-4 py-3 rounded-2xl text-xs font-medium cursor-not-allowed border opacity-70 ${
-                        isDark
-                          ? 'bg-slate-900 border-slate-700 text-slate-400'
-                          : 'bg-[#FAF9F5] border-[#E2E0D5] text-slate-500'
-                      }`}
+                      className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-[var(--line)] bg-[var(--bg)]/60 text-xs font-medium text-[var(--ink-soft)] opacity-80 cursor-not-allowed"
                     />
                   </div>
-                  <p className="text-[11px] text-slate-400 font-medium mt-1">
-                    Email address is managed by the server system admin.
+                  <p className="text-[11px] text-[var(--ink-soft)] mt-1.5">
+                    Email address is managed by your institutional administrator.
                   </p>
                 </div>
 
@@ -400,7 +393,7 @@ export function ManagerProfileClient({ slug }: ManagerProfileClientProps) {
                   <button
                     type="submit"
                     disabled={updateProfileMutation.isPending}
-                    className="inline-flex items-center gap-2 px-6 py-2.5 bg-[#FF5733] hover:bg-[#E64A26] text-white font-extrabold text-xs uppercase tracking-wider rounded-full shadow-md transition disabled:opacity-50 cursor-pointer"
+                    className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[var(--primary)] px-5 py-2.5 text-xs font-bold text-white transition-colors hover:bg-[var(--primary-strong)] shadow-xs disabled:opacity-50 cursor-pointer"
                   >
                     {updateProfileMutation.isPending ? (
                       <>
@@ -419,29 +412,17 @@ export function ManagerProfileClient({ slug }: ManagerProfileClientProps) {
             </div>
 
             {/* Password & Security Form */}
-            <div
-              className={`rounded-3xl p-6 lg:p-8 shadow-sm space-y-6 border ${
-                isDark ? 'bg-[#12141C] border-white/10' : 'bg-white border-[#E2E0D5]'
-              }`}
-            >
-              <div
-                className={`flex items-center gap-3 border-b pb-4 ${
-                  isDark ? 'border-white/10' : 'border-[#E8E6DF]'
-                }`}
-              >
-                <div className="p-2 bg-[#2563EB]/10 text-[#2563EB] rounded-xl">
+            <div className="rounded-3xl border border-[var(--line)] bg-[var(--surface)] p-6 lg:p-8 shadow-xs space-y-6">
+              <div className="flex items-center gap-3 border-b border-[var(--line)] pb-4">
+                <div className="p-2.5 bg-[var(--secondary-soft)] text-[var(--secondary)] rounded-xl">
                   <Key className="w-5 h-5" />
                 </div>
                 <div>
-                  <h2
-                    className={`font-['Syne',sans-serif] text-lg font-black uppercase tracking-tight ${
-                      isDark ? 'text-white' : 'text-[#0F172A]'
-                    }`}
-                  >
+                  <h3 className="font-display text-lg font-bold tracking-tight text-[var(--ink)]">
                     Security & Password
-                  </h2>
-                  <p className="text-xs text-slate-400 font-medium">
-                    Change account password
+                  </h3>
+                  <p className="text-xs text-[var(--ink-soft)]">
+                    Change your manager account login password
                   </p>
                 </div>
               </div>
@@ -449,30 +430,22 @@ export function ManagerProfileClient({ slug }: ManagerProfileClientProps) {
               <form onSubmit={handleUpdatePassword} className="space-y-5">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="md:col-span-2">
-                    <label
-                      className={`block text-xs font-extrabold uppercase tracking-wider mb-2 ${
-                        isDark ? 'text-slate-300' : 'text-[#0F172A]'
-                      }`}
-                    >
+                    <label className="block text-xs font-bold uppercase tracking-wider text-[var(--ink-soft)] mb-2">
                       Current Password
                     </label>
                     <div className="relative">
-                      <Lock className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <Lock className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--ink-soft)]" />
                       <input
                         type={showCurrentPassword ? 'text' : 'password'}
                         value={currentPassword}
                         onChange={(e) => setCurrentPassword(e.target.value)}
                         placeholder="Enter current password"
-                        className={`w-full pl-10 pr-10 py-3 rounded-2xl text-xs font-medium focus:outline-none focus:border-[#2563EB] border ${
-                          isDark
-                            ? 'bg-slate-900 border-slate-700 text-white placeholder-slate-500'
-                            : 'bg-[#FAF9F5] border-[#E2E0D5] text-[#0F172A] placeholder-slate-400'
-                        }`}
+                        className="w-full pl-10 pr-10 py-2.5 rounded-xl border border-[var(--line)] bg-[var(--bg)] text-xs font-medium text-[var(--ink)] placeholder-[var(--ink-soft)]/50 focus:border-[var(--primary)] focus:outline-hidden focus:ring-1 focus:ring-[var(--primary)] transition-colors"
                       />
                       <button
                         type="button"
                         onClick={() => setShowCurrentPassword(!showCurrentPassword)}
-                        className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition"
+                        className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[var(--ink-soft)] hover:text-[var(--ink)] transition-colors"
                       >
                         {showCurrentPassword ? (
                           <EyeOff className="w-4 h-4" />
@@ -484,30 +457,22 @@ export function ManagerProfileClient({ slug }: ManagerProfileClientProps) {
                   </div>
 
                   <div>
-                    <label
-                      className={`block text-xs font-extrabold uppercase tracking-wider mb-2 ${
-                        isDark ? 'text-slate-300' : 'text-[#0F172A]'
-                      }`}
-                    >
+                    <label className="block text-xs font-bold uppercase tracking-wider text-[var(--ink-soft)] mb-2">
                       New Password
                     </label>
                     <div className="relative">
-                      <Lock className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <Lock className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--ink-soft)]" />
                       <input
                         type={showNewPassword ? 'text' : 'password'}
                         value={newPassword}
                         onChange={(e) => setNewPassword(e.target.value)}
                         placeholder="At least 6 characters"
-                        className={`w-full pl-10 pr-10 py-3 rounded-2xl text-xs font-medium focus:outline-none focus:border-[#2563EB] border ${
-                          isDark
-                            ? 'bg-slate-900 border-slate-700 text-white placeholder-slate-500'
-                            : 'bg-[#FAF9F5] border-[#E2E0D5] text-[#0F172A] placeholder-slate-400'
-                        }`}
+                        className="w-full pl-10 pr-10 py-2.5 rounded-xl border border-[var(--line)] bg-[var(--bg)] text-xs font-medium text-[var(--ink)] placeholder-[var(--ink-soft)]/50 focus:border-[var(--primary)] focus:outline-hidden focus:ring-1 focus:ring-[var(--primary)] transition-colors"
                       />
                       <button
                         type="button"
                         onClick={() => setShowNewPassword(!showNewPassword)}
-                        className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition"
+                        className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[var(--ink-soft)] hover:text-[var(--ink)] transition-colors"
                       >
                         {showNewPassword ? (
                           <EyeOff className="w-4 h-4" />
@@ -519,30 +484,22 @@ export function ManagerProfileClient({ slug }: ManagerProfileClientProps) {
                   </div>
 
                   <div>
-                    <label
-                      className={`block text-xs font-extrabold uppercase tracking-wider mb-2 ${
-                        isDark ? 'text-slate-300' : 'text-[#0F172A]'
-                      }`}
-                    >
+                    <label className="block text-xs font-bold uppercase tracking-wider text-[var(--ink-soft)] mb-2">
                       Confirm New Password
                     </label>
                     <div className="relative">
-                      <Lock className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <Lock className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--ink-soft)]" />
                       <input
                         type={showConfirmPassword ? 'text' : 'password'}
                         value={confirmPassword}
                         onChange={(e) => setConfirmPassword(e.target.value)}
                         placeholder="Re-enter new password"
-                        className={`w-full pl-10 pr-10 py-3 rounded-2xl text-xs font-medium focus:outline-none focus:border-[#2563EB] border ${
-                          isDark
-                            ? 'bg-slate-900 border-slate-700 text-white placeholder-slate-500'
-                            : 'bg-[#FAF9F5] border-[#E2E0D5] text-[#0F172A] placeholder-slate-400'
-                        }`}
+                        className="w-full pl-10 pr-10 py-2.5 rounded-xl border border-[var(--line)] bg-[var(--bg)] text-xs font-medium text-[var(--ink)] placeholder-[var(--ink-soft)]/50 focus:border-[var(--primary)] focus:outline-hidden focus:ring-1 focus:ring-[var(--primary)] transition-colors"
                       />
                       <button
                         type="button"
                         onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                        className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition"
+                        className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[var(--ink-soft)] hover:text-[var(--ink)] transition-colors"
                       >
                         {showConfirmPassword ? (
                           <EyeOff className="w-4 h-4" />
@@ -558,7 +515,7 @@ export function ManagerProfileClient({ slug }: ManagerProfileClientProps) {
                   <button
                     type="submit"
                     disabled={savingPassword}
-                    className="inline-flex items-center gap-2 px-6 py-2.5 bg-[#0F172A] hover:bg-[#2563EB] text-white font-extrabold text-xs uppercase tracking-wider rounded-full shadow-md transition disabled:opacity-50 cursor-pointer"
+                    className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[var(--ink)] text-[var(--bg)] hover:bg-[var(--primary)] hover:text-white px-5 py-2.5 text-xs font-bold transition-colors shadow-xs disabled:opacity-50 cursor-pointer"
                   >
                     {savingPassword ? (
                       <>
@@ -577,95 +534,93 @@ export function ManagerProfileClient({ slug }: ManagerProfileClientProps) {
             </div>
           </div>
 
-          {/* Right 1 Column: Account Summary Card */}
+          {/* Right 1 Column: Account Overview */}
           <div className="space-y-6">
-            <div
-              className={`rounded-3xl p-6 shadow-sm space-y-6 border ${
-                isDark ? 'bg-[#12141C] border-white/10' : 'bg-white border-[#E2E0D5]'
-              }`}
-            >
-              <h3
-                className={`font-['Syne',sans-serif] text-base font-black uppercase border-b pb-3 ${
-                  isDark ? 'text-white border-white/10' : 'text-[#0F172A] border-[#E8E6DF]'
-                }`}
-              >
-                Account Overview
-              </h3>
+            <div className="rounded-3xl border border-[var(--line)] bg-[var(--surface)] p-6 shadow-xs space-y-6">
+              <div className="border-b border-[var(--line)] pb-3">
+                <h3 className="font-display text-base font-bold tracking-tight text-[var(--ink)]">
+                  Account Overview
+                </h3>
+                <p className="text-xs text-[var(--ink-soft)] mt-0.5">Summary & permissions</p>
+              </div>
 
-              <div className="space-y-4">
-                <div
-                  className={`flex items-center justify-between p-3 rounded-2xl border ${
-                    isDark ? 'bg-slate-900 border-white/10' : 'bg-[#FAF9F5] border-[#E2E0D5]'
-                  }`}
-                >
-                  <div className="flex items-center gap-3 text-xs font-bold text-slate-400">
-                    <Building2 className="w-4 h-4 text-[#FF5733]" />
+              <div className="space-y-3">
+                <div className="flex items-center justify-between p-3.5 rounded-2xl border border-[var(--line)] bg-[var(--bg)]">
+                  <div className="flex items-center gap-2.5 text-xs font-bold text-[var(--ink-soft)]">
+                    <div className="grid h-7 w-7 place-items-center rounded-lg bg-[var(--primary-soft)] text-[var(--primary)]">
+                      <Building2 className="w-4 h-4" />
+                    </div>
                     <span>Managed Clubs</span>
                   </div>
-                  <span
-                    className={`font-['Syne',sans-serif] text-base font-black ${
-                      isDark ? 'text-white' : 'text-[#0F172A]'
-                    }`}
-                  >
+                  <span className="font-display text-base font-bold text-[var(--ink)]">
                     {managedClubs.length}
                   </span>
                 </div>
 
-                <div
-                  className={`flex items-center justify-between p-3 rounded-2xl border ${
-                    isDark ? 'bg-slate-900 border-white/10' : 'bg-[#FAF9F5] border-[#E2E0D5]'
-                  }`}
-                >
-                  <div className="flex items-center gap-3 text-xs font-bold text-slate-400">
-                    <Shield className="w-4 h-4 text-[#2563EB]" />
+                <div className="flex items-center justify-between p-3.5 rounded-2xl border border-[var(--line)] bg-[var(--bg)]">
+                  <div className="flex items-center gap-2.5 text-xs font-bold text-[var(--ink-soft)]">
+                    <div className="grid h-7 w-7 place-items-center rounded-lg bg-[var(--secondary-soft)] text-[var(--secondary)]">
+                      <Shield className="w-4 h-4" />
+                    </div>
                     <span>Account Role</span>
                   </div>
-                  <span className="text-[10px] font-black uppercase text-[#2563EB] bg-[#2563EB]/10 px-2.5 py-0.5 rounded-full">
+                  <span className="text-[10px] font-bold uppercase text-[var(--primary)] bg-[var(--primary-soft)] px-2.5 py-0.5 rounded-full border border-[var(--primary)]/20">
                     {authUser?.role || 'MANAGER'}
                   </span>
                 </div>
 
-                <div
-                  className={`flex items-center justify-between p-3 rounded-2xl border ${
-                    isDark ? 'bg-slate-900 border-white/10' : 'bg-[#FAF9F5] border-[#E2E0D5]'
-                  }`}
-                >
-                  <div className="flex items-center gap-3 text-xs font-bold text-slate-400">
-                    <Calendar className="w-4 h-4 text-emerald-500" />
-                    <span>Joined</span>
+                <div className="flex items-center justify-between p-3.5 rounded-2xl border border-[var(--line)] bg-[var(--bg)]">
+                  <div className="flex items-center gap-2.5 text-xs font-bold text-[var(--ink-soft)]">
+                    <div className="grid h-7 w-7 place-items-center rounded-lg bg-emerald-500/10 text-emerald-500">
+                      <Calendar className="w-4 h-4" />
+                    </div>
+                    <span>Member Since</span>
                   </div>
-                  <span
-                    className={`text-xs font-bold ${
-                      isDark ? 'text-white' : 'text-[#0F172A]'
-                    }`}
-                  >
+                  <span className="text-xs font-semibold text-[var(--ink)]">
                     {formattedJoinedDate}
                   </span>
                 </div>
               </div>
 
-              {managedClubs.length > 0 && (
-                <div className="pt-2">
-                  <h4 className="text-xs font-black text-slate-400 uppercase tracking-wider mb-2">
-                    Assigned Clubs
+              <div className="pt-2 border-t border-[var(--line)]">
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="text-[11px] font-bold uppercase tracking-wider text-[var(--ink-soft)]">
+                    Assigned Clubs ({managedClubs.length})
                   </h4>
+                  <Link
+                    href={getPath('/manager/clubs')}
+                    className="text-xs font-bold text-[var(--primary)] hover:underline"
+                  >
+                    View all
+                  </Link>
+                </div>
+
+                {managedClubs.length > 0 ? (
                   <div className="space-y-2">
                     {managedClubs.map((club) => (
                       <Link
                         key={club.id}
                         href={getPath(`/manager/clubs/${club.id}`)}
-                        className={`block p-3 rounded-2xl border text-xs font-bold truncate transition hover:border-[#FF5733] ${
-                          isDark
-                            ? 'bg-slate-900 border-white/10 text-white'
-                            : 'bg-[#FAF9F5] border-[#E2E0D5] text-[#0F172A]'
-                        }`}
+                        className="group flex items-center justify-between p-3 rounded-2xl border border-[var(--line)] bg-[var(--bg)] hover:border-[var(--primary)]/50 hover:bg-[var(--primary-soft)]/20 transition-all text-xs font-bold text-[var(--ink)]"
                       >
-                        {club.name}
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-[var(--surface)] border border-[var(--line)] text-[var(--primary)]">
+                            <Building2 className="w-3.5 h-3.5" />
+                          </div>
+                          <span className="truncate group-hover:text-[var(--primary)] transition-colors">
+                            {club.name}
+                          </span>
+                        </div>
+                        <ChevronRight className="w-4 h-4 text-[var(--ink-soft)] group-hover:text-[var(--primary)] group-hover:translate-x-0.5 transition-all shrink-0" />
                       </Link>
                     ))}
                   </div>
-                </div>
-              )}
+                ) : (
+                  <div className="p-4 rounded-2xl border border-[var(--line)] bg-[var(--bg)] text-center text-xs text-[var(--ink-soft)]">
+                    No managed clubs assigned yet.
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>

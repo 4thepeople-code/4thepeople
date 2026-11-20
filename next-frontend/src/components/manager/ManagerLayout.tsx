@@ -6,6 +6,8 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
 import { useMyClubsQuery } from '@/lib/api/manager';
+import BrandLogo from '@/components/landing/BrandLogo';
+import { LBRCE_LOGO_URL } from '@/components/public/PublicNavbar';
 import {
   Building2,
   LayoutDashboard,
@@ -48,18 +50,21 @@ export function ManagerLayout({ slug, children }: ManagerLayoutProps) {
   const publicHref = getCanonicalPath('/');
   const loginHref = getCanonicalPath('/login/manager');
 
-  const navItems = [
-    { label: 'Dashboard', href: dashboardHref, icon: LayoutDashboard },
-    { label: 'My Clubs', href: clubsHref, icon: Building2 },
-    { label: 'Profile Settings', href: profileHref, icon: UserIcon },
+  const mainNavItems = [
+    { label: 'Overview', href: dashboardHref, icon: LayoutDashboard },
+    { label: 'My clubs', href: clubsHref, icon: Building2 },
+  ];
+
+  const accountNavItems = [
+    { label: 'Profile', href: profileHref, icon: UserIcon },
   ];
 
   const getBreadcrumb = () => {
     if (pathname.includes('/manager/profile')) return 'Profile Settings';
     if (pathname.includes('/events/')) return 'Event Management';
     if (pathname.includes('/manager/clubs/') && pathname.split('/').length > 5) return 'Club Management';
-    if (pathname.includes('/manager/clubs')) return 'My Clubs';
-    return 'Dashboard';
+    if (pathname.includes('/manager/clubs')) return 'My clubs';
+    return 'Overview';
   };
 
   const handleLogout = async () => {
@@ -92,14 +97,10 @@ export function ManagerLayout({ slug, children }: ManagerLayoutProps) {
 
   if (user && user.role === 'COLLEGE_ADMIN') {
     return (
-      <div
-        className={`min-h-screen flex items-center justify-center ${
-          isDark ? 'bg-[#0B0C10] text-white' : 'bg-[#FAF9F5] text-[#0F172A]'
-        }`}
-      >
+      <div className="dashboard-scope manager-dashboard-scope min-h-screen flex items-center justify-center bg-[var(--bg)] text-[var(--ink)]">
         <div className="text-center space-y-3">
-          <div className="w-10 h-10 border-2 border-[#B08D57] border-t-transparent rounded-full animate-spin mx-auto" />
-          <p className="text-xs font-bold uppercase tracking-wider text-[#B08D57]">
+          <div className="w-10 h-10 border-2 border-[var(--primary)] border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="text-xs font-bold uppercase tracking-wider text-[var(--primary)]">
             College Administrator detected. Redirecting to Admin Command Center...
           </p>
         </div>
@@ -109,14 +110,10 @@ export function ManagerLayout({ slug, children }: ManagerLayoutProps) {
 
   if (validating) {
     return (
-      <div
-        className={`min-h-screen flex items-center justify-center ${
-          isDark ? 'bg-[#0B0C10] text-white' : 'bg-[#FAF9F5] text-[#0F172A]'
-        }`}
-      >
+      <div className="dashboard-scope manager-dashboard-scope min-h-screen flex items-center justify-center bg-[var(--bg)] text-[var(--ink)]">
         <div className="text-center space-y-3">
-          <div className="w-10 h-10 border-2 border-[#00F0FF] border-t-transparent rounded-full animate-spin mx-auto" />
-          <p className="text-xs font-bold uppercase tracking-wider text-gray-400">
+          <div className="w-10 h-10 border-2 border-[var(--primary)] border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="text-xs font-bold uppercase tracking-wider text-[var(--ink-soft)]">
             Validating Manager Credentials...
           </p>
         </div>
@@ -132,41 +129,33 @@ export function ManagerLayout({ slug, children }: ManagerLayoutProps) {
         : '/student';
 
     return (
-      <div
-        className={`min-h-screen flex items-center justify-center p-6 ${
-          isDark ? 'bg-[#0B0C10] text-white' : 'bg-[#FAF9F5] text-[#0F172A]'
-        }`}
-      >
-        <div
-          className={`max-w-md w-full p-8 rounded-3xl border shadow-xl text-center space-y-5 ${
-            isDark ? 'bg-[#12141C] border-white/10' : 'bg-white border-slate-200'
-          }`}
-        >
+      <div className="dashboard-scope manager-dashboard-scope min-h-screen flex items-center justify-center p-6 bg-[var(--bg)] text-[var(--ink)]">
+        <div className="max-w-md w-full p-8 rounded-3xl border border-[var(--line)] bg-[var(--surface)] shadow-xl text-center space-y-5">
           <div
             className={`w-14 h-14 rounded-2xl border flex items-center justify-center mx-auto ${
               isStudentWithoutClubs
-                ? 'bg-amber-500/15 border-amber-500/30 text-amber-400'
-                : 'bg-rose-500/15 border-rose-500/30 text-rose-400'
+                ? 'bg-amber-500/10 border-amber-500/30 text-amber-500'
+                : 'bg-[var(--secondary-soft)] border-[var(--secondary)]/30 text-[var(--secondary)]'
             }`}
           >
             <ShieldAlert className="w-7 h-7" />
           </div>
 
           <div className="space-y-2">
-            <h2 className="font-['Syne',sans-serif] text-xl font-black uppercase">
+            <h2 className="font-display text-xl font-bold tracking-tight text-[var(--ink)]">
               {isStudentWithoutClubs ? 'No Managed Clubs Assigned' : 'Manager Access Required'}
             </h2>
-            <p className="text-xs text-gray-400 leading-relaxed">
+            <p className="text-xs text-[var(--ink-soft)] leading-relaxed">
               {isStudentWithoutClubs ? (
                 <>
                   Your account is active, but you have not been assigned as a manager to any student clubs in{' '}
-                  <strong className="text-[#00F0FF]">{slug ? slug.toUpperCase() : 'this campus'}</strong> yet.
+                  <strong className="text-[var(--primary)]">{slug ? slug.toUpperCase() : 'this campus'}</strong> yet.
                   Please ask your College Administrator to link you to a club in the College Admin Portal.
                 </>
               ) : (
                 <>
                   This workspace is restricted to authorized Club and Event Managers of{' '}
-                  <strong className="text-[#00F0FF]">{slug ? slug.toUpperCase() : 'this campus'}</strong>.
+                  <strong className="text-[var(--primary)]">{slug ? slug.toUpperCase() : 'this campus'}</strong>.
                 </>
               )}
             </p>
@@ -177,14 +166,14 @@ export function ManagerLayout({ slug, children }: ManagerLayoutProps) {
               <>
                 <Link
                   href={studentHref}
-                  className="w-full inline-flex items-center justify-center gap-2 py-3 rounded-full bg-[#00F0FF] text-black font-extrabold text-xs uppercase tracking-wider shadow-lg shadow-cyan-500/20 hover:bg-cyan-300 transition"
+                  className="w-full inline-flex items-center justify-center gap-2 py-3 rounded-xl bg-[var(--primary)] text-[var(--on-primary)] font-semibold text-xs tracking-wide shadow-sm hover:bg-[var(--primary-strong)] transition-colors"
                 >
                   <span>Go to Student Portal</span>
                 </Link>
                 <button
                   type="button"
                   onClick={handleLogout}
-                  className="w-full inline-flex items-center justify-center gap-2 py-3 rounded-full border border-rose-500/30 hover:bg-rose-500/10 text-rose-400 text-xs font-bold uppercase tracking-wider transition"
+                  className="w-full inline-flex items-center justify-center gap-2 py-3 rounded-xl border border-[var(--line)] bg-[var(--surface)] text-[var(--ink-soft)] hover:bg-[var(--primary-soft)]/50 hover:text-[var(--ink)] text-xs font-semibold tracking-wide transition-colors"
                 >
                   <LogOut className="w-4 h-4" />
                   <span>Sign Out</span>
@@ -194,7 +183,7 @@ export function ManagerLayout({ slug, children }: ManagerLayoutProps) {
               <>
                 <Link
                   href={`${loginHref}?returnUrl=${encodeURIComponent(pathname)}`}
-                  className="w-full inline-flex items-center justify-center gap-2 py-3 rounded-full bg-[#00F0FF] text-black font-extrabold text-xs uppercase tracking-wider shadow-lg shadow-cyan-500/20 hover:bg-cyan-300 transition"
+                  className="w-full inline-flex items-center justify-center gap-2 py-3 rounded-xl bg-[var(--primary)] text-[var(--on-primary)] font-semibold text-xs tracking-wide shadow-sm hover:bg-[var(--primary-strong)] transition-colors"
                 >
                   <LogIn className="w-4 h-4" />
                   <span>Manager Portal Login</span>
@@ -202,11 +191,7 @@ export function ManagerLayout({ slug, children }: ManagerLayoutProps) {
 
                 <Link
                   href={publicHref}
-                  className={`w-full inline-flex items-center justify-center gap-2 py-3 rounded-full border text-xs font-bold uppercase tracking-wider transition ${
-                    isDark
-                      ? 'border-white/10 text-gray-300 hover:bg-white/5'
-                      : 'border-slate-200 text-slate-700 hover:bg-slate-100'
-                  }`}
+                  className="w-full inline-flex items-center justify-center gap-2 py-3 rounded-xl border border-[var(--line)] bg-[var(--surface)] text-[var(--ink)] hover:border-[var(--primary)] text-xs font-semibold tracking-wide transition-colors"
                 >
                   <span>Return to Public Directory</span>
                 </Link>
@@ -218,254 +203,264 @@ export function ManagerLayout({ slug, children }: ManagerLayoutProps) {
     );
   }
 
-  return (
-    <div
-      className={`min-h-screen flex font-sans antialiased transition-colors duration-300 ${
-        isDark ? 'bg-[#0B0C10] text-slate-100 dark' : 'bg-[#FAF9F5] text-[#0F172A]'
-      }`}
-    >
-      {/* Mobile Drawer Overlay */}
-      {mobileMenuOpen && (
-        <div
-          className="fixed inset-0 bg-black/70 backdrop-blur-sm z-40 lg:hidden"
-          onClick={() => setMobileMenuOpen(false)}
-        />
-      )}
+  const renderNavLinks = (onItemClick?: () => void) => (
+    <nav aria-label="Main navigation" className="flex-1 space-y-6 px-3 pt-7 pb-6">
+      <div>
+        <p className="px-3 pb-2.5 text-[11px] font-bold uppercase tracking-[0.18em] text-[var(--ink-soft)]">
+          Main
+        </p>
+        <ul className="space-y-1">
+          {mainNavItems.map((item) => {
+            const Icon = item.icon;
+            const isActive =
+              item.href === dashboardHref
+                ? pathname === dashboardHref
+                : pathname.startsWith(item.href);
 
-      {/* Sidebar */}
-      <aside
-        className={`fixed lg:static inset-y-0 left-0 z-50 w-64 border-r flex flex-col justify-between transition-all duration-300 transform ${
-          mobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
-        } ${
-          isDark
-            ? 'bg-[#12141C] border-white/10 shadow-2xl'
-            : 'bg-white border-slate-200 shadow-sm'
-        }`}
+            return (
+              <li key={item.label}>
+                <Link
+                  href={item.href}
+                  onClick={onItemClick}
+                  aria-current={isActive ? 'page' : undefined}
+                  className={`flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-semibold transition-colors duration-150 motion-reduce:transition-none focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-[var(--primary)] ${
+                    isActive
+                      ? 'bg-[var(--primary-soft)] text-[var(--primary)] font-bold'
+                      : 'text-[var(--ink-soft)] hover:bg-[var(--primary-soft)]/60 hover:text-[var(--ink)]'
+                  }`}
+                >
+                  <Icon className="h-4.5 w-4.5 shrink-0" />
+                  <span>{item.label}</span>
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+
+      <div>
+        <p className="px-3 pb-2 text-[11px] font-bold uppercase tracking-[0.18em] text-[var(--ink-soft)]">
+          Account
+        </p>
+        <ul className="space-y-1">
+          {accountNavItems.map((item) => {
+            const Icon = item.icon;
+            const isActive = pathname.startsWith(item.href);
+
+            return (
+              <li key={item.label}>
+                <Link
+                  href={item.href}
+                  onClick={onItemClick}
+                  aria-current={isActive ? 'page' : undefined}
+                  className={`flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-semibold transition-colors duration-150 motion-reduce:transition-none focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-[var(--primary)] ${
+                    isActive
+                      ? 'bg-[var(--primary-soft)] text-[var(--primary)] font-bold'
+                      : 'text-[var(--ink-soft)] hover:bg-[var(--primary-soft)]/60 hover:text-[var(--ink)]'
+                  }`}
+                >
+                  <Icon className="h-4.5 w-4.5 shrink-0" />
+                  <span>{item.label}</span>
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+    </nav>
+  );
+
+  const isLbrce = slug?.toLowerCase() === 'lbrce';
+  const collegeLogoUrl = isLbrce ? LBRCE_LOGO_URL : undefined;
+
+  const renderSidebarBrand = () => (
+    <div className="border-b border-[var(--line)] px-5 py-5 pb-6">
+      <Link href={dashboardHref} className="group flex items-center gap-3 min-w-0">
+        <BrandLogo size="md" />
+        <span
+          aria-hidden="true"
+          className="h-9 w-px bg-[var(--line)] inline-block self-center opacity-70"
+        />
+        <div className="flex flex-col items-center justify-center shrink-0">
+          {collegeLogoUrl ? (
+            <img
+              src={collegeLogoUrl}
+              alt={`${slug.toUpperCase()} Logo`}
+              className="h-10 w-10 rounded-full object-contain border border-[var(--line)] bg-white p-0.5 shadow-xs shrink-0 group-hover:scale-105 transition-transform"
+              onError={(e) => {
+                (e.currentTarget as HTMLElement).style.display = 'none';
+              }}
+            />
+          ) : (
+            <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-[var(--primary)] font-display text-xs font-bold text-[var(--on-primary)]">
+              {slug ? slug.charAt(0).toUpperCase() : '4'}
+            </span>
+          )}
+          <span className="font-display text-[10px] font-black uppercase tracking-wider text-[var(--ink-soft)] mt-0.5 text-center leading-none group-hover:text-[var(--primary)] transition-colors">
+            {slug ? slug.toUpperCase() : 'CAMPUS'}
+          </span>
+        </div>
+      </Link>
+      <div className="mt-2.5 flex items-center gap-1.5 px-1">
+        <span className="h-1.5 w-1.5 rounded-full bg-[var(--primary)]" />
+        <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--ink-soft)]">
+          Event Manager Workspace
+        </p>
+      </div>
+    </div>
+  );
+
+  const renderSidebarFooter = () => (
+    <div className="border-t border-[var(--line)] px-3 py-4 space-y-2">
+      {user && (
+        <div className="px-3 pb-1 text-xs text-[var(--ink-soft)]">
+          <span className="sr-only">Signed in as: </span>
+          <span className="font-semibold text-[var(--ink)] truncate block">
+            {user.name || user.email}
+          </span>
+        </div>
+      )}
+      <div className="flex items-center justify-between gap-2 px-1">
+        <Link
+          href={publicHref}
+          className="inline-flex min-h-9 items-center gap-1.5 rounded-xl px-2.5 text-xs font-semibold text-[var(--ink-soft)] hover:bg-[var(--primary-soft)]/60 hover:text-[var(--ink)] transition-colors"
+          title="Public Campus Directory"
+        >
+          <ExternalLink className="h-3.5 w-3.5" />
+          <span>Campus</span>
+        </Link>
+        <button
+          type="button"
+          onClick={handleLogout}
+          className="inline-flex min-h-9 items-center gap-1.5 rounded-xl px-2.5 text-xs font-semibold text-[var(--primary)] hover:bg-[var(--primary-soft)] transition-colors"
+        >
+          <LogOut className="h-3.5 w-3.5" />
+          <span>Log out</span>
+        </button>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="dashboard-scope manager-dashboard-scope min-h-screen bg-[var(--bg)] text-[var(--ink)] flex flex-col font-sans antialiased">
+      <a
+        href="#dashboard-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-xl focus:bg-[var(--primary)] focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-[var(--on-primary)]"
       >
-        <div>
-          {/* Brand Header */}
-          <div
-            className={`py-4 px-6 flex items-center justify-between border-b ${
-              isDark ? 'border-white/10' : 'border-slate-200'
-            }`}
-          >
-            <Link href={dashboardHref} className="flex flex-col gap-1 cursor-pointer group">
-              <div className="flex items-center gap-2.5">
-                <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-[#00F0FF] to-blue-600 flex items-center justify-center text-black font-black shadow-lg shadow-cyan-500/25 group-hover:scale-105 transition-transform shrink-0">
-                  <span className="font-['Syne',sans-serif] text-2xl font-black leading-none">4</span>
-                </div>
-                <div className="flex flex-col justify-center leading-none">
-                  <span className="text-[10px] font-black tracking-[0.25em] text-[#00F0FF] uppercase leading-none mb-0.5">
-                    THE
-                  </span>
-                  <span
-                    className={`font-['Syne',sans-serif] text-xl font-black tracking-tight leading-none ${
-                      isDark ? 'text-white' : 'text-[#0F172A]'
-                    }`}
-                  >
-                    PEOPLE<span className="text-[#00F0FF]">.</span>
-                  </span>
-                </div>
-              </div>
-              <div className="pl-[50px]">
-                <span className="text-[8px] font-black uppercase tracking-wider text-[#00F0FF] bg-[#00F0FF]/10 px-2 py-0.5 rounded-full inline-block border border-[#00F0FF]/25">
-                  Club Manager
+        Skip to content
+      </a>
+
+      <div className="flex min-h-screen">
+        {/* Desktop Sidebar */}
+        <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col border-r border-[var(--line)] bg-[var(--surface)] md:flex">
+          {renderSidebarBrand()}
+          {renderNavLinks()}
+          {renderSidebarFooter()}
+        </aside>
+
+        {/* Main Content Area */}
+        <div className="flex min-w-0 flex-1 flex-col">
+          {/* Top Sticky Header */}
+          <header className="sticky top-0 z-40 border-b border-[var(--line)] bg-[var(--bg)]/90 backdrop-blur-md">
+            <div className="mx-auto flex h-16 max-w-7xl items-center gap-3 px-4 sm:px-6 lg:px-8">
+              {/* Mobile hamburger */}
+              <button
+                type="button"
+                onClick={() => setMobileMenuOpen(true)}
+                aria-label="Open menu"
+                aria-expanded={mobileMenuOpen}
+                aria-controls="dashboard-drawer"
+                className="grid h-11 w-11 place-items-center rounded-xl border border-[var(--line)] text-[var(--ink)] transition-colors hover:bg-[var(--primary-soft)]/60 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-[var(--primary)] md:hidden motion-reduce:transition-none"
+              >
+                <Menu className="h-5 w-5" />
+              </button>
+
+              <div className="min-w-0 flex-1 flex items-center gap-2">
+                <Link href={dashboardHref} className="flex md:hidden items-center gap-2 shrink-0 mr-1">
+                  <BrandLogo size="sm" />
+                  {collegeLogoUrl && (
+                    <img
+                      src={collegeLogoUrl}
+                      alt="Logo"
+                      className="h-7 w-7 rounded-full object-contain bg-white border border-[var(--line)] p-0.5"
+                    />
+                  )}
+                </Link>
+                <span className="truncate font-display text-base font-bold text-[var(--ink)] sm:text-lg">
+                  {slug ? slug.toUpperCase() : 'CAMPUS'}
+                </span>
+                <span className="text-[var(--line)] font-normal">/</span>
+                <span className="text-xs font-semibold uppercase tracking-wider text-[var(--ink-soft)] truncate">
+                  {getBreadcrumb()}
                 </span>
               </div>
-            </Link>
 
-            <button
-              type="button"
-              onClick={() => setMobileMenuOpen(false)}
-              className={`lg:hidden p-1.5 rounded-lg border transition ${
-                isDark ? 'border-white/10 text-gray-400 hover:text-white' : 'border-slate-200 text-slate-600'
-              }`}
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-
-          {/* Navigation Links */}
-          <nav className="p-4 space-y-1.5">
-            {navItems.map((item) => {
-              const Icon = item.icon;
-              const isActive =
-                item.href === dashboardHref
-                  ? pathname === dashboardHref
-                  : pathname.startsWith(item.href);
-
-              return (
+              <div className="flex items-center gap-2">
                 <Link
-                  key={item.href}
-                  href={item.href}
-                  onClick={() => setMobileMenuOpen(false)}
-                  className={`flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-extrabold uppercase tracking-wider transition-all ${
-                    isActive
-                      ? isDark
-                        ? 'bg-[#00F0FF] text-black shadow-lg shadow-cyan-500/25'
-                        : 'bg-[#0F172A] text-white shadow-md'
-                      : isDark
-                        ? 'text-gray-400 hover:bg-white/5 hover:text-white'
-                        : 'text-slate-600 hover:bg-slate-100 hover:text-[#0F172A]'
-                  }`}
+                  href={
+                    myClubs.length === 1
+                      ? `/college/${slug}/manager/clubs/${myClubs[0].id}/events/create`
+                      : clubsHref
+                  }
+                  className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl px-4 text-xs font-bold tracking-wide transition-colors bg-[var(--primary)] text-[var(--on-primary)] hover:bg-[var(--primary-strong)] shadow-xs"
                 >
-                  <div className="flex items-center gap-3">
-                    <Icon className="w-4 h-4" />
-                    <span>{item.label}</span>
-                  </div>
-                  <ChevronRight className="w-4 h-4 opacity-40" />
+                  <Sparkles className="h-3.5 w-3.5" />
+                  <span>Create event</span>
                 </Link>
-              );
-            })}
-          </nav>
-        </div>
 
-        {/* Sidebar Bottom Controls */}
-        <div
-          className={`p-4 border-t space-y-3 ${
-            isDark ? 'border-white/10' : 'border-slate-200'
-          }`}
-        >
-          {/* Theme Toggle Button */}
-          <button
-            type="button"
-            onClick={toggleTheme}
-            className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl border text-xs font-bold transition-all cursor-pointer ${
-              isDark
-                ? 'bg-white/5 border-white/10 text-slate-200 hover:bg-white/10'
-                : 'bg-slate-50 border-slate-200 text-slate-800 hover:bg-slate-100'
-            }`}
-          >
-            <span className="flex items-center gap-2">
-              {isDark ? (
-                <Moon className="w-4 h-4 text-purple-400" />
-              ) : (
-                <Sun className="w-4 h-4 text-amber-500" />
-              )}
-              <span>{isDark ? 'Dark Theme' : 'Light Theme'}</span>
-            </span>
-            <span
-              className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${
-                isDark ? 'bg-purple-500/20 text-purple-300' : 'bg-amber-500/20 text-amber-700'
-              }`}
-            >
-              {isDark ? 'ON' : 'OFF'}
-            </span>
-          </button>
-
-          {/* Public Portal Link */}
-          <Link
-            href={publicHref}
-            className={`w-full flex items-center justify-between px-3 py-2 rounded-xl border text-xs font-bold transition ${
-              isDark
-                ? 'bg-white/5 border-white/10 text-gray-300 hover:bg-white/10'
-                : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
-            }`}
-          >
-            <span className="flex items-center gap-2">
-              <Sparkles className="w-3.5 h-3.5 text-[#00F0FF]" />
-              <span>Public Directory</span>
-            </span>
-            <ExternalLink className="w-3.5 h-3.5 opacity-60" />
-          </Link>
-
-          {/* Profile Quick Access */}
-          {user && (
-            <Link
-              href={profileHref}
-              onClick={() => setMobileMenuOpen(false)}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-2xl border cursor-pointer transition group shadow-xs ${
-                isDark
-                  ? 'bg-white/5 border-white/10 hover:bg-white/10'
-                  : 'bg-slate-50 border-slate-200 hover:bg-slate-100'
-              }`}
-            >
-              <div className="w-9 h-9 rounded-xl bg-[#00F0FF]/15 border border-[#00F0FF]/30 flex items-center justify-center text-[#00F0FF] font-black text-xs shrink-0 group-hover:bg-[#00F0FF] group-hover:text-black transition-all">
-                {user.name ? user.name.charAt(0).toUpperCase() : <UserIcon className="w-4 h-4" />}
-              </div>
-              <div className="overflow-hidden flex-1 min-w-0">
-                <p
-                  className={`text-xs font-bold group-hover:text-[#00F0FF] transition truncate ${
-                    isDark ? 'text-white' : 'text-[#0F172A]'
-                  }`}
+                <button
+                  type="button"
+                  onClick={toggleTheme}
+                  aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+                  className="grid h-10 w-10 place-items-center rounded-xl border border-[var(--line)] text-[var(--ink-soft)] hover:bg-[var(--primary-soft)]/60 hover:text-[var(--ink)] transition-colors"
+                  title="Toggle Theme"
                 >
-                  {user.name || 'Club Manager'}
-                </p>
-                <p className={`text-[10px] truncate font-medium ${isDark ? 'text-gray-400' : 'text-slate-500'}`}>
-                  {user.email}
-                </p>
+                  {isDark ? <Sun className="h-4 w-4 text-amber-400" /> : <Moon className="h-4 w-4" />}
+                </button>
               </div>
-            </Link>
-          )}
-
-          {/* Logout Button */}
-          <button
-            type="button"
-            onClick={handleLogout}
-            className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 hover:bg-rose-500 hover:text-white border text-xs font-extrabold uppercase tracking-wider rounded-2xl transition-all cursor-pointer ${
-              isDark
-                ? 'bg-white/5 border-white/10 text-gray-400 hover:border-transparent'
-                : 'bg-slate-50 border-slate-200 text-slate-600 hover:border-transparent'
-            }`}
-          >
-            <LogOut className="w-4 h-4" />
-            <span>Logout</span>
-          </button>
-        </div>
-      </aside>
-
-      {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0">
-        {/* Top Sticky Header */}
-        <header
-          className={`h-16 px-6 border-b flex items-center justify-between sticky top-0 z-30 backdrop-blur-md transition-colors ${
-            isDark
-              ? 'bg-[#12141C]/90 border-white/10 text-white'
-              : 'bg-white/90 border-slate-200 text-[#0F172A]'
-          }`}
-        >
-          <div className="flex items-center gap-4">
-            <button
-              type="button"
-              onClick={() => setMobileMenuOpen(true)}
-              className={`lg:hidden p-2 rounded-xl border ${
-                isDark
-                  ? 'bg-white/5 border-white/10 text-gray-300'
-                  : 'bg-slate-100 border-slate-200 text-slate-700'
-              }`}
-            >
-              <Menu className="w-5 h-5" />
-            </button>
-            <div className="flex items-center gap-2 text-xs font-bold">
-              <span className="uppercase text-[10px] font-black px-2 py-0.5 rounded-full bg-[#00F0FF]/15 text-[#00F0FF] border border-[#00F0FF]/30">
-                {slug ? slug.toUpperCase() : 'CAMPUS'}
-              </span>
-              <span className={isDark ? 'text-gray-600' : 'text-slate-300'}>/</span>
-              <span className={`uppercase tracking-wider font-extrabold ${isDark ? 'text-gray-200' : 'text-slate-900'}`}>
-                {getBreadcrumb()}
-              </span>
             </div>
-          </div>
+          </header>
 
-          {/* Quick Theme Toggle Icon */}
+          {/* Viewport Outlet */}
+          <main id="dashboard-content" className="mx-auto w-full max-w-7xl flex-1 px-4 py-8 sm:px-6 lg:px-8">
+            {children}
+          </main>
+        </div>
+      </div>
+
+      {/* Mobile Drawer */}
+      {mobileMenuOpen && (
+        <div className="fixed inset-0 z-50 md:hidden" role="presentation">
           <button
             type="button"
-            onClick={toggleTheme}
-            className={`p-2 rounded-xl border transition-all cursor-pointer flex items-center gap-2 text-xs font-extrabold ${
-              isDark
-                ? 'bg-white/5 border-white/10 text-amber-300 hover:bg-white/10'
-                : 'bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200'
-            }`}
-            title="Toggle Theme"
+            aria-label="Close drawer"
+            onClick={() => setMobileMenuOpen(false)}
+            className="absolute inset-0 h-full w-full cursor-default bg-black/40 focus-visible:outline-hidden"
+          />
+          <div
+            id="dashboard-drawer"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Navigation drawer"
+            tabIndex={-1}
+            className="absolute inset-y-0 left-0 flex w-72 max-w-[85vw] flex-col border-r border-[var(--line)] bg-[var(--surface)] shadow-xl outline-hidden"
           >
-            {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-            <span className="hidden sm:inline">{isDark ? 'Light Mode' : 'Dark Mode'}</span>
-          </button>
-        </header>
-
-        {/* Viewport Outlet */}
-        <main className="flex-1 p-6 lg:p-8 max-w-7xl w-full mx-auto">{children}</main>
-      </div>
+            <div className="flex items-start justify-between">
+              {renderSidebarBrand()}
+              <button
+                type="button"
+                onClick={() => setMobileMenuOpen(false)}
+                aria-label="Close menu"
+                className="m-2 grid h-11 w-11 place-items-center rounded-xl text-[var(--ink-soft)] hover:bg-[var(--primary-soft)]/60 transition-colors"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            {renderNavLinks(() => setMobileMenuOpen(false))}
+            <div className="mt-auto">{renderSidebarFooter()}</div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

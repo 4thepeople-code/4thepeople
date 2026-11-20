@@ -256,10 +256,11 @@ export function TemplateGenerationModal({
       onClose={onClose}
       title="Automated Certificate Generation (Method C)"
       maxWidth={step === 'editor' ? 'max-w-7xl' : 'max-w-4xl'}
+      contentClassName="p-0 flex flex-col flex-1 min-h-0 overflow-hidden"
     >
-      <div className="flex flex-col h-full max-h-[88vh] font-sans">
+      <div className="flex flex-col h-[85vh] max-h-[85vh] min-h-[580px] flex-1 min-h-0 font-sans">
         {/* Step Indicator Header */}
-        <div className="flex items-center justify-between px-6 py-3 border-b border-[#E7E5E4] dark:border-[#2D3139] bg-[#FAF9F7] dark:bg-[#1A1D24]">
+        <div className="flex items-center justify-between px-6 py-3 border-b border-[#E7E5E4] dark:border-[#2D3139] bg-[#FAF9F7] dark:bg-[#1A1D24] shrink-0">
           <div className="flex items-center gap-2 sm:gap-4 text-xs font-medium">
             <span
               className={`flex items-center gap-1.5 ${
@@ -330,7 +331,7 @@ export function TemplateGenerationModal({
 
         {/* STEP 1: Select Template Design (Option A vs Option B) */}
         {step === 'select_template' && (
-          <div className="p-6 space-y-6 overflow-y-auto">
+          <div className="flex-1 min-h-0 overflow-y-auto p-6 space-y-6">
             {/* Template Source Selector Tabs */}
             <div className="flex items-center gap-2 border-b border-[#E7E5E4] dark:border-[#2D3139] pb-3">
               <button
@@ -377,7 +378,7 @@ export function TemplateGenerationModal({
                     <span className="text-xs text-[#6B6966]">Loading template gallery...</span>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     {predefinedTemplates.map((tpl) => {
                       const isSelected = selectedPredefined?.id === tpl.id;
                       return (
@@ -494,7 +495,7 @@ export function TemplateGenerationModal({
 
         {/* STEP 2: Visual Certificate Editor Canvas & Real PDF Preview */}
         {step === 'editor' && (
-          <div className="flex-1 overflow-hidden">
+          <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
             <VisualCertificateEditor
               templateSource={templateSource}
               predefinedTemplate={selectedPredefined}
@@ -511,7 +512,7 @@ export function TemplateGenerationModal({
 
         {/* STEP 3: Target Recipients Selection */}
         {step === 'target' && (
-          <div className="p-6 space-y-5 overflow-y-auto">
+          <div className="flex-1 min-h-0 overflow-y-auto p-6 space-y-5">
             <div>
               <h4 className="text-sm font-serif font-semibold text-[#1C1B1F] dark:text-[#F5F3EF]">
                 Select Recipient Students
@@ -630,7 +631,7 @@ export function TemplateGenerationModal({
 
         {/* STEP 4 (Result): Generation Summary */}
         {step === 'result' && batchResult && (
-          <div className="p-8 text-center space-y-4">
+          <div className="flex-1 min-h-0 overflow-y-auto p-8 text-center space-y-4">
             <div className="w-14 h-14 rounded-full bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 flex items-center justify-center mx-auto">
               <CheckCircle2 className="w-8 h-8" />
             </div>
@@ -659,7 +660,7 @@ export function TemplateGenerationModal({
         )}
 
         {/* Modal Footer Controls */}
-        <div className="px-6 py-3.5 bg-white dark:bg-[#1A1D24] border-t border-[#E7E5E4] dark:border-[#2D3139] flex items-center justify-between">
+        <div className="px-6 py-3.5 bg-white dark:bg-[#1A1D24] border-t border-[#E7E5E4] dark:border-[#2D3139] flex items-center justify-between shrink-0">
           {step === 'select_template' && (
             <>
               <button

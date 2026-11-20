@@ -26,6 +26,9 @@ import {
   ChevronLeft,
   ChevronRight,
   Loader2,
+  ShieldCheck,
+  Users,
+  FileCheck,
 } from 'lucide-react';
 import type { EventCertificate } from '@/types/models';
 
@@ -80,52 +83,72 @@ export function EventCertificatesSection({
     refetchEligible();
   };
 
+  const coveragePercent =
+    Array.isArray(eligibleStudents) && eligibleStudents.length > 0
+      ? Math.round(
+          (eligibleStudents.filter((s) => Boolean(s?.hasActiveCertificate)).length /
+            eligibleStudents.length) *
+            100
+        )
+      : 0;
+
   return (
-    <div
-      className={`rounded-3xl p-6 sm:p-8 border shadow-xl space-y-6 transition-all ${
-        isDark ? 'bg-slate-900/60 border-white/10' : 'bg-white border-[#E8E6DF]'
-      }`}
+    <section
+      aria-label="Event Certificates Section"
+      className="relative rounded-3xl border-2 border-[var(--primary)]/35 bg-[var(--surface)] p-6 sm:p-8 shadow-xl shadow-[var(--primary)]/5 space-y-7 overflow-hidden transition-all"
     >
-      {/* Section Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400">
-              <Award className="w-4 h-4" />
-            </div>
-            <h2 className="text-lg font-black uppercase tracking-wider text-slate-100">
-              Event Certificates
-            </h2>
+      {/* Top Colorful Accent Ribbon */}
+      <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-[var(--primary)] via-indigo-500 to-amber-500" />
+
+      {/* Section Header: Prominently Highlighted Title and Description */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5 border-b border-[var(--line)] pb-6">
+        <div className="space-y-2">
+          {/* Pill Badge */}
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[var(--primary-soft)] text-[var(--primary)] border border-[var(--primary)]/30 text-[10px] font-bold uppercase tracking-wider shadow-xs">
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>Official Accreditation & Verification Hub</span>
           </div>
-          <p className="text-xs text-slate-400 mt-1">
-            Issue, auto-generate, and audit official participation certificates for registered attendees.
-          </p>
+
+          {/* Highlighted Title and Description */}
+          <div className="flex items-center gap-3.5">
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-[var(--primary)] to-indigo-600 text-white flex items-center justify-center shadow-md shadow-[var(--primary)]/30 shrink-0">
+              <Award className="w-6 h-6" />
+            </div>
+            <div>
+              <h2 className="font-display text-2xl sm:text-3xl font-extrabold tracking-tight text-[var(--ink)]">
+                Event Certificates
+              </h2>
+              <p className="text-xs sm:text-sm font-semibold text-[var(--ink-soft)] mt-0.5 leading-relaxed">
+                Issue, auto-generate, and audit verifiable participation certificates for registered attendees.
+              </p>
+            </div>
+          </div>
         </div>
 
         {/* Issuance Action Buttons */}
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2.5 shrink-0">
           <button
             type="button"
             onClick={() => setIsIndividualModalOpen(true)}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-xl border border-white/10 transition cursor-pointer"
+            className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[var(--line)] bg-[var(--bg)] px-3.5 py-2 text-xs font-bold text-[var(--ink)] transition-colors hover:bg-[var(--primary-soft)]/60 hover:border-[var(--primary)]/40 cursor-pointer shadow-xs"
           >
-            <Upload className="w-3.5 h-3.5 text-cyan-400" />
+            <Upload className="w-3.5 h-3.5 text-[var(--primary)]" />
             <span>Individual PDF</span>
           </button>
 
           <button
             type="button"
             onClick={() => setIsBulkModalOpen(true)}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-xl border border-white/10 transition cursor-pointer"
+            className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[var(--line)] bg-[var(--bg)] px-3.5 py-2 text-xs font-bold text-[var(--ink)] transition-colors hover:bg-[var(--primary-soft)]/60 hover:border-[var(--primary)]/40 cursor-pointer shadow-xs"
           >
-            <Archive className="w-3.5 h-3.5 text-amber-400" />
+            <Archive className="w-3.5 h-3.5 text-amber-500" />
             <span>Bulk ZIP</span>
           </button>
 
           <button
             type="button"
             onClick={() => setIsTemplateModalOpen(true)}
-            className="inline-flex items-center gap-1.5 px-4 py-2 bg-cyan-500 hover:bg-cyan-400 text-slate-950 text-xs font-bold rounded-xl shadow-md transition cursor-pointer"
+            className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[var(--primary)] px-4 py-2 text-xs font-bold text-white transition-all hover:bg-[var(--primary-strong)] shadow-md shadow-[var(--primary)]/25 cursor-pointer"
           >
             <Sparkles className="w-3.5 h-3.5" />
             <span>Auto-Generate</span>
@@ -133,52 +156,64 @@ export function EventCertificatesSection({
         </div>
       </div>
 
-      {/* Overview Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <div className="p-4 rounded-2xl bg-white/5 border border-white/10">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-            Certificates Issued
-          </span>
-          <div className="flex items-baseline gap-2 mt-1">
-            <span className="text-2xl font-black text-white">{pagination.total}</span>
-            <span className="text-xs text-slate-400">total records</span>
-          </div>
-        </div>
-
-        <div className="p-4 rounded-2xl bg-white/5 border border-white/10">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-            Eligible Registered Students
-          </span>
-          <div className="flex items-baseline gap-2 mt-1">
-            <span className="text-2xl font-black text-cyan-400">{eligibleStudents.length}</span>
-            <span className="text-xs text-slate-400">attendees</span>
-          </div>
-        </div>
-
-        <div className="p-4 rounded-2xl bg-white/5 border border-white/10">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-            Coverage
-          </span>
-          <div className="flex items-baseline gap-2 mt-1">
-            <span className="text-2xl font-black text-emerald-400">
-              {Array.isArray(eligibleStudents) && eligibleStudents.length > 0
-                ? Math.round(
-                    (eligibleStudents.filter((s) => Boolean(s?.hasActiveCertificate)).length /
-                      eligibleStudents.length) *
-                      100
-                  )
-                : 0}
-              %
+      {/* Overview Stat Cards - High-Contrast & Clearly Highlighted */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="p-4 rounded-2xl border border-[var(--line)] bg-[var(--bg)] shadow-xs transition-colors hover:border-[var(--primary)]/40">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--ink-soft)]">
+              Certificates Issued
             </span>
-            <span className="text-xs text-slate-400">students awarded</span>
+            <div className="grid h-7 w-7 place-items-center rounded-lg bg-[var(--primary-soft)] text-[var(--primary)]">
+              <FileCheck className="w-4 h-4" />
+            </div>
+          </div>
+          <div className="flex items-baseline gap-2 mt-2">
+            <span className="font-display text-3xl font-extrabold text-[var(--ink)]">
+              {pagination.total}
+            </span>
+            <span className="text-xs font-semibold text-[var(--ink-soft)]">total records</span>
+          </div>
+        </div>
+
+        <div className="p-4 rounded-2xl border border-[var(--line)] bg-[var(--bg)] shadow-xs transition-colors hover:border-[var(--primary)]/40">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--ink-soft)]">
+              Eligible Attendees
+            </span>
+            <div className="grid h-7 w-7 place-items-center rounded-lg bg-[var(--primary-soft)] text-[var(--primary)]">
+              <Users className="w-4 h-4" />
+            </div>
+          </div>
+          <div className="flex items-baseline gap-2 mt-2">
+            <span className="font-display text-3xl font-extrabold text-[var(--primary)]">
+              {eligibleStudents.length}
+            </span>
+            <span className="text-xs font-semibold text-[var(--ink-soft)]">registered</span>
+          </div>
+        </div>
+
+        <div className="p-4 rounded-2xl border border-[var(--line)] bg-[var(--bg)] shadow-xs transition-colors hover:border-[var(--primary)]/40">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--ink-soft)]">
+              Award Coverage
+            </span>
+            <div className="grid h-7 w-7 place-items-center rounded-lg bg-emerald-500/10 text-emerald-500">
+              <ShieldCheck className="w-4 h-4" />
+            </div>
+          </div>
+          <div className="flex items-baseline gap-2 mt-2">
+            <span className="font-display text-3xl font-extrabold text-emerald-600 dark:text-emerald-400">
+              {coveragePercent}%
+            </span>
+            <span className="text-xs font-semibold text-[var(--ink-soft)]">awarded</span>
           </div>
         </div>
       </div>
 
       {/* Filter and Search Bar */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-1">
         {/* Status Tabs */}
-        <div className="inline-flex p-1 rounded-xl bg-white/5 border border-white/10 self-start">
+        <div className="inline-flex p-1 rounded-xl bg-[var(--bg)] border border-[var(--line)] self-start shadow-xs">
           {(['ALL', 'ISSUED', 'REVOKED'] as const).map((tab) => (
             <button
               key={tab}
@@ -187,10 +222,10 @@ export function EventCertificatesSection({
                 setStatusFilter(tab);
                 setPage(1);
               }}
-              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition ${
+              className={`px-3.5 py-1.5 text-xs font-bold rounded-lg transition-colors cursor-pointer ${
                 statusFilter === tab
-                  ? 'bg-cyan-500 text-slate-950 shadow-sm'
-                  : 'text-slate-400 hover:text-white'
+                  ? 'bg-[var(--primary)] text-white shadow-xs'
+                  : 'text-[var(--ink-soft)] hover:text-[var(--ink)]'
               }`}
             >
               {tab === 'ALL' ? 'All' : tab === 'ISSUED' ? 'Issued' : 'Revoked'}
@@ -199,8 +234,8 @@ export function EventCertificatesSection({
         </div>
 
         {/* Search Input */}
-        <div className="relative w-full sm:w-72">
-          <Search className="w-3.5 h-3.5 absolute left-3 top-3 text-slate-400" />
+        <div className="relative w-full sm:w-80">
+          <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--ink-soft)]" />
           <input
             type="text"
             placeholder="Search by student, roll #, or cert #..."
@@ -209,39 +244,35 @@ export function EventCertificatesSection({
               setSearchQuery(e.target.value);
               setPage(1);
             }}
-            className={`w-full pl-9 pr-3 py-2 text-xs rounded-xl border outline-none transition ${
-              isDark
-                ? 'bg-black/30 border-white/10 text-white placeholder-slate-500 focus:border-cyan-500'
-                : 'bg-white border-slate-200 text-slate-900 placeholder-slate-400 focus:border-cyan-500'
-            }`}
+            className="w-full pl-10 pr-3.5 py-2.5 text-xs font-medium rounded-xl border border-[var(--line)] bg-[var(--bg)] text-[var(--ink)] placeholder-[var(--ink-soft)]/50 focus:border-[var(--primary)] focus:outline-hidden focus:ring-1 focus:ring-[var(--primary)] transition-colors shadow-xs"
           />
         </div>
       </div>
 
-      {/* Certificates Table */}
+      {/* Certificates Table & Empty States */}
       {certsLoading ? (
-        <div className="py-12 flex flex-col items-center justify-center text-xs text-slate-400">
-          <Loader2 className="w-6 h-6 animate-spin mb-2 text-cyan-400" />
+        <div className="py-14 flex flex-col items-center justify-center text-xs font-semibold text-[var(--ink-soft)] space-y-3">
+          <Loader2 className="w-7 h-7 animate-spin text-[var(--primary)]" />
           <span>Loading event certificates...</span>
         </div>
       ) : certificates.length === 0 ? (
-        <div className="py-12 text-center text-slate-400 text-xs font-medium space-y-2 border border-dashed border-white/10 rounded-2xl">
-          <Award className="w-8 h-8 mx-auto text-slate-600 mb-1" />
-          <div>No certificates found matching your criteria.</div>
-          <p className="text-[11px] text-slate-500">
-            Use the actions above to issue certificates individually, upload in bulk, or auto-generate from a template.
+        <div className="py-12 text-center text-xs font-medium space-y-3 border-2 border-dashed border-[var(--line)] bg-[var(--bg)]/50 rounded-2xl p-8">
+          <div className="w-12 h-12 mx-auto rounded-2xl bg-[var(--primary-soft)] text-[var(--primary)] flex items-center justify-center shadow-xs">
+            <Award className="w-6 h-6" />
+          </div>
+          <div className="font-display text-base font-bold text-[var(--ink)]">
+            No certificates found
+          </div>
+          <p className="text-xs text-[var(--ink-soft)] max-w-md mx-auto leading-relaxed">
+            No certificates match your current filters. Use the actions above to auto-generate certificates from a template, upload individual PDFs, or import in bulk.
           </p>
         </div>
       ) : (
         <div className="space-y-4">
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto rounded-2xl border border-[var(--line)] bg-[var(--surface)] shadow-xs">
             <table className="w-full text-left text-xs">
               <thead>
-                <tr
-                  className={`border-b text-[10px] font-black uppercase tracking-wider ${
-                    isDark ? 'border-white/10 text-slate-400' : 'border-[#E8E6DF] text-[#64748B]'
-                  }`}
-                >
+                <tr className="border-b border-[var(--line)] bg-[var(--bg)] text-[10px] font-bold uppercase tracking-wider text-[var(--ink-soft)]">
                   <th className="py-3 px-4">Student Recipient</th>
                   <th className="py-3 px-4">Certificate Number</th>
                   <th className="py-3 px-4">Method</th>
@@ -250,7 +281,7 @@ export function EventCertificatesSection({
                   <th className="py-3 px-4 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-white/5">
+              <tbody className="divide-y divide-[var(--line)]">
                 {certificates.map((cert) => {
                   const isIssued = cert.status === 'ISSUED';
                   const downloadUrl = `/api/manager/events/${eventId}/certificates/${cert.id}/download?college=${slug}`;
@@ -258,9 +289,7 @@ export function EventCertificatesSection({
                   return (
                     <tr
                       key={cert.id}
-                      className={`transition-colors ${
-                        isDark ? 'hover:bg-white/5 text-slate-200' : 'hover:bg-slate-50 text-slate-900'
-                      }`}
+                      className="hover:bg-[var(--primary-soft)]/20 transition-colors"
                     >
                       {/* Recipient */}
                       <td className="py-3 px-4">
@@ -269,16 +298,16 @@ export function EventCertificatesSection({
                             <img
                               src={cert.user.avatar.url}
                               alt={cert.user?.name || 'User'}
-                              className="w-8 h-8 rounded-full object-cover border border-white/10"
+                              className="w-8 h-8 rounded-full object-cover border border-[var(--line)]"
                             />
                           ) : (
-                            <div className="w-8 h-8 rounded-full bg-cyan-500/20 text-cyan-400 flex items-center justify-center font-bold text-xs uppercase">
+                            <div className="w-8 h-8 rounded-full bg-[var(--primary-soft)] text-[var(--primary)] flex items-center justify-center font-bold text-xs uppercase border border-[var(--primary)]/20">
                               {(cert.user?.name || 'Student').slice(0, 2)}
                             </div>
                           )}
                           <div>
-                            <div className="font-bold text-slate-200">{cert.user?.name || 'Student'}</div>
-                            <div className="text-[11px] text-slate-400">
+                            <div className="font-bold text-[var(--ink)]">{cert.user?.name || 'Student'}</div>
+                            <div className="text-[11px] font-medium text-[var(--ink-soft)]">
                               {cert.user?.rollNumber || 'No Roll #'} • {cert.user?.email || '—'}
                             </div>
                           </div>
@@ -286,18 +315,18 @@ export function EventCertificatesSection({
                       </td>
 
                       {/* Certificate Number */}
-                      <td className="py-3 px-4 font-mono font-medium text-slate-300">
-                        <div className="inline-flex items-center gap-1.5">
+                      <td className="py-3 px-4">
+                        <div className="inline-flex items-center gap-1.5 font-mono text-xs font-semibold text-[var(--ink)] bg-[var(--bg)] px-2 py-0.5 rounded-md border border-[var(--line)]">
                           <span>{cert.certificateNumber || '—'}</span>
                           {cert.certificateNumber && (
                             <button
                               type="button"
                               onClick={() => handleCopyNumber(cert.certificateNumber)}
-                              className="p-1 rounded-md hover:bg-white/10 text-slate-400 hover:text-white transition"
+                              className="p-1 rounded-md hover:bg-[var(--primary-soft)] text-[var(--ink-soft)] hover:text-[var(--primary)] transition-colors cursor-pointer"
                               title="Copy Certificate Number"
                             >
                               {copiedCertId === cert.certificateNumber ? (
-                                <Check className="w-3.5 h-3.5 text-emerald-400" />
+                                <Check className="w-3.5 h-3.5 text-emerald-500" />
                               ) : (
                                 <Copy className="w-3.5 h-3.5" />
                               )}
@@ -308,7 +337,7 @@ export function EventCertificatesSection({
 
                       {/* Source Method */}
                       <td className="py-3 px-4">
-                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-white/5 text-slate-400 border border-white/10">
+                        <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-[var(--bg)] text-[var(--ink-soft)] border border-[var(--line)] uppercase">
                           {cert.source === 'INDIVIDUAL_UPLOAD'
                             ? 'Single Upload'
                             : cert.source === 'BULK_UPLOAD'
@@ -320,12 +349,12 @@ export function EventCertificatesSection({
                       {/* Status */}
                       <td className="py-3 px-4">
                         {isIssued ? (
-                          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20">
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20 uppercase">
                             <CheckCircle2 className="w-3 h-3" /> Issued
                           </span>
                         ) : (
                           <span
-                            className="inline-flex items-center gap-1 text-[10px] font-bold text-rose-400 bg-rose-500/10 px-2.5 py-0.5 rounded-full border border-rose-500/20 cursor-help"
+                            className="inline-flex items-center gap-1 text-[10px] font-bold text-rose-600 dark:text-rose-400 bg-rose-500/10 px-2.5 py-0.5 rounded-full border border-rose-500/20 cursor-help uppercase"
                             title={cert.revocationReason || 'Revoked by administrator'}
                           >
                             <Ban className="w-3 h-3" /> Revoked
@@ -334,7 +363,7 @@ export function EventCertificatesSection({
                       </td>
 
                       {/* Issued Date */}
-                      <td className="py-3 px-4 text-slate-400 text-[11px]">
+                      <td className="py-3 px-4 text-[var(--ink-soft)] text-[11px] font-medium">
                         {(() => {
                           if (!cert.issuedAt) return '—';
                           const d = new Date(cert.issuedAt);
@@ -355,8 +384,8 @@ export function EventCertificatesSection({
                           <a
                             href={downloadUrl}
                             target="_blank"
-                            rel="noopener"
-                            className="p-1.5 rounded-lg border border-white/10 text-slate-300 hover:text-cyan-400 hover:border-cyan-500/30 hover:bg-white/5 transition"
+                            rel="noopener noreferrer"
+                            className="p-1.5 rounded-lg border border-[var(--line)] bg-[var(--bg)] text-[var(--ink-soft)] hover:text-[var(--primary)] hover:border-[var(--primary)]/50 hover:bg-[var(--primary-soft)]/20 transition-colors shadow-xs"
                             title="View / Download PDF"
                           >
                             <Download className="w-3.5 h-3.5" />
@@ -366,7 +395,7 @@ export function EventCertificatesSection({
                           <button
                             type="button"
                             onClick={() => setReissuingCert(cert)}
-                            className="p-1.5 rounded-lg border border-white/10 text-slate-300 hover:text-cyan-400 hover:border-cyan-500/30 hover:bg-white/5 transition"
+                            className="p-1.5 rounded-lg border border-[var(--line)] bg-[var(--bg)] text-[var(--ink-soft)] hover:text-[var(--primary)] hover:border-[var(--primary)]/50 hover:bg-[var(--primary-soft)]/20 transition-colors cursor-pointer shadow-xs"
                             title="Reissue Certificate"
                           >
                             <RefreshCw className="w-3.5 h-3.5" />
@@ -377,7 +406,7 @@ export function EventCertificatesSection({
                             <button
                               type="button"
                               onClick={() => setRevokingCert(cert)}
-                              className="p-1.5 rounded-lg border border-white/10 text-slate-400 hover:text-rose-400 hover:border-rose-500/30 hover:bg-rose-500/10 transition"
+                              className="p-1.5 rounded-lg border border-[var(--line)] bg-[var(--bg)] text-[var(--ink-soft)] hover:text-rose-500 hover:border-rose-500/30 hover:bg-rose-500/10 transition-colors cursor-pointer shadow-xs"
                               title="Revoke Certificate"
                             >
                               <Ban className="w-3.5 h-3.5" />
@@ -394,8 +423,8 @@ export function EventCertificatesSection({
 
           {/* Pagination */}
           {pagination.totalPages > 1 && (
-            <div className="flex items-center justify-between pt-3 border-t border-white/10">
-              <span className="text-xs text-slate-400">
+            <div className="flex items-center justify-between pt-3 border-t border-[var(--line)]">
+              <span className="text-xs font-medium text-[var(--ink-soft)]">
                 Page {page} of {pagination.totalPages} ({pagination.total} total)
               </span>
               <div className="flex items-center gap-2">
@@ -403,7 +432,7 @@ export function EventCertificatesSection({
                   type="button"
                   disabled={page <= 1}
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  className="p-2 rounded-xl border border-white/10 text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-white/5"
+                  className="p-2 rounded-xl border border-[var(--line)] bg-[var(--bg)] text-[var(--ink)] disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[var(--primary-soft)]/40 transition-colors cursor-pointer"
                 >
                   <ChevronLeft className="w-4 h-4" />
                 </button>
@@ -411,7 +440,7 @@ export function EventCertificatesSection({
                   type="button"
                   disabled={page >= pagination.totalPages}
                   onClick={() => setPage((p) => p + 1)}
-                  className="p-2 rounded-xl border border-white/10 text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-white/5"
+                  className="p-2 rounded-xl border border-[var(--line)] bg-[var(--bg)] text-[var(--ink)] disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[var(--primary-soft)]/40 transition-colors cursor-pointer"
                 >
                   <ChevronRight className="w-4 h-4" />
                 </button>
@@ -465,6 +494,8 @@ export function EventCertificatesSection({
         certificate={reissuingCert}
         onSuccess={handleRefresh}
       />
-    </div>
+    </section>
   );
 }
+
+export default EventCertificatesSection;

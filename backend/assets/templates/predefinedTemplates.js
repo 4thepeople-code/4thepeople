@@ -56,6 +56,42 @@ const PREDEFINED_TEMPLATES = [
       { id: 'certificateId', placeholder: '{{certificateId}}', xPercent: 88, yPercent: 92, widthPercent: 35, fontSize: 11, font: 'Helvetica', color: '#64748B', align: 'right', autoFit: false },
     ],
   },
+  {
+    id: 'tpl-regal-emerald',
+    name: 'Executive Leadership & Merit',
+    description: 'Deep forest emerald borders with brushed champagne gold corners and refined serif accents. Ideal for leadership summits, annual club honors, hackathon winners, and executive merit awards.',
+    orientation: 'landscape',
+    aspectRatio: 841.89 / 595.28,
+    pdfFilename: 'tpl-regal-emerald.pdf',
+    backgroundColor: '#FAFDFB',
+    primaryTextColor: '#064E3B',
+    defaultConfig: [
+      { id: 'collegeName', placeholder: '{{collegeName}}', xPercent: 50, yPercent: 12, widthPercent: 85, fontSize: 16, font: 'Times', color: '#064E3B', align: 'center', autoFit: true },
+      { id: 'studentName', placeholder: '{{studentName}}', xPercent: 50, yPercent: 37, widthPercent: 75, fontSize: 26, font: 'TimesBold', color: '#064E3B', align: 'center', autoFit: true },
+      { id: 'rollNumber', placeholder: '{{rollNumber}}', xPercent: 50, yPercent: 42.5, widthPercent: 40, fontSize: 13, font: 'Helvetica', color: '#047857', align: 'center', autoFit: true },
+      { id: 'eventName', placeholder: '{{eventName}}', xPercent: 50, yPercent: 53.5, widthPercent: 70, fontSize: 20, font: 'TimesBold', color: '#B45309', align: 'center', autoFit: true },
+      { id: 'issueDate', placeholder: '{{issueDate}}', xPercent: 12, yPercent: 92, widthPercent: 30, fontSize: 11, font: 'Helvetica', color: '#64748B', align: 'left', autoFit: false },
+      { id: 'certificateId', placeholder: '{{certificateId}}', xPercent: 88, yPercent: 92, widthPercent: 35, fontSize: 11, font: 'Helvetica', color: '#64748B', align: 'right', autoFit: false },
+    ],
+  },
+  {
+    id: 'tpl-creative-violet',
+    name: 'Creative Arts & Design Distinction',
+    description: 'Vibrant royal violet with radiant rose borders and sleek modern typography. Ideal for cultural fests, design showcases, creative symposiums, and innovative club events.',
+    orientation: 'landscape',
+    aspectRatio: 841.89 / 595.28,
+    pdfFilename: 'tpl-creative-violet.pdf',
+    backgroundColor: '#FDFBFE',
+    primaryTextColor: '#6D28D9',
+    defaultConfig: [
+      { id: 'collegeName', placeholder: '{{collegeName}}', xPercent: 50, yPercent: 12, widthPercent: 85, fontSize: 16, font: 'HelveticaBold', color: '#6D28D9', align: 'center', autoFit: true },
+      { id: 'studentName', placeholder: '{{studentName}}', xPercent: 50, yPercent: 37, widthPercent: 75, fontSize: 26, font: 'HelveticaBold', color: '#1E1B4B', align: 'center', autoFit: true },
+      { id: 'rollNumber', placeholder: '{{rollNumber}}', xPercent: 50, yPercent: 42.5, widthPercent: 40, fontSize: 13, font: 'Helvetica', color: '#6B7280', align: 'center', autoFit: true },
+      { id: 'eventName', placeholder: '{{eventName}}', xPercent: 50, yPercent: 53.5, widthPercent: 70, fontSize: 20, font: 'HelveticaBold', color: '#7C3AED', align: 'center', autoFit: true },
+      { id: 'issueDate', placeholder: '{{issueDate}}', xPercent: 12, yPercent: 92, widthPercent: 30, fontSize: 11, font: 'Helvetica', color: '#64748B', align: 'left', autoFit: false },
+      { id: 'certificateId', placeholder: '{{certificateId}}', xPercent: 88, yPercent: 92, widthPercent: 35, fontSize: 11, font: 'Helvetica', color: '#64748B', align: 'right', autoFit: false },
+    ],
+  },
 ];
 
 function getPredefinedTemplates() {

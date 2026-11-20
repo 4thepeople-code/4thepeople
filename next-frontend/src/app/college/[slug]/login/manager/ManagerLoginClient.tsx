@@ -56,9 +56,10 @@ export function ManagerLoginClient({ slug, initialReturnUrl }: ManagerLoginClien
   // If already authenticated as College Admin, redirect to College Admin portal
   React.useEffect(() => {
     if (user && user.role === 'COLLEGE_ADMIN') {
-      const adminUrl = typeof window !== 'undefined' && window.location.pathname.startsWith(`/college/${slug}`)
-        ? `/college/${slug}/admin`
-        : '/admin';
+      const adminUrl =
+        typeof window !== 'undefined' && window.location.pathname.startsWith(`/college/${slug}`)
+          ? `/college/${slug}/admin`
+          : '/admin';
       window.location.href = adminUrl;
     }
   }, [user, slug]);
@@ -180,39 +181,31 @@ export function ManagerLoginClient({ slug, initialReturnUrl }: ManagerLoginClien
 
   return (
     <PublicLayout collegeSlug={slug} collegeName={collegeDisplay}>
-      <div className="min-h-[85vh] flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+      <div className="college-scope min-h-[85vh] bg-[var(--surface-page)] text-[var(--text-primary)] flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
         <div className="max-w-md w-full space-y-8 animate-in fade-in duration-300">
           {/* Header Card */}
           <div className="text-center space-y-3">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#00F0FF]/10 text-[#00F0FF] border border-[#00F0FF]/20 text-[10px] font-black uppercase tracking-wider">
+            <div className="inline-flex items-center gap-1.5 rounded-full border-2 border-[var(--border-strong)] bg-[var(--surface-card)] px-3.5 py-1 text-xs font-bold uppercase tracking-wider text-[var(--accent-strong)] shadow-brutal-xs mb-2">
               <ShieldCheck className="w-3.5 h-3.5" />
               <span>Manager Workspace</span>
             </div>
 
-            <h1
-              className={`font-['Syne',sans-serif] text-3xl sm:text-4xl font-black uppercase tracking-tight ${
-                isDark ? 'text-white' : 'text-[#0F172A]'
-              }`}
-            >
-              Manager <span className="text-[#00F0FF]">Login</span>
+            <h1 className="font-campus text-4xl sm:text-5xl uppercase leading-[0.95] tracking-wide text-[var(--text-primary)]">
+              MANAGER <span className="text-[var(--accent-strong)]">LOGIN.</span>
             </h1>
 
-            <p className={`text-xs font-medium ${isDark ? 'text-gray-400' : 'text-slate-600'}`}>
+            <p className="text-xs font-medium text-[var(--text-secondary)]">
               Sign in to manage clubs, create events, and oversee campus registrations at{' '}
-              <strong className={isDark ? 'text-white' : 'text-slate-900'}>{collegeDisplay}</strong>.
+              <strong className="text-[var(--text-primary)]">{collegeDisplay}</strong>.
             </p>
           </div>
 
           {/* Form Box */}
-          <div
-            className={`p-6 sm:p-8 rounded-3xl border shadow-xl backdrop-blur-md transition-all ${
-              isDark ? 'bg-[#12141C] border-white/10' : 'bg-white border-slate-200'
-            }`}
-          >
+          <div className="p-6 sm:p-8 rounded-3xl border-2 border-[var(--border-strong)] bg-[var(--surface-card)] shadow-brutal-md transition-all">
             {/* Feedback Notifications */}
             {errorMsg && (
-              <div className="mb-6 p-4 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs font-semibold flex items-start gap-3 animate-in fade-in">
-                <AlertCircle className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
+              <div className="mb-6 p-4 rounded-2xl border-2 border-red-500/40 bg-red-500/10 text-red-700 dark:text-red-300 text-xs font-semibold flex items-start gap-3 shadow-brutal-xs animate-in fade-in">
+                <AlertCircle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
                 <div className="flex-1 space-y-1">
                   <p>{errorMsg}</p>
                 </div>
@@ -220,8 +213,8 @@ export function ManagerLoginClient({ slug, initialReturnUrl }: ManagerLoginClien
             )}
 
             {successMsg && (
-              <div className="mb-6 p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-semibold flex items-center gap-3 animate-in fade-in">
-                <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+              <div className="mb-6 p-4 rounded-2xl border-2 border-emerald-500/40 bg-emerald-500/10 text-emerald-800 dark:text-emerald-300 text-xs font-semibold flex items-center gap-3 shadow-brutal-xs animate-in fade-in">
+                <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />
                 <p>{successMsg}</p>
               </div>
             )}
@@ -232,14 +225,12 @@ export function ManagerLoginClient({ slug, initialReturnUrl }: ManagerLoginClien
                 <div className="space-y-1.5">
                   <label
                     htmlFor="email"
-                    className={`block text-xs font-bold uppercase tracking-wider ${
-                      isDark ? 'text-gray-300' : 'text-slate-700'
-                    }`}
+                    className="block text-xs font-bold uppercase tracking-wider text-[var(--text-primary)]"
                   >
                     Manager Email
                   </label>
                   <div className="relative">
-                    <Mail className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <Mail className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
                     <input
                       id="email"
                       type="email"
@@ -248,11 +239,7 @@ export function ManagerLoginClient({ slug, initialReturnUrl }: ManagerLoginClien
                       placeholder="manager@college.ac.in"
                       required
                       autoComplete="email"
-                      className={`w-full pl-10 pr-4 py-3 rounded-2xl border text-xs font-medium transition-all focus:outline-hidden focus:border-[#00F0FF] ${
-                        isDark
-                          ? 'bg-[#0B0C10] border-white/10 text-white placeholder-gray-600'
-                          : 'bg-slate-50 border-slate-200 text-slate-900 placeholder-slate-400'
-                      }`}
+                      className="w-full pl-10 pr-4 py-3 rounded-xl border-2 border-[var(--border-strong)] bg-[var(--surface-tile)] text-xs font-medium text-[var(--text-primary)] placeholder-[var(--text-muted)] transition-all focus:outline-hidden focus:border-[var(--accent-strong)] shadow-brutal-xs"
                     />
                   </div>
                 </div>
@@ -261,9 +248,7 @@ export function ManagerLoginClient({ slug, initialReturnUrl }: ManagerLoginClien
                   <div className="flex items-center justify-between">
                     <label
                       htmlFor="password"
-                      className={`block text-xs font-bold uppercase tracking-wider ${
-                        isDark ? 'text-gray-300' : 'text-slate-700'
-                      }`}
+                      className="block text-xs font-bold uppercase tracking-wider text-[var(--text-primary)]"
                     >
                       Password
                     </label>
@@ -274,13 +259,13 @@ export function ManagerLoginClient({ slug, initialReturnUrl }: ManagerLoginClien
                         setErrorMsg('');
                         setSuccessMsg('');
                       }}
-                      className="text-[11px] font-bold text-[#00F0FF] hover:underline cursor-pointer"
+                      className="text-[11px] font-bold text-[var(--accent-strong)] hover:underline cursor-pointer"
                     >
                       Forgot password?
                     </button>
                   </div>
                   <div className="relative">
-                    <Lock className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <Lock className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
                     <input
                       id="password"
                       type={showPassword ? 'text' : 'password'}
@@ -289,16 +274,12 @@ export function ManagerLoginClient({ slug, initialReturnUrl }: ManagerLoginClien
                       placeholder="••••••••"
                       required
                       autoComplete="current-password"
-                      className={`w-full pl-10 pr-12 py-3 rounded-2xl border text-xs font-medium transition-all focus:outline-hidden focus:border-[#00F0FF] ${
-                        isDark
-                          ? 'bg-[#0B0C10] border-white/10 text-white placeholder-gray-600'
-                          : 'bg-slate-50 border-slate-200 text-slate-900 placeholder-slate-400'
-                      }`}
+                      className="w-full pl-10 pr-12 py-3 rounded-xl border-2 border-[var(--border-strong)] bg-[var(--surface-tile)] text-xs font-medium text-[var(--text-primary)] placeholder-[var(--text-muted)] transition-all focus:outline-hidden focus:border-[var(--accent-strong)] shadow-brutal-xs"
                     />
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
+                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors cursor-pointer"
                       aria-label="Toggle password visibility"
                     >
                       {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -309,7 +290,7 @@ export function ManagerLoginClient({ slug, initialReturnUrl }: ManagerLoginClien
                 <button
                   type="submit"
                   disabled={managerLoginMutation.isPending}
-                  className="w-full inline-flex items-center justify-center gap-2 py-3.5 rounded-full bg-[#00F0FF] text-black font-extrabold text-xs uppercase tracking-wider shadow-lg shadow-cyan-500/25 hover:bg-cyan-300 transition-all cursor-pointer disabled:opacity-50"
+                  className="w-full inline-flex items-center justify-center gap-2 py-3.5 rounded-xl border-2 border-[var(--border-strong)] bg-[var(--accent-strong)] text-[var(--surface-page)] dark:text-black font-extrabold text-xs uppercase tracking-wider shadow-brutal-sm hover:opacity-95 active:translate-x-[1px] active:translate-y-[1px] transition-all cursor-pointer disabled:opacity-50"
                 >
                   {managerLoginMutation.isPending ? (
                     <>
@@ -328,39 +309,27 @@ export function ManagerLoginClient({ slug, initialReturnUrl }: ManagerLoginClien
               /* FORGOT PASSWORD: STEP 1 (REQUEST OTP) */
               <form onSubmit={handleSendOtp} className="space-y-5">
                 <div className="space-y-2">
-                  <h3
-                    className={`font-['Syne',sans-serif] text-base font-bold uppercase ${
-                      isDark ? 'text-white' : 'text-[#0F172A]'
-                    }`}
-                  >
+                  <h3 className="font-campus text-xl uppercase tracking-wide text-[var(--text-primary)]">
                     Reset Manager Password
                   </h3>
-                  <p className={`text-xs ${isDark ? 'text-gray-400' : 'text-slate-600'}`}>
+                  <p className="text-xs text-[var(--text-secondary)] font-medium">
                     Enter your manager email address to receive a 6-digit one-time verification code.
                   </p>
                 </div>
 
                 <div className="space-y-1.5">
-                  <label
-                    className={`block text-xs font-bold uppercase tracking-wider ${
-                      isDark ? 'text-gray-300' : 'text-slate-700'
-                    }`}
-                  >
+                  <label className="block text-xs font-bold uppercase tracking-wider text-[var(--text-primary)]">
                     Manager Email
                   </label>
                   <div className="relative">
-                    <Mail className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <Mail className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
                     <input
                       type="email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       placeholder="manager@college.ac.in"
                       required
-                      className={`w-full pl-10 pr-4 py-3 rounded-2xl border text-xs font-medium transition-all focus:outline-hidden focus:border-[#00F0FF] ${
-                        isDark
-                          ? 'bg-[#0B0C10] border-white/10 text-white placeholder-gray-600'
-                          : 'bg-slate-50 border-slate-200 text-slate-900 placeholder-slate-400'
-                      }`}
+                      className="w-full pl-10 pr-4 py-3 rounded-xl border-2 border-[var(--border-strong)] bg-[var(--surface-tile)] text-xs font-medium text-[var(--text-primary)] placeholder-[var(--text-muted)] transition-all focus:outline-hidden focus:border-[var(--accent-strong)] shadow-brutal-xs"
                     />
                   </div>
                 </div>
@@ -372,11 +341,7 @@ export function ManagerLoginClient({ slug, initialReturnUrl }: ManagerLoginClien
                       setIsForgotPassword(false);
                       setErrorMsg('');
                     }}
-                    className={`flex-1 py-3 rounded-full border text-xs font-bold uppercase tracking-wider transition ${
-                      isDark
-                        ? 'border-white/10 text-gray-300 hover:bg-white/5'
-                        : 'border-slate-200 text-slate-700 hover:bg-slate-100'
-                    }`}
+                    className="flex-1 py-3 rounded-xl border-2 border-[var(--border-strong)] bg-[var(--surface-tile)] text-xs font-bold uppercase tracking-wider text-[var(--text-primary)] hover:bg-[var(--surface-card)] shadow-brutal-xs transition cursor-pointer"
                   >
                     Cancel
                   </button>
@@ -384,7 +349,7 @@ export function ManagerLoginClient({ slug, initialReturnUrl }: ManagerLoginClien
                   <button
                     type="submit"
                     disabled={forgotPasswordMutation.isPending}
-                    className="flex-1 inline-flex items-center justify-center gap-2 py-3 rounded-full bg-[#00F0FF] text-black font-extrabold text-xs uppercase tracking-wider shadow-lg shadow-cyan-500/25 hover:bg-cyan-300 transition disabled:opacity-50"
+                    className="flex-1 inline-flex items-center justify-center gap-2 py-3 rounded-xl border-2 border-[var(--border-strong)] bg-[var(--accent-strong)] text-[var(--surface-page)] dark:text-black font-extrabold text-xs uppercase tracking-wider shadow-brutal-xs hover:opacity-95 active:translate-x-[1px] active:translate-y-[1px] transition disabled:opacity-50 cursor-pointer"
                   >
                     {forgotPasswordMutation.isPending ? (
                       <RefreshCw className="w-4 h-4 animate-spin" />
@@ -398,29 +363,21 @@ export function ManagerLoginClient({ slug, initialReturnUrl }: ManagerLoginClien
               /* FORGOT PASSWORD: STEP 2 (VERIFY OTP & SET PASSWORD) */
               <form onSubmit={handleResetPassword} className="space-y-5">
                 <div className="space-y-2">
-                  <h3
-                    className={`font-['Syne',sans-serif] text-base font-bold uppercase ${
-                      isDark ? 'text-white' : 'text-[#0F172A]'
-                    }`}
-                  >
+                  <h3 className="font-campus text-xl uppercase tracking-wide text-[var(--text-primary)]">
                     Enter Verification Code
                   </h3>
-                  <p className={`text-xs ${isDark ? 'text-gray-400' : 'text-slate-600'}`}>
-                    Enter the 6-digit code sent to <strong className="text-[#00F0FF]">{email}</strong> and
+                  <p className="text-xs text-[var(--text-secondary)] font-medium">
+                    Enter the 6-digit code sent to <strong className="text-[var(--accent-strong)]">{email}</strong> and
                     choose a new password.
                   </p>
                 </div>
 
                 <div className="space-y-1.5">
-                  <label
-                    className={`block text-xs font-bold uppercase tracking-wider ${
-                      isDark ? 'text-gray-300' : 'text-slate-700'
-                    }`}
-                  >
+                  <label className="block text-xs font-bold uppercase tracking-wider text-[var(--text-primary)]">
                     6-Digit OTP Code
                   </label>
                   <div className="relative">
-                    <KeyRound className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <KeyRound className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
                     <input
                       type="text"
                       maxLength={6}
@@ -428,41 +385,29 @@ export function ManagerLoginClient({ slug, initialReturnUrl }: ManagerLoginClien
                       onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
                       placeholder="123456"
                       required
-                      className={`w-full pl-10 pr-4 py-3 rounded-2xl border text-xs font-mono tracking-widest text-center font-bold focus:outline-hidden focus:border-[#00F0FF] ${
-                        isDark
-                          ? 'bg-[#0B0C10] border-white/10 text-white'
-                          : 'bg-slate-50 border-slate-200 text-slate-900'
-                      }`}
+                      className="w-full pl-10 pr-4 py-3 rounded-xl border-2 border-[var(--border-strong)] bg-[var(--surface-tile)] text-base font-mono tracking-widest text-center font-bold text-[var(--accent-strong)] placeholder-[var(--text-muted)] focus:outline-hidden focus:border-[var(--accent-strong)] shadow-brutal-xs transition-all"
                     />
                   </div>
                 </div>
 
                 <div className="space-y-1.5">
-                  <label
-                    className={`block text-xs font-bold uppercase tracking-wider ${
-                      isDark ? 'text-gray-300' : 'text-slate-700'
-                    }`}
-                  >
+                  <label className="block text-xs font-bold uppercase tracking-wider text-[var(--text-primary)]">
                     New Password
                   </label>
                   <div className="relative">
-                    <Lock className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <Lock className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
                     <input
                       type={showNewPassword ? 'text' : 'password'}
                       value={newPassword}
                       onChange={(e) => setNewPassword(e.target.value)}
                       placeholder="Minimum 6 characters"
                       required
-                      className={`w-full pl-10 pr-12 py-3 rounded-2xl border text-xs font-medium focus:outline-hidden focus:border-[#00F0FF] ${
-                        isDark
-                          ? 'bg-[#0B0C10] border-white/10 text-white'
-                          : 'bg-slate-50 border-slate-200 text-slate-900'
-                      }`}
+                      className="w-full pl-10 pr-12 py-3 rounded-xl border-2 border-[var(--border-strong)] bg-[var(--surface-tile)] text-xs font-medium text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-hidden focus:border-[var(--accent-strong)] shadow-brutal-xs transition-all"
                     />
                     <button
                       type="button"
                       onClick={() => setShowNewPassword(!showNewPassword)}
-                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
+                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors cursor-pointer"
                     >
                       {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
@@ -476,11 +421,7 @@ export function ManagerLoginClient({ slug, initialReturnUrl }: ManagerLoginClien
                       setOtpSent(false);
                       setIsForgotPassword(false);
                     }}
-                    className={`flex-1 py-3 rounded-full border text-xs font-bold uppercase tracking-wider transition ${
-                      isDark
-                        ? 'border-white/10 text-gray-300 hover:bg-white/5'
-                        : 'border-slate-200 text-slate-700 hover:bg-slate-100'
-                    }`}
+                    className="flex-1 py-3 rounded-xl border-2 border-[var(--border-strong)] bg-[var(--surface-tile)] text-xs font-bold uppercase tracking-wider text-[var(--text-primary)] hover:bg-[var(--surface-card)] shadow-brutal-xs transition cursor-pointer"
                   >
                     Back to Login
                   </button>
@@ -488,7 +429,7 @@ export function ManagerLoginClient({ slug, initialReturnUrl }: ManagerLoginClien
                   <button
                     type="submit"
                     disabled={resetPasswordMutation.isPending}
-                    className="flex-1 inline-flex items-center justify-center gap-2 py-3 rounded-full bg-[#00F0FF] text-black font-extrabold text-xs uppercase tracking-wider shadow-lg shadow-cyan-500/25 hover:bg-cyan-300 transition disabled:opacity-50"
+                    className="flex-1 inline-flex items-center justify-center gap-2 py-3 rounded-xl border-2 border-[var(--border-strong)] bg-[var(--accent-strong)] text-[var(--surface-page)] dark:text-black font-extrabold text-xs uppercase tracking-wider shadow-brutal-xs hover:opacity-95 active:translate-x-[1px] active:translate-y-[1px] transition disabled:opacity-50 cursor-pointer"
                   >
                     {resetPasswordMutation.isPending ? (
                       <RefreshCw className="w-4 h-4 animate-spin" />
@@ -501,15 +442,11 @@ export function ManagerLoginClient({ slug, initialReturnUrl }: ManagerLoginClien
             )}
 
             {/* Toggle to Student Portal Login */}
-            <div
-              className={`mt-6 pt-6 border-t text-center text-xs ${
-                isDark ? 'border-white/10 text-gray-400' : 'border-slate-200 text-slate-600'
-              }`}
-            >
+            <div className="mt-6 pt-6 border-t-2 border-[var(--border-subtle)] text-center text-xs text-[var(--text-secondary)]">
               <span>Are you an enrolled student? </span>
               <Link
                 href={`/college/${slug}/login`}
-                className="font-bold text-[#00F0FF] hover:underline"
+                className="font-bold text-[var(--accent-strong)] hover:underline"
               >
                 Go to Student Login
               </Link>

@@ -112,15 +112,6 @@ async function proxyRequest(request: NextRequest, { params }: { params: Promise<
       }
     }
 
-    // 4. Origin & Referer forwarding (required by backend originValidation.js)
-    const origin = request.headers.get('origin') || `${proto}://${cleanHost}`;
-    forwardHeaders.set('origin', origin);
-
-    const referer = request.headers.get('referer');
-    if (referer) {
-      forwardHeaders.set('referer', referer);
-    }
-
     // Prepare body for non-GET/HEAD methods
     const method = request.method.toUpperCase();
     const hasBody = method !== 'GET' && method !== 'HEAD';
@@ -128,6 +119,29 @@ async function proxyRequest(request: NextRequest, { params }: { params: Promise<
 
     if (hasBody) {
       body = await request.arrayBuffer();
+    }
+
+    // 4. Origin & Referer forwarding (required by backend originValidation.js)
+    // Safe HTTP methods (GET, HEAD, OPTIONS) must NOT send an Origin header, as server-to-server proxy calls
+    // would otherwise trigger unnecessary CORS rejection. State-changing requests must map localhost origins
+    // to the verified effective domain so upstream origin validation and CORS policies succeed.
+    if (hasBody) {
+      const clientOrigin = request.headers.get('origin');
+      let targetOrigin = clientOrigin;
+
+      if (!targetOrigin || targetOrigin.includes('localhost') || targetOrigin.includes('127.0.0.1')) {
+        const domain = effectiveHost.includes('4thepeople.in')
+          ? effectiveHost
+          : '4thepeople.in';
+        targetOrigin = `https://${domain}`;
+      }
+
+      forwardHeaders.set('origin', targetOrigin);
+    }
+
+    const referer = request.headers.get('referer');
+    if (referer) {
+      forwardHeaders.set('referer', referer);
     }
 
     // Execute upstream request

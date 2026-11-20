@@ -10,6 +10,7 @@ export interface ModalProps {
   title: string;
   children: React.ReactNode;
   maxWidth?: string;
+  contentClassName?: string;
 }
 
 export function Modal({
@@ -18,6 +19,7 @@ export function Modal({
   title,
   children,
   maxWidth = 'max-w-xl',
+  contentClassName,
 }: ModalProps) {
   const { isDark } = useTheme();
 
@@ -80,7 +82,7 @@ export function Modal({
         </div>
 
         {/* Content with Smooth Scrolling */}
-        <div className="p-5 sm:p-6 overflow-y-auto flex-1 overscroll-contain">
+        <div className={`overflow-y-auto flex-1 overscroll-contain ${contentClassName ?? 'p-5 sm:p-6'}`}>
           {children}
         </div>
       </div>

@@ -2,9 +2,9 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { X, Calendar, MapPin, Clock, Building2, Globe, Image as ImageIcon } from 'lucide-react';
-import { useTheme } from '@/context/ThemeContext';
+import { X, Calendar, MapPin, Clock, Building2, Globe, Image as ImageIcon, ArrowUpRight } from 'lucide-react';
 import type { Event, Club } from '@/types/models';
+import { getEventCoverImage } from '@/lib/utils/eventCovers';
 
 const formatDate = (dateStr?: string) => {
   if (!dateStr) return 'TBA';
@@ -38,10 +38,9 @@ export interface EventModalProps {
 }
 
 export function EventModal({ event, club, collegeSlug, onClose, onOpenGallery }: EventModalProps) {
-  const { isDark } = useTheme();
   if (!event) return null;
 
-  const coverUrl = event.coverImage?.url || event.coverUrl || event.bannerUrl || event.coverImageUrl;
+  const coverUrl = getEventCoverImage(event);
   const clubInfo = event.club || club;
   const hasGallery = Array.isArray(event.gallery) && event.gallery.length > 0;
 
@@ -50,85 +49,90 @@ export function EventModal({ event, club, collegeSlug, onClose, onOpenGallery }:
     ? `/college/${collegeSlug}/events/${event.id}`
     : `/events/${event.id}`;
 
+  const isOngoing = event.status === 'ONGOING';
+  const isCompleted = event.status === 'COMPLETED';
+  const isCancelled = event.status === 'CANCELLED';
+
+  const timeString = formatTime(event.startAt || event.startDate);
+  const endTimeString = event.endAt ? formatTime(event.endAt) : '';
+  const fullTimeString = timeString ? (endTimeString ? `${timeString} - ${endTimeString}` : timeString) : 'Time TBA';
+
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md overflow-y-auto"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="modal-event-title"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm overflow-y-auto animate-in fade-in duration-200"
       onClick={onClose}
     >
       <div
-        className={`relative w-full max-w-2xl rounded-3xl overflow-hidden shadow-2xl my-8 border transition-colors animate-in fade-in zoom-in-95 duration-200 ${
-          isDark ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-[#0F172A]'
-        }`}
+        className="college-scope relative w-full max-w-2xl rounded-3xl border-2 border-[var(--border-strong)] bg-[var(--surface-card)] text-[var(--text-primary)] shadow-brutal-lg my-8 overflow-hidden transition-all duration-200"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Close Button */}
         <button
           type="button"
           onClick={onClose}
-          className={`absolute top-4 right-4 z-10 p-2.5 rounded-full border backdrop-blur-md transition-all shadow-lg cursor-pointer ${
-            isDark
-              ? 'bg-slate-950/60 hover:bg-slate-950 text-slate-400 hover:text-white border-slate-700/50'
-              : 'bg-white/80 hover:bg-white text-slate-600 hover:text-slate-900 border-slate-200'
-          }`}
+          className="absolute top-4 right-4 z-20 grid h-11 w-11 place-items-center rounded-xl border-2 border-[var(--border-strong)] bg-[var(--surface-card)] text-[var(--text-primary)] hover:bg-[var(--surface-tile)] shadow-brutal-xs transition-colors cursor-pointer"
           aria-label="Close modal"
         >
           <X className="w-5 h-5" />
         </button>
 
         {/* Cover Image or Fallback Banner */}
-        <div className="relative h-64 w-full bg-slate-800 overflow-hidden">
+        <div className="relative h-64 sm:h-72 w-full bg-[var(--surface-tile)] overflow-hidden border-b-2 border-[var(--border-strong)]">
           {coverUrl ? (
-            <img src={coverUrl} alt={event.title} className="w-full h-full object-cover" />
+            <img
+              src={coverUrl}
+              alt={event.title}
+              className="w-full h-full object-cover"
+            />
           ) : (
-            <div className="w-full h-full bg-gradient-to-br from-indigo-900/60 via-purple-900/50 to-slate-900 flex items-center justify-center p-6 text-center">
-              <div className="space-y-2">
-                <div className="inline-flex p-3 bg-indigo-500/20 rounded-2xl text-indigo-400 border border-indigo-500/30">
-                  <Calendar className="w-8 h-8" />
-                </div>
-                <p className="text-xs uppercase tracking-wider font-semibold text-indigo-300">
-                  {clubInfo?.name || 'Club Event'}
-                </p>
-              </div>
+            <div className="w-full h-full flex items-center justify-center bg-[var(--surface-tile)] text-[var(--text-primary)]">
+              <span className="font-campus text-7xl font-bold opacity-30">
+                {(clubInfo?.name || 'CAMPUS').charAt(0).toUpperCase()}
+              </span>
             </div>
           )}
 
-          {/* Status Badge Overlay */}
-          <div className="absolute bottom-4 left-4 flex flex-wrap gap-2">
+          {/* Dark gradient for text readability */}
+          <div aria-hidden="true" className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent" />
+
+          {/* Badges on Poster */}
+          <div className="absolute bottom-4 left-4 right-4 flex flex-wrap items-center gap-2 z-10">
             <span
-              className={`px-3 py-1 text-xs font-semibold rounded-full border backdrop-blur-md shadow-md ${
-                event.status === 'ONGOING'
-                  ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
-                  : event.status === 'COMPLETED'
-                  ? 'bg-blue-500/20 text-blue-300 border-blue-500/40'
-                  : event.status === 'CANCELLED'
-                  ? 'bg-rose-500/20 text-rose-300 border-rose-500/40'
-                  : 'bg-indigo-500/20 text-indigo-300 border-indigo-500/40'
+              className={`inline-flex items-center rounded-full border-2 border-[var(--border-strong)] px-3 py-1 text-xs font-bold uppercase tracking-wider shadow-brutal-xs ${
+                isOngoing
+                  ? 'bg-emerald-500 text-white'
+                  : isCompleted
+                  ? 'bg-blue-600 text-white'
+                  : isCancelled
+                  ? 'bg-rose-600 text-white'
+                  : 'bg-[var(--accent-strong)] text-white'
               }`}
             >
               {event.status || 'UPCOMING'}
             </span>
+
             {event.visibility === 'PUBLIC' ? (
-              <span className="inline-flex items-center gap-1 px-3 py-1 text-xs font-semibold rounded-full border backdrop-blur-md shadow-md bg-emerald-500/20 text-emerald-300 border-emerald-500/40">
-                <Globe className="w-3.5 h-3.5" />
+              <span className="inline-flex items-center gap-1.5 rounded-full border-2 border-[var(--border-strong)] bg-[var(--surface-card)] px-3 py-1 text-xs font-bold uppercase tracking-wider text-[var(--text-primary)] shadow-brutal-xs">
+                <Globe className="w-3.5 h-3.5 text-[var(--accent-strong)]" />
                 <span>Public Event</span>
               </span>
             ) : (
-              <span className="inline-flex items-center gap-1 px-3 py-1 text-xs font-semibold rounded-full border backdrop-blur-md shadow-md bg-slate-500/20 text-slate-300 border-slate-500/40">
-                <Building2 className="w-3.5 h-3.5" />
-                <span>College Only</span>
+              <span className="inline-flex items-center gap-1.5 rounded-full border-2 border-[var(--border-strong)] bg-[var(--surface-card)] px-3 py-1 text-xs font-bold uppercase tracking-wider text-[var(--text-primary)] shadow-brutal-xs">
+                <Building2 className="w-3.5 h-3.5 text-[var(--accent-strong)]" />
+                <span>Campus Only</span>
               </span>
             )}
+
             {clubInfo?.id && (
               <Link
                 href={clubHref}
                 onClick={onClose}
-                className={`inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-full border transition-all backdrop-blur-md ${
-                  isDark
-                    ? 'bg-slate-950/70 text-slate-200 border-slate-700/60 hover:border-indigo-500'
-                    : 'bg-white/90 text-slate-700 border-slate-300 hover:border-indigo-500'
-                }`}
+                className="inline-flex items-center gap-1.5 rounded-full border-2 border-[var(--border-strong)] bg-[var(--surface-card)] px-3 py-1 text-xs font-bold uppercase tracking-wider text-[var(--text-primary)] shadow-brutal-xs transition-colors hover:bg-[var(--surface-tile)]"
               >
-                <Building2 className="w-3.5 h-3.5" />
+                <Building2 className="w-3.5 h-3.5 text-[var(--accent-strong)]" />
                 <span>{clubInfo.name}</span>
               </Link>
             )}
@@ -139,79 +143,53 @@ export function EventModal({ event, club, collegeSlug, onClose, onOpenGallery }:
         <div className="p-6 md:p-8 space-y-6">
           <div>
             <h2
-              className={`text-2xl md:text-3xl font-extrabold tracking-tight uppercase font-['Syne',sans-serif] ${
-                isDark ? 'text-white' : 'text-[#0F172A]'
-              }`}
+              id="modal-event-title"
+              className="font-campus text-3xl sm:text-4xl font-bold uppercase leading-tight tracking-tight text-[var(--text-primary)]"
             >
               {event.title}
             </h2>
 
-            {/* Quick Meta Strip */}
-            <div
-              className={`flex flex-wrap items-center gap-y-2 gap-x-4 mt-3 text-xs ${
-                isDark ? 'text-slate-400' : 'text-slate-500'
-              }`}
-            >
-              <div className="flex items-center gap-1.5">
-                <Calendar className="w-4 h-4 text-cyan-500" />
+            {/* Quick Meta Badges */}
+            <div className="mt-4 flex flex-wrap items-center gap-3 text-xs font-semibold">
+              <div className="flex items-center gap-2 rounded-full border border-[var(--border-soft)] bg-[var(--surface-tile)] px-3.5 py-1.5 text-[var(--text-primary)]">
+                <Calendar className="w-4 h-4 text-[var(--accent-strong)]" />
                 <span>{formatDate(event.startAt || event.startDate || event.date)}</span>
               </div>
 
-              {(event.startAt || event.startDate) && (
-                <div className="flex items-center gap-1.5">
-                  <Clock className="w-4 h-4 text-purple-400" />
-                  <span>
-                    {formatTime(event.startAt || event.startDate)}
-                    {event.endAt ? ` - ${formatTime(event.endAt)}` : ''}
-                  </span>
-                </div>
-              )}
+              <div className="flex items-center gap-2 rounded-full border border-[var(--border-soft)] bg-[var(--surface-tile)] px-3.5 py-1.5 text-[var(--text-primary)]">
+                <Clock className="w-4 h-4 text-[var(--accent-strong)]" />
+                <span>{fullTimeString}</span>
+              </div>
 
               {(event.venue || event.location) && (
-                <div className="flex items-center gap-1.5">
-                  <MapPin className="w-4 h-4 text-rose-400" />
+                <div className="flex items-center gap-2 rounded-full border border-[var(--border-soft)] bg-[var(--surface-tile)] px-3.5 py-1.5 text-[var(--text-primary)]">
+                  <MapPin className="w-4 h-4 text-[var(--accent-strong)]" />
                   <span>{event.venue || event.location}</span>
                 </div>
               )}
             </div>
           </div>
 
-          {/* Description */}
-          <div className="space-y-2">
-            <h3
-              className={`text-xs font-bold uppercase tracking-wider ${
-                isDark ? 'text-slate-400' : 'text-slate-500'
-              }`}
-            >
+          {/* Description Section */}
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.22em] text-[var(--accent-strong)] mb-2">
               About This Event
-            </h3>
-            <p
-              className={`text-sm leading-relaxed whitespace-pre-line ${
-                isDark ? 'text-slate-300' : 'text-slate-600'
-              }`}
-            >
-              {event.description || 'No detailed description provided for this campus event.'}
             </p>
+            <div className="rounded-2xl border-2 border-[var(--border-soft)] bg-[var(--surface-tile)] p-4 text-sm leading-relaxed text-[var(--text-secondary)] whitespace-pre-line">
+              {event.description || 'No detailed description provided for this campus event.'}
+            </div>
           </div>
 
-          {/* Action Row */}
-          <div
-            className={`pt-4 border-t flex flex-wrap items-center justify-between gap-3 ${
-              isDark ? 'border-slate-800' : 'border-slate-200'
-            }`}
-          >
+          {/* Action Footer */}
+          <div className="pt-4 border-t-2 border-[var(--border-soft)] flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-center gap-2">
               {hasGallery && onOpenGallery && (
                 <button
                   type="button"
                   onClick={() => onOpenGallery(event)}
-                  className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border text-xs font-semibold transition cursor-pointer ${
-                    isDark
-                      ? 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700'
-                      : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300'
-                  }`}
+                  className="inline-flex min-h-11 items-center gap-2 px-5 py-2.5 rounded-xl border-2 border-[var(--border-strong)] bg-[var(--surface-card)] text-xs font-bold uppercase tracking-wider text-[var(--text-primary)] shadow-brutal-xs transition-colors hover:bg-[var(--surface-tile)] cursor-pointer"
                 >
-                  <ImageIcon className="w-4 h-4 text-purple-400" />
+                  <ImageIcon className="w-4 h-4 text-[var(--accent-strong)]" />
                   <span>View Photos ({event.gallery?.length})</span>
                 </button>
               )}
@@ -220,9 +198,10 @@ export function EventModal({ event, club, collegeSlug, onClose, onOpenGallery }:
             <Link
               href={eventHref}
               onClick={onClose}
-              className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-[#00F0FF] hover:bg-[#38f2ff] text-black text-xs font-extrabold uppercase tracking-wider transition shadow-md shadow-cyan-500/20"
+              className="inline-flex min-h-12 items-center justify-center gap-2 px-8 py-3 rounded-2xl bg-[var(--accent-strong)] hover:bg-[var(--accent-primary)] text-white text-xs font-bold uppercase tracking-wider shadow-brutal-sm transition-transform hover:-translate-y-0.5"
             >
-              <span>View Full Details & RSVP</span>
+              <span>View Full Details &amp; RSVP</span>
+              <ArrowUpRight className="w-4 h-4" />
             </Link>
           </div>
         </div>
@@ -232,4 +211,3 @@ export function EventModal({ event, club, collegeSlug, onClose, onOpenGallery }:
 }
 
 export default EventModal;
-
