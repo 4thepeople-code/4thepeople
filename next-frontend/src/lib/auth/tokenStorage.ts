@@ -136,6 +136,8 @@ export function clearStoredAuth(): void {
   for (const key of USER_KEYS) {
     window.localStorage.removeItem(key);
   }
+  clearStoredExternalToken();
+  clearStoredExternalUser();
 }
 
 const EXTERNAL_REGISTRATION_TOKEN_KEY = 'yuva_external_reg_token';

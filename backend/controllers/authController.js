@@ -25,6 +25,7 @@ const getCookieOptions = () => {
     secure: isProduction,
     sameSite: isProduction ? 'strict' : 'lax',
     maxAge: 24 * 60 * 60 * 1000, // 24 hours (short expiry, host-only: NO domain attribute)
+    path: '/',
   };
 };
 
@@ -234,14 +235,20 @@ exports.managerLogin = asyncHandler(async (req, res) => {
 /**
  * POST /auth/logout
  * College user logout endpoint.
+ * Clears both 'token' (Student Portal) and 'yuva_token' (Manager & Admin Portals)
+ * with explicit path: '/' to prevent stale session reactivation.
  */
 exports.logout = asyncHandler(async (req, res) => {
   const isProduction = process.env.NODE_ENV === 'production';
-  res.clearCookie('yuva_token', {
+  const cookieOpts = {
     httpOnly: true,
     secure: isProduction,
     sameSite: isProduction ? 'strict' : 'lax',
-  });
+    path: '/',
+  };
+
+  res.clearCookie('token', cookieOpts);
+  res.clearCookie('yuva_token', cookieOpts);
 
   res.status(200).json({
     success: true,
