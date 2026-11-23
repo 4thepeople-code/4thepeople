@@ -11,9 +11,13 @@ import {
   useCancelRegistrationMutation,
   useExternalRegistrationStatus,
   useCancelExternalMutation,
+  registerExternalParticipant,
 } from '@/lib/api/events';
-import { getStoredExternalToken, clearStoredExternalToken } from '@/lib/auth/tokenStorage';
-import { ExternalGuestRegistrationDialog } from '@/components/public/ExternalGuestRegistrationDialog';
+import {
+  getStoredExternalToken,
+  clearStoredExternalToken,
+  getStoredExternalUser,
+} from '@/lib/auth/tokenStorage';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
 import PublicLayout from '@/components/public/PublicLayout';
@@ -39,6 +43,8 @@ import { launchPaymentCheckout } from '@/lib/payment/paymentSdk';
 import {
   useStudentCheckoutMutation,
   useStudentVerifyPaymentMutation,
+  externalCheckout,
+  externalVerifyPayment,
 } from '@/lib/api/payment';
 import type { Event } from '@/types/models';
 
@@ -103,7 +109,6 @@ export function EventDetailPageClient({ slug, eventId, clubId: propClubId }: Eve
 
   const [showModal, setShowModal] = useState(false);
   const [showFormModal, setShowFormModal] = useState(false);
-  const [showExternalDialog, setShowExternalDialog] = useState(false);
   const [showCrossCollegeModal, setShowCrossCollegeModal] = useState(false);
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [formAnswers, setFormAnswers] = useState<Record<string, unknown>>({});
@@ -191,26 +196,129 @@ export function EventDetailPageClient({ slug, eventId, clubId: propClubId }: Eve
     }
   };
 
+  const executeExternalRegistration = async (submittedAnswers?: Record<string, unknown>) => {
+    if (!event?.id) return;
+    const activeToken = externalToken || getStoredExternalToken();
+    if (!activeToken) {
+      const returnPath = `/college/${slug}/events/${eventId}`;
+      router.push(`/college/${slug}/login?returnUrl=${encodeURIComponent(returnPath)}&type=external`);
+      return;
+    }
+
+    const storedUser = getStoredExternalUser();
+    const participantName = user?.name || storedUser?.name || 'Guest Participant';
+    const participantEmail = user?.email || storedUser?.email || '';
+    const participantPhone = storedUser?.phone;
+    const participantInstitution = storedUser?.institutionName;
+
+    try {
+      setRegError(null);
+      setIsCheckingOut(true);
+
+      if (event.isPaid) {
+        const checkoutSession = await externalCheckout(
+          event.id,
+          {
+            name: participantName,
+            phone: participantPhone,
+            institutionName: participantInstitution,
+            formAnswers: submittedAnswers,
+            returnUrl: window.location.href,
+          },
+          activeToken
+        );
+
+        await launchPaymentCheckout({
+          session: checkoutSession,
+          participant: {
+            name: participantName,
+            email: participantEmail,
+            phone: participantPhone,
+          },
+          onSuccess: async (verifyPayload) => {
+            const verifyRes = await externalVerifyPayment(event.id, verifyPayload, activeToken);
+            if (verifyRes.success && verifyRes.registration) {
+              setShowModal(true);
+            } else {
+              router.push(
+                `/college/${slug}/events/${event.id}/payment/status?transactionId=${checkoutSession.transactionId}`
+              );
+            }
+          },
+          onFailure: (err) => {
+            setRegError(err.message);
+          },
+          onDismiss: () => {
+            setRegError('Checkout cancelled. You may complete your registration within 15 minutes before the seat reservation expires.');
+          },
+        });
+        return;
+      }
+
+      // Free external registration
+      const regRes = await registerExternalParticipant(
+        event.id,
+        {
+          name: participantName,
+          phone: participantPhone,
+          institutionName: participantInstitution,
+          formAnswers: submittedAnswers,
+        },
+        activeToken
+      );
+
+      if (regRes.success) {
+        setShowModal(true);
+      }
+    } catch (err: unknown) {
+      const msg =
+        (err as { message?: string })?.message ||
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+        (err instanceof Error ? err.message : 'Failed to register for event.');
+      setRegError(msg);
+    } finally {
+      setIsCheckingOut(false);
+    }
+  };
+
   const handleRegister = async () => {
     if (validRegistrationUrl) {
       window.open(validRegistrationUrl, '_blank', 'noopener,noreferrer');
       return;
     }
 
-    // 1. Unauthenticated visitor
-    if (!user) {
-      if (event?.visibility === 'PUBLIC' || !event?.visibility) {
-        setShowExternalDialog(true);
-        return;
-      }
+    // 1. Unauthenticated visitor (neither student nor external session)
+    if (!user && !externalToken) {
       const returnPath = `/college/${slug}/events/${eventId}`;
-      router.push(`/college/${slug}/login?returnUrl=${encodeURIComponent(returnPath)}`);
+      const loginUrl =
+        event?.visibility === 'PUBLIC'
+          ? `/college/${slug}/login?returnUrl=${encodeURIComponent(returnPath)}&type=external`
+          : `/college/${slug}/login?returnUrl=${encodeURIComponent(returnPath)}`;
+      router.push(loginUrl);
       return;
     }
 
     if (!event?.id) return;
 
-    // 2. Cross-college student
+    // 2. External participant flow
+    const isExternalParticipant = user?.role === 'EXTERNAL' || (!user && Boolean(externalToken));
+    if (isExternalParticipant) {
+      if (event.visibility !== 'PUBLIC') {
+        setRegError('This event is exclusive to students of this institution.');
+        return;
+      }
+
+      const fields = event.customFormDefinition?.fields;
+      if (fields && Array.isArray(fields) && fields.length > 0) {
+        setShowFormModal(true);
+        return;
+      }
+
+      await executeExternalRegistration();
+      return;
+    }
+
+    // 3. Cross-college student
     if (isCrossCollege) {
       if (event.visibility !== 'PUBLIC') {
         setRegError('Cross-college registration is only available for public events.');
@@ -220,7 +328,7 @@ export function EventDetailPageClient({ slug, eventId, clubId: propClubId }: Eve
       return;
     }
 
-    // 3. Same-college student flow
+    // 4. Same-college student flow
     const fields = event.customFormDefinition?.fields;
     if (fields && Array.isArray(fields) && fields.length > 0) {
       setShowFormModal(true);
@@ -285,6 +393,13 @@ export function EventDetailPageClient({ slug, eventId, clubId: propClubId }: Eve
         setFormValidationError(`"${f.label || key}" is required.`);
         return;
       }
+    }
+
+    const isExternalParticipant = user?.role === 'EXTERNAL' || (!user && Boolean(externalToken));
+    if (isExternalParticipant) {
+      setShowFormModal(false);
+      await executeExternalRegistration(formAnswers);
+      return;
     }
 
     if (event.isPaid) {
@@ -982,19 +1097,7 @@ export function EventDetailPageClient({ slug, eventId, clubId: propClubId }: Eve
         </div>
       )}
 
-      {/* External Guest Registration Dialog */}
-      {showExternalDialog && event && (
-        <ExternalGuestRegistrationDialog
-          isOpen={showExternalDialog}
-          event={event}
-          onClose={() => setShowExternalDialog(false)}
-          onSuccess={() => {
-            setExternalToken(getStoredExternalToken());
-            setShowExternalDialog(false);
-            setShowModal(true);
-          }}
-        />
-      )}
+
 
       {/* Cross-College Student Confirmation Modal */}
       {showCrossCollegeModal && event && (

@@ -87,39 +87,43 @@ exports.requestExternalOtp = asyncHandler(async (req, res) => {
   const { email, eventId } = req.body; // Validated by schema middleware (email normalized, UUID checked)
 
   // 1. Derive hostCollegeId from the event (public read — no tenant context required)
-  //    The slug in req.collegeId (from BFF proxy) is validated against the event's college_id below.
+  //    or fallback to active college tenant context if requested from college login.
   let hostCollegeId = null;
   let eventTitle = null;
 
-  try {
-    const eventRow = await withTenant(null, async (tx) => {
-      return tx.eventsWithStatus.findFirst({
-        where: {
-          id: eventId,
-          visibility: 'PUBLIC',
-          cancelledAt: null,
-          status: { in: ['UPCOMING', 'ONGOING'] },
-          registrationMode: 'INTERNAL',
-        },
-        select: { id: true, collegeId: true, title: true },
-      });
-    }, { isPublic: true });
+  if (eventId) {
+    try {
+      const eventRow = await withTenant(null, async (tx) => {
+        return tx.eventsWithStatus.findFirst({
+          where: {
+            id: eventId,
+            visibility: 'PUBLIC',
+            cancelledAt: null,
+            status: { in: ['UPCOMING', 'ONGOING'] },
+            registrationMode: 'INTERNAL',
+          },
+          select: { id: true, collegeId: true, title: true },
+        });
+      }, { isPublic: true });
 
-    if (eventRow) {
-      hostCollegeId = eventRow.collegeId;
-      eventTitle = eventRow.title;
+      if (eventRow) {
+        hostCollegeId = eventRow.collegeId;
+        eventTitle = eventRow.title;
 
-      // SAFEGUARD: validate URL slug context against actual event ownership.
-      // If the client navigated to /college/colA/... but the event belongs to colB, reject.
-      if (req.collegeId && hostCollegeId !== req.collegeId) {
-        // Log the mismatch but do not reveal details in the response (treat as not found)
-        console.warn(`[externalOtp] Tenant mismatch: req.collegeId=${req.collegeId} event.collegeId=${hostCollegeId} eventId=${eventId}`);
-        hostCollegeId = null; // Treat as not found — silent 200 response
+        // SAFEGUARD: validate URL slug context against actual event ownership.
+        // If the client navigated to /college/colA/... but the event belongs to colB, reject.
+        if (req.collegeId && hostCollegeId !== req.collegeId) {
+          console.warn(`[externalOtp] Tenant mismatch: req.collegeId=${req.collegeId} event.collegeId=${hostCollegeId} eventId=${eventId}`);
+          hostCollegeId = null; // Treat as not found — silent 200 response
+        }
       }
+    } catch {
+      // Any error during event lookup → treat as not found, return 200 silently
+      hostCollegeId = null;
     }
-  } catch {
-    // Any error during event lookup → treat as not found, return 200 silently
-    hostCollegeId = null;
+  } else if (req.collegeId) {
+    hostCollegeId = req.collegeId;
+    eventTitle = 'Campus Events';
   }
 
   await jitterPromise;

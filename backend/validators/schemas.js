@@ -128,7 +128,7 @@ const attendeeQuery = z.object({
 // External participant OTP and registration schemas (Phase 3)
 const externalOtpRequestBody = z.object({
   email: email,
-  eventId: uuid,
+  eventId: uuid.optional(),
 });
 
 const externalOtpVerifyBody = z.object({

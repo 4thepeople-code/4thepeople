@@ -139,23 +139,58 @@ export function clearStoredAuth(): void {
 }
 
 const EXTERNAL_REGISTRATION_TOKEN_KEY = 'yuva_external_reg_token';
+const EXTERNAL_USER_KEY = 'yuva_external_user';
+
+export interface StoredExternalUser {
+  name: string;
+  email: string;
+  phone?: string;
+  institutionName?: string;
+}
 
 /**
- * Safe session storage reader for temporary external participant tokens.
- * Scoped to sessionStorage so it stays isolated from persistent student/manager logins
- * and automatically clears when the tab/browser is closed.
+ * Safe storage reader for external participant tokens.
+ * Checks sessionStorage first, then localStorage fallback.
  */
 export function getStoredExternalToken(): string | null {
-  if (typeof window === 'undefined' || !window.sessionStorage) return null;
-  return window.sessionStorage.getItem(EXTERNAL_REGISTRATION_TOKEN_KEY);
+  if (typeof window === 'undefined') return null;
+  return (
+    (window.sessionStorage && window.sessionStorage.getItem(EXTERNAL_REGISTRATION_TOKEN_KEY)) ||
+    (window.localStorage && window.localStorage.getItem(EXTERNAL_REGISTRATION_TOKEN_KEY)) ||
+    null
+  );
 }
 
 export function setStoredExternalToken(token: string): void {
-  if (typeof window === 'undefined' || !window.sessionStorage) return;
-  window.sessionStorage.setItem(EXTERNAL_REGISTRATION_TOKEN_KEY, token);
+  if (typeof window === 'undefined') return;
+  if (window.sessionStorage) window.sessionStorage.setItem(EXTERNAL_REGISTRATION_TOKEN_KEY, token);
+  if (window.localStorage) window.localStorage.setItem(EXTERNAL_REGISTRATION_TOKEN_KEY, token);
 }
 
 export function clearStoredExternalToken(): void {
-  if (typeof window === 'undefined' || !window.sessionStorage) return;
-  window.sessionStorage.removeItem(EXTERNAL_REGISTRATION_TOKEN_KEY);
+  if (typeof window === 'undefined') return;
+  if (window.sessionStorage) window.sessionStorage.removeItem(EXTERNAL_REGISTRATION_TOKEN_KEY);
+  if (window.localStorage) window.localStorage.removeItem(EXTERNAL_REGISTRATION_TOKEN_KEY);
+  clearStoredExternalUser();
+}
+
+export function getStoredExternalUser(): StoredExternalUser | null {
+  if (typeof window === 'undefined' || !window.localStorage) return null;
+  const raw = window.localStorage.getItem(EXTERNAL_USER_KEY);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as StoredExternalUser;
+  } catch {
+    return null;
+  }
+}
+
+export function setStoredExternalUser(user: StoredExternalUser): void {
+  if (typeof window === 'undefined' || !window.localStorage) return;
+  window.localStorage.setItem(EXTERNAL_USER_KEY, JSON.stringify(user));
+}
+
+export function clearStoredExternalUser(): void {
+  if (typeof window === 'undefined' || !window.localStorage) return;
+  window.localStorage.removeItem(EXTERNAL_USER_KEY);
 }

@@ -320,13 +320,16 @@ export interface ExternalRegistrationStatusResponse {
  * and resists email enumeration via constant-time timing jitter and a generic 200 response.
  */
 export async function requestExternalOtp(
-  eventId: string,
-  email: string
+  eventId?: string | null,
+  email?: string
 ): Promise<{ success: boolean; message: string }> {
-  const response = await apiClient.post('/external/otp/request', {
-    eventId,
-    email: email.trim().toLowerCase(),
-  });
+  const payload: { email: string; eventId?: string } = {
+    email: (email || '').trim().toLowerCase(),
+  };
+  if (eventId) {
+    payload.eventId = eventId;
+  }
+  const response = await apiClient.post('/external/otp/request', payload);
   return response.data;
 }
 

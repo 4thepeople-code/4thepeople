@@ -3,7 +3,7 @@ import { LoginPageClient } from './LoginPageClient';
 
 interface LoginPageProps {
   params: Promise<{ slug: string }>;
-  searchParams?: Promise<{ returnUrl?: string; activated?: string; rollNumber?: string }>;
+  searchParams?: Promise<{ returnUrl?: string; activated?: string; rollNumber?: string; type?: string }>;
 }
 
 export async function generateMetadata({ params }: LoginPageProps): Promise<Metadata> {
@@ -35,6 +35,7 @@ export default async function LoginPage({ params, searchParams }: LoginPageProps
       initialReturnUrl={resolvedSearchParams.returnUrl}
       activated={resolvedSearchParams.activated === 'true'}
       initialRollNumber={resolvedSearchParams.rollNumber}
+      initialType={resolvedSearchParams.type === 'external' ? 'external' : 'registered'}
     />
   );
 }

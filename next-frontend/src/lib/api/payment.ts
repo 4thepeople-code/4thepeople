@@ -101,6 +101,7 @@ export async function externalCheckout(
     externalParticipantId?: string;
     name: string;
     phone?: string;
+    institutionName?: string;
     formAnswers?: Record<string, unknown>;
     returnUrl?: string;
   },
