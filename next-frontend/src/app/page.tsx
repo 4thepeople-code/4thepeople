@@ -78,7 +78,7 @@ export default function PublicDirectoryPage() {
       </section>
 
       {/* Partner Colleges Directory Grid */}
-      <section className="py-12 md:py-16 bg-white/50 dark:bg-[#0F1117] border-y border-slate-200 dark:border-white/10">
+      <section id="campuses" className="py-12 md:py-16 bg-white/50 dark:bg-[#0F1117] border-y border-slate-200 dark:border-white/10 scroll-mt-24">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col md:flex-row md:items-end justify-between mb-10 pb-6 border-b border-slate-200 dark:border-white/10 gap-4">
             <div>
