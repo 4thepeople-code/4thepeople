@@ -4,6 +4,7 @@ const crypto = require('crypto');
 const { withTenant } = require('../../config/db');
 const { defaultPaymentConfigService } = require('./paymentConfigService');
 const { getAdapter } = require('./paymentGatewayFactory');
+const { assertNoDuplicateParticipants } = require('../../utils/teamUtils');
 
 const HOLD_DURATION_MINUTES = 15;
 
@@ -255,7 +256,15 @@ class PaymentOrderService {
         resolvedExternalParticipantId = externalRecord.id;
       }
 
-      // 2.3 Check if user is already registered for this event
+      // 2.3 Check if user or any teammate is already registered for this event
+      await assertNoDuplicateParticipants(
+        tx,
+        collegeId,
+        eventId,
+        participant.email,
+        formAnswers?.teamMembers || []
+      );
+
       const existingRegistration = await tx.eventRegistration.findFirst({
         where: isStudent
           ? { collegeId, eventId, userId }

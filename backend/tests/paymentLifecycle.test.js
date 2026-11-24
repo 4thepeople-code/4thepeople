@@ -106,6 +106,13 @@ test('Payment Lifecycle: Checkout, Verification, Webhooks, and Refunds', async (
           ) || null
         );
       },
+      findMany: async ({ where }) => {
+        return registrationsStore.filter(
+          (r) =>
+            (!where?.collegeId || r.collegeId === where.collegeId) &&
+            (!where?.eventId || r.eventId === where.eventId)
+        );
+      },
       create: async ({ data }) => {
         if (simulateRegistrationFailure) {
           throw new Error('Simulated database trigger capacity overflow');

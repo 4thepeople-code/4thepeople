@@ -25,6 +25,7 @@ const asyncHandler = require('../utils/asyncHandler');
 const { AppError } = require('../middleware/errorHandler');
 const { hashExternalOtp, verifyExternalOtpCode } = require('../utils/cryptoUtils');
 const { enqueueEmail } = require('../services/outboxService');
+const { assertNoDuplicateParticipants, findParticipantEventMembership } = require('../utils/teamUtils');
 
 const UUID_REGEX = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 
@@ -535,6 +536,14 @@ exports.registerExternalParticipant = asyncHandler(async (req, res) => {
     }
 
     // 4. Pre-check duplicate registration (application-level fast path)
+    await assertNoDuplicateParticipants(
+      tx,
+      effectiveCollegeId,
+      eventId,
+      normalizedEmail,
+      answers?.teamMembers || []
+    );
+
     const existing = await tx.eventRegistration.findFirst({
       where: { externalParticipantId: participant.id, eventId },
     });
@@ -622,6 +631,19 @@ exports.cancelExternalRegistration = asyncHandler(async (req, res) => {
       where: { externalParticipantId: participant.id, eventId, collegeId: effectiveCollegeId },
     });
     if (!registration) {
+      const membership = await findParticipantEventMembership(
+        tx,
+        effectiveCollegeId,
+        eventId,
+        null,
+        req.externalUser.email
+      );
+      if (membership.isTeamMember) {
+        throw new AppError(
+          `You are registered as a team member of "${membership.teamName}". Only the team leader (${membership.teamLeader?.name || 'Leader'}) can cancel the team registration.`,
+          403
+        );
+      }
       throw new AppError('Registration not found', 404);
     }
 
@@ -671,29 +693,36 @@ exports.getExternalRegistrationStatus = asyncHandler(async (req, res) => {
   validateUUID(eventId, 'event ID');
 
   const status = await withTenant(effectiveCollegeId, async (tx) => {
-    const participant = await tx.externalParticipant.findFirst({
-      where: { collegeId: effectiveCollegeId, email: req.externalUser.email },
-    });
-    if (!participant) {
-      return { isRegistered: false, registration: null };
-    }
-
-    const registration = await tx.eventRegistration.findFirst({
-      where: { externalParticipantId: participant.id, eventId, collegeId: effectiveCollegeId },
-      select: { id: true, eventId: true, registeredAt: true },
-    });
+    const membership = await findParticipantEventMembership(
+      tx,
+      effectiveCollegeId,
+      eventId,
+      null,
+      req.externalUser.email
+    );
 
     return {
-      isRegistered: Boolean(registration),
-      registration: registration
-        ? { id: registration.id, eventId: registration.eventId, registeredAt: registration.registeredAt }
+      isRegistered: membership.isRegistered,
+      isLeader: membership.isLeader,
+      isTeamMember: membership.isTeamMember,
+      isTeamRegistration: membership.isTeamRegistration,
+      teamName: membership.teamName,
+      teamSize: membership.teamSize,
+      teamLeader: membership.teamLeader,
+      teamMembers: membership.teamMembers,
+      myDetails: membership.myDetails || null,
+      registration: membership.registration
+        ? {
+            id: membership.registration.id,
+            eventId: membership.registration.eventId,
+            registeredAt: membership.registration.registeredAt,
+          }
         : null,
     };
   });
 
   return res.status(200).json({
     success: true,
-    isRegistered: status.isRegistered,
-    registration: status.registration,
+    ...status,
   });
 });

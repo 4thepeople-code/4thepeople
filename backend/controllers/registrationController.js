@@ -1,6 +1,7 @@
 const { withTenant } = require('../config/db');
 const asyncHandler = require('../utils/asyncHandler');
 const { AppError } = require('../middleware/errorHandler');
+const { assertNoDuplicateParticipants, findParticipantEventMembership } = require('../utils/teamUtils');
 
 const UUID_REGEX = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 
@@ -158,7 +159,7 @@ exports.registerForEvent = asyncHandler(async (req, res) => {
       validatedAnswers.isTeamRegistration = true;
       validatedAnswers.teamName = teamName;
       validatedAnswers.teamSize = teamSize;
-      validatedAnswers.teamLeader = answers.teamLeader || {
+      validatedAnswers.teamLeader = {
         name: req.user?.name || '',
         email: req.user?.email || '',
         rollNumber: req.user?.rollNumber || null,
@@ -169,17 +170,22 @@ exports.registerForEvent = asyncHandler(async (req, res) => {
       validatedAnswers.isTeamRegistration = true;
       validatedAnswers.teamName = answers.teamName;
       validatedAnswers.teamSize = answers.teamSize;
-      validatedAnswers.teamLeader = answers.teamLeader;
+      validatedAnswers.teamLeader = {
+        name: req.user?.name || answers.teamLeader?.name || '',
+        email: req.user?.email || answers.teamLeader?.email || '',
+        rollNumber: req.user?.rollNumber || answers.teamLeader?.rollNumber || null,
+      };
       validatedAnswers.teamMembers = answers.teamMembers;
     }
 
-    // 3. Check if user is already registered before trying to insert
-    const existing = await tx.eventRegistration.findFirst({
-      where: { eventId, userId: req.user.id, collegeId: req.collegeId },
-    });
-    if (existing) {
-      throw new AppError('You are already registered for this event', 409);
-    }
+    // 3. Check duplicate participant across both individual and team registrations
+    await assertNoDuplicateParticipants(
+      tx,
+      req.collegeId,
+      eventId,
+      req.user.email,
+      validatedAnswers?.teamMembers || []
+    );
 
     // 4. Build snapshot identity fields — always from server-side user data,
     //    never from client-supplied values.
@@ -190,6 +196,11 @@ exports.registerForEvent = asyncHandler(async (req, res) => {
     const participantEmail = req.user.email;
     const participantRollNumber = req.user.rollNumber || null;
     const participantCollegeName = req.user.college?.name || null;
+
+    // Ensure teamLeader in validatedAnswers has trusted snapshot roll number
+    if (validatedAnswers && validatedAnswers.isTeamRegistration && validatedAnswers.teamLeader) {
+      validatedAnswers.teamLeader.rollNumber = participantRollNumber;
+    }
 
     // 5. Atomically insert registration. PostgreSQL trigger handle_registration_insert
     // row-locks the events table row FOR UPDATE, enforces capacity, and increments registered_count.
@@ -274,6 +285,19 @@ exports.cancelRegistration = asyncHandler(async (req, res) => {
       where: { eventId, userId: req.user.id, collegeId: req.collegeId },
     });
     if (!existing) {
+      const membership = await findParticipantEventMembership(
+        tx,
+        req.collegeId,
+        eventId,
+        req.user.id,
+        req.user.email
+      );
+      if (membership.isTeamMember) {
+        throw new AppError(
+          `You are registered as a team member of "${membership.teamName}". Only the team leader (${membership.teamLeader?.name || 'Leader'}) can cancel the team registration.`,
+          403
+        );
+      }
       throw new AppError('Registration not found', 404);
     }
 
@@ -316,18 +340,30 @@ exports.getMyRegistrationStatus = asyncHandler(async (req, res) => {
       throw new AppError('Cross-college registration is only available for public events', 403);
     }
 
-    const registration = await tx.eventRegistration.findFirst({
-      where: { eventId, userId: req.user.id, collegeId: req.collegeId },
-    });
+    const membership = await findParticipantEventMembership(
+      tx,
+      req.collegeId,
+      eventId,
+      req.user.id,
+      req.user.email
+    );
 
     return {
-      isRegistered: Boolean(registration),
-      registration: registration
+      isRegistered: membership.isRegistered,
+      isLeader: membership.isLeader,
+      isTeamMember: membership.isTeamMember,
+      isTeamRegistration: membership.isTeamRegistration,
+      teamName: membership.teamName,
+      teamSize: membership.teamSize,
+      teamLeader: membership.teamLeader,
+      teamMembers: membership.teamMembers,
+      myDetails: membership.myDetails || null,
+      registration: membership.registration
         ? {
-            id: registration.id,
-            eventId: registration.eventId,
-            userId: registration.userId,
-            registeredAt: registration.registeredAt,
+            id: membership.registration.id,
+            eventId: membership.registration.eventId,
+            userId: membership.registration.userId,
+            registeredAt: membership.registration.registeredAt,
           }
         : null,
     };
@@ -336,6 +372,14 @@ exports.getMyRegistrationStatus = asyncHandler(async (req, res) => {
   res.status(200).json({
     success: true,
     isRegistered: status.isRegistered,
+    isLeader: status.isLeader,
+    isTeamMember: status.isTeamMember,
+    isTeamRegistration: status.isTeamRegistration,
+    teamName: status.teamName,
+    teamSize: status.teamSize,
+    teamLeader: status.teamLeader,
+    teamMembers: status.teamMembers,
+    myDetails: status.myDetails,
     registration: status.registration,
   });
 });
@@ -383,6 +427,56 @@ exports.listMyRegistrations = asyncHandler(async (req, res) => {
         },
       },
     });
+
+    // Also include registrations where user is listed as a teammate in an active team
+    const userEmail = (req.user.email || '').toLowerCase().trim();
+    if (userEmail) {
+      const otherTeamRegs = await tx.eventRegistration.findMany({
+        where: {
+          collegeId: req.collegeId,
+          userId: { not: req.user.id },
+        },
+        orderBy: { registeredAt: 'desc' },
+        select: {
+          id: true,
+          eventId: true,
+          registeredAt: true,
+          formAnswers: true,
+          event: {
+            select: {
+              id: true,
+              clubId: true,
+              title: true,
+              description: true,
+              location: true,
+              startAt: true,
+              endAt: true,
+              capacity: true,
+              registeredCount: true,
+              cancelledAt: true,
+              coverImageUrl: true,
+              coverImagePublicId: true,
+              registrationUrl: true,
+              club: {
+                select: { id: true, name: true, description: true },
+              },
+            },
+          },
+        },
+      });
+
+      for (const r of otherTeamRegs) {
+        const answers = r.formAnswers;
+        if (answers && answers.isTeamRegistration && Array.isArray(answers.teamMembers)) {
+          const isMember = answers.teamMembers.some(
+            (m) => (m?.email || '').toLowerCase().trim() === userEmail
+          );
+          if (isMember) {
+            list.push(r);
+          }
+        }
+      }
+    }
 
     return list;
   });
@@ -585,37 +679,94 @@ exports.exportEventRegistrations = asyncHandler(async (req, res) => {
       },
     });
 
-    // 4. Build CSV — includes all participant types
+    // 4. Build CSV — includes all participant types and structured team rosters
     const rows = [
       [
         'Registration ID',
         'Participant Type',
+        'Registration Type',
+        'Team Name',
+        'Team Role',
         'Name',
         'Email',
         'Roll Number',
         'Home College / Institution',
         'Department',
         'Registered At',
-        'Form Answers',
+        'Additional Answers',
       ],
     ];
 
     for (const r of registrations) {
-      const answersStr = r.formAnswers ? JSON.stringify(r.formAnswers) : '';
       const dept = r.user && r.user.department
         ? (r.user.department.shortCode || r.user.department.name)
         : '';
-      rows.push([
-        r.id,
-        r.participantType || 'STUDENT',
-        r.participantName || '',
-        r.participantEmail || '',
-        r.participantRollNumber || '',
-        r.participantCollegeName || '',
-        dept,
-        new Date(r.registeredAt).toISOString(),
-        answersStr,
-      ]);
+      const answers = r.formAnswers;
+      const isTeam = Boolean(answers && answers.isTeamRegistration);
+
+      if (isTeam) {
+        const teamName = answers.teamName || 'Unnamed Team';
+        const leader = answers.teamLeader || {};
+        const members = Array.isArray(answers.teamMembers) ? answers.teamMembers : [];
+
+        // Exclude internal team registration metadata from other answers
+        const otherKeys = Object.keys(answers).filter(
+          (k) => !['isTeamRegistration', 'teamName', 'teamSize', 'teamLeader', 'teamMembers'].includes(k)
+        );
+        const otherAnswersStr = otherKeys.length > 0
+          ? otherKeys.map((k) => `${k}: ${answers[k]}`).join('; ')
+          : '';
+
+        // Leader row
+        rows.push([
+          r.id,
+          r.participantType || 'STUDENT',
+          'TEAM',
+          teamName,
+          'LEADER',
+          r.participantName || leader.name || '',
+          r.participantEmail || leader.email || '',
+          r.participantRollNumber || leader.rollNumber || '',
+          r.participantCollegeName || '',
+          dept,
+          new Date(r.registeredAt).toISOString(),
+          otherAnswersStr,
+        ]);
+
+        // Member rows
+        for (const m of members) {
+          rows.push([
+            r.id,
+            r.participantType || 'STUDENT',
+            'TEAM',
+            teamName,
+            'MEMBER',
+            m.name || '',
+            m.email || '',
+            m.rollNumber || '',
+            r.participantCollegeName || '',
+            dept,
+            new Date(r.registeredAt).toISOString(),
+            '',
+          ]);
+        }
+      } else {
+        const answersStr = answers ? JSON.stringify(answers) : '';
+        rows.push([
+          r.id,
+          r.participantType || 'STUDENT',
+          'INDIVIDUAL',
+          '—',
+          'INDIVIDUAL',
+          r.participantName || '',
+          r.participantEmail || '',
+          r.participantRollNumber || '',
+          r.participantCollegeName || '',
+          dept,
+          new Date(r.registeredAt).toISOString(),
+          answersStr,
+        ]);
+      }
     }
 
     const csvContent = rows

@@ -220,6 +220,19 @@ class PaymentRegistrationService {
 
       // 6. Create EventRegistration
       // Trigger `handle_registration_insert` atomically checks capacity and increments registered_count
+      let finalFormAnswers = txn.registrationPayload || null;
+      if (finalFormAnswers && finalFormAnswers.isTeamRegistration) {
+        finalFormAnswers = {
+          ...finalFormAnswers,
+          teamLeader: {
+            ...(finalFormAnswers.teamLeader || {}),
+            name: participantName,
+            email: participantEmail,
+            rollNumber: participantRollNumber || (finalFormAnswers.teamLeader && finalFormAnswers.teamLeader.rollNumber) || null,
+          },
+        };
+      }
+
       let registration;
       try {
         registration = await tx.eventRegistration.create({
@@ -237,7 +250,7 @@ class PaymentRegistrationService {
             participantCollegeName,
             isUserDeleted: false,
             registeredByRole: 'SELF',
-            formAnswers: txn.registrationPayload || null,
+            formAnswers: finalFormAnswers,
           },
         });
       } catch (createErr) {

@@ -145,21 +145,55 @@ export async function cancelRegistration(eventId: string) {
   return response.data;
 }
 
+export interface TeamLeaderInfo {
+  name?: string;
+  email?: string;
+  rollNumber?: string;
+  phone?: string;
+  institutionName?: string;
+}
+
+export interface TeamMemberInfo {
+  name: string;
+  email: string;
+  rollNumber?: string;
+  department?: string;
+  collegeName?: string;
+}
+
+export interface RegistrationStatusResponse {
+  isRegistered: boolean;
+  isLeader?: boolean;
+  isTeamMember?: boolean;
+  isTeamRegistration?: boolean;
+  teamName?: string | null;
+  teamSize?: number;
+  teamLeader?: TeamLeaderInfo | null;
+  teamMembers?: TeamMemberInfo[];
+  myDetails?: TeamMemberInfo | null;
+  registration?: {
+    id: string;
+    eventId: string;
+    userId?: string | null;
+    registeredAt: string;
+  } | null;
+}
+
 /**
  * Checks whether the current user is registered for the specified event.
  */
 export async function getMyRegistrationStatus(
   eventId: string
-): Promise<{ isRegistered: boolean; registration?: unknown }> {
+): Promise<RegistrationStatusResponse> {
   const response = await apiClient.get(`/events/${eventId}/my-registration`);
   const res = response.data;
   if (res && typeof res === 'object') {
     const obj = res as Record<string, unknown>;
     if (obj.data && typeof obj.data === 'object') {
-      return obj.data as { isRegistered: boolean; registration?: unknown };
+      return obj.data as RegistrationStatusResponse;
     }
   }
-  return res as { isRegistered: boolean; registration?: unknown };
+  return res as RegistrationStatusResponse;
 }
 
 /**
@@ -305,14 +339,7 @@ export interface ExternalRegisterInput {
   formAnswers?: Record<string, unknown> | null;
 }
 
-export interface ExternalRegistrationStatusResponse {
-  isRegistered: boolean;
-  registration?: {
-    id: string;
-    eventId: string;
-    registeredAt: string;
-  } | null;
-}
+export interface ExternalRegistrationStatusResponse extends RegistrationStatusResponse {}
 
 /**
  * Requests an OTP for external participant verification.

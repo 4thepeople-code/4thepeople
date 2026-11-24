@@ -163,7 +163,11 @@ export function EventDetailPageClient({ slug, eventId, clubId: propClubId }: Eve
 
   const hostCollegeId = event?.collegeId || event?.college?.id || (event?.club as unknown as { collegeId?: string })?.collegeId;
   const isCrossCollege = Boolean(user && user.collegeId && hostCollegeId && user.collegeId !== hostCollegeId);
-  const isRegistered = Boolean(regStatus?.isRegistered || externalRegStatus?.isRegistered);
+  const activeStatus = regStatus?.isRegistered ? regStatus : externalRegStatus?.isRegistered ? externalRegStatus : null;
+  const isRegistered = Boolean(activeStatus?.isRegistered);
+  const isTeamMember = Boolean(activeStatus?.isTeamMember);
+  const isTeamLeader = Boolean(activeStatus?.isLeader);
+  const registeredTeamName = activeStatus?.teamName;
 
   const isDeadlinePassed = Boolean(
     event?.registrationDeadline && new Date() > new Date(event.registrationDeadline)
@@ -908,6 +912,44 @@ export function EventDetailPageClient({ slug, eventId, clubId: propClubId }: Eve
                         <span>{regError}</span>
                       </div>
                     )}
+                    {isRegistered && isTeamMember && (
+                      <div className="p-3.5 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-xs text-cyan-200 flex items-start gap-3">
+                        <Users className="w-5 h-5 text-[#00F0FF] shrink-0 mt-0.5" />
+                        <div className="space-y-1">
+                          <p className="font-bold text-[#00F0FF]">
+                            Team Membership: {registeredTeamName || 'Team'}
+                          </p>
+                          <p className="text-[11px] text-gray-300 leading-relaxed">
+                            You are registered as a team member. Team Leader:{' '}
+                            <span className="font-semibold text-white">
+                              {activeStatus?.teamLeader?.name || 'Leader'}
+                            </span>{' '}
+                            {activeStatus?.teamLeader?.email ? `(${activeStatus.teamLeader.email})` : ''}.
+                          </p>
+                          <p className="text-[10px] text-gray-400">
+                            Only the team leader can modify or cancel this team registration.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {isRegistered && isTeamLeader && (
+                      <div className="p-3.5 rounded-xl bg-purple-500/10 border border-purple-500/20 text-xs text-purple-200 flex items-start gap-3">
+                        <Users className="w-5 h-5 text-purple-400 shrink-0 mt-0.5" />
+                        <div className="space-y-1">
+                          <p className="font-bold text-purple-300">
+                            Team Leader: {registeredTeamName || 'Team'}
+                          </p>
+                          <p className="text-[11px] text-gray-300 leading-relaxed">
+                            You registered this team with{' '}
+                            <span className="font-semibold text-white">
+                              {activeStatus?.teamSize || (activeStatus?.teamMembers?.length ? activeStatus.teamMembers.length + 1 : 1)} members
+                            </span>.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
                     <div className="flex flex-wrap items-center gap-3">
                       {validRegistrationUrl ? (
                         <a
@@ -921,21 +963,44 @@ export function EventDetailPageClient({ slug, eventId, clubId: propClubId }: Eve
                           <ExternalLink className="w-4 h-4 shrink-0" />
                         </a>
                       ) : isRegistered ? (
-                        <div className="flex-1 flex flex-wrap items-center gap-2">
-                          <div className="flex-1 min-w-[160px] py-3.5 px-6 rounded-full font-extrabold text-xs uppercase tracking-wider shadow-lg bg-emerald-500 text-black flex items-center justify-center gap-2 cursor-default">
-                            <CheckCircle2 className="w-4 h-4" />
-                            <span>RSVP Confirmed</span>
+                        isTeamMember ? (
+                          <div className="flex-1 min-w-[200px] py-3.5 px-6 rounded-full font-extrabold text-xs uppercase tracking-wider shadow-lg bg-emerald-500 text-black flex items-center justify-center gap-2 cursor-default">
+                            <Users className="w-4 h-4 shrink-0" />
+                            <span>Registered with Team {registeredTeamName || ''}</span>
                           </div>
-                          <button
-                            type="button"
-                            onClick={handleCancelRegistration}
-                            disabled={cancelMutation.isPending || cancelExternalMutation.isPending}
-                            className="py-3 px-4 rounded-full font-bold text-xs uppercase tracking-wider border border-red-500/30 text-red-400 hover:bg-red-500/10 transition cursor-pointer"
-                            title="Cancel RSVP"
-                          >
-                            {cancelMutation.isPending || cancelExternalMutation.isPending ? 'Cancelling...' : 'Cancel RSVP'}
-                          </button>
-                        </div>
+                        ) : isTeamLeader ? (
+                          <div className="flex-1 flex flex-wrap items-center gap-2">
+                            <div className="flex-1 min-w-[160px] py-3.5 px-6 rounded-full font-extrabold text-xs uppercase tracking-wider shadow-lg bg-emerald-500 text-black flex items-center justify-center gap-2 cursor-default">
+                              <Users className="w-4 h-4 shrink-0" />
+                              <span>Team Leader: {registeredTeamName || ''}</span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={handleCancelRegistration}
+                              disabled={cancelMutation.isPending || cancelExternalMutation.isPending}
+                              className="py-3 px-4 rounded-full font-bold text-xs uppercase tracking-wider border border-red-500/30 text-red-400 hover:bg-red-500/10 transition cursor-pointer"
+                              title="Cancel Team RSVP"
+                            >
+                              {cancelMutation.isPending || cancelExternalMutation.isPending ? 'Cancelling...' : 'Cancel Team RSVP'}
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex-1 flex flex-wrap items-center gap-2">
+                            <div className="flex-1 min-w-[160px] py-3.5 px-6 rounded-full font-extrabold text-xs uppercase tracking-wider shadow-lg bg-emerald-500 text-black flex items-center justify-center gap-2 cursor-default">
+                              <CheckCircle2 className="w-4 h-4" />
+                              <span>RSVP Confirmed</span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={handleCancelRegistration}
+                              disabled={cancelMutation.isPending || cancelExternalMutation.isPending}
+                              className="py-3 px-4 rounded-full font-bold text-xs uppercase tracking-wider border border-red-500/30 text-red-400 hover:bg-red-500/10 transition cursor-pointer"
+                              title="Cancel RSVP"
+                            >
+                              {cancelMutation.isPending || cancelExternalMutation.isPending ? 'Cancelling...' : 'Cancel RSVP'}
+                            </button>
+                          </div>
+                        )
                       ) : isDeadlinePassed ? (
                         <div className="flex-1 min-w-[200px] py-3.5 px-6 rounded-full font-extrabold text-xs uppercase tracking-wider shadow-lg bg-rose-500/10 border border-rose-500/30 text-rose-400 flex items-center justify-center gap-2 cursor-not-allowed">
                           <AlertCircle className="w-4 h-4 shrink-0" />
