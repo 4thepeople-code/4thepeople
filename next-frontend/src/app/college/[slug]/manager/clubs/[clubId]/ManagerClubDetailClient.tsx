@@ -146,6 +146,10 @@ export function ManagerClubDetailClient({ slug, clubId }: ManagerClubDetailClien
   const [eventVisibility, setEventVisibility] = useState<EventVisibility>('COLLEGE');
   const [isPaid, setIsPaid] = useState<boolean>(false);
   const [fee, setFee] = useState<string>('');
+  const [isTeamEvent, setIsTeamEvent] = useState(false);
+  const [minTeamSize, setMinTeamSize] = useState('2');
+  const [maxTeamSize, setMaxTeamSize] = useState('4');
+  const [feeModel, setFeeModel] = useState<'PER_TEAM' | 'PER_MEMBER'>('PER_TEAM');
   const [eventError, setEventError] = useState('');
 
   // Toast State
@@ -318,6 +322,23 @@ export function ManagerClubDetailClient({ slug, clubId }: ManagerClubDetailClien
       }
     }
 
+    if (isTeamEvent) {
+      const min = parseInt(minTeamSize, 10);
+      const max = parseInt(maxTeamSize, 10);
+      if (isNaN(min) || min < 2) {
+        setEventError('Minimum team size must be at least 2.');
+        return;
+      }
+      if (isNaN(max) || max < min) {
+        setEventError('Maximum team size must be greater than or equal to minimum team size.');
+        return;
+      }
+      if (max > 20) {
+        setEventError('Maximum team size cannot exceed 20 members.');
+        return;
+      }
+    }
+
     try {
       await createEventMutation.mutateAsync({
         clubId,
@@ -333,6 +354,17 @@ export function ManagerClubDetailClient({ slug, clubId }: ManagerClubDetailClien
           isPaid,
           fee: isPaid ? parseInt(fee, 10) : 0,
           currency: 'INR',
+          customFormDefinition: isTeamEvent
+            ? {
+                teamSettings: {
+                  enabled: true,
+                  minTeamSize: parseInt(minTeamSize, 10),
+                  maxTeamSize: parseInt(maxTeamSize, 10),
+                  feeModel: isPaid ? feeModel : 'PER_TEAM',
+                },
+                fields: [],
+              }
+            : undefined,
         },
       });
 
@@ -347,6 +379,10 @@ export function ManagerClubDetailClient({ slug, clubId }: ManagerClubDetailClien
       setEventVisibility('COLLEGE');
       setIsPaid(false);
       setFee('');
+      setIsTeamEvent(false);
+      setMinTeamSize('2');
+      setMaxTeamSize('4');
+      setFeeModel('PER_TEAM');
       showToast('Event created successfully!');
       void refetchEvents();
       void refetchClub();
@@ -1447,6 +1483,127 @@ export function ManagerClubDetailClient({ slug, clubId }: ManagerClubDetailClien
                     <p className="text-[11px] text-slate-400">
                       Amount in Indian Rupees (₹). Online payments will only process if Super Admin has activated a gateway for this institution.
                     </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Team Registration Settings */}
+              <div className="md:col-span-2 pt-2 border-t border-slate-800/80">
+                <div className="flex items-center justify-between mb-3">
+                  <div>
+                    <span className={`block text-xs font-semibold uppercase tracking-wider ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                      Team Registration
+                    </span>
+                    <p className="text-[11px] text-slate-400">
+                      Allow participants to register as a team with a team leader and teammates.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsTeamEvent(!isTeamEvent)}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors cursor-pointer ${
+                      isTeamEvent ? 'bg-indigo-600' : isDark ? 'bg-slate-800' : 'bg-slate-300'
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        isTeamEvent ? 'translate-x-6' : 'translate-x-1'
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                {isTeamEvent && (
+                  <div className={`p-4 rounded-xl border space-y-4 ${
+                    isDark ? 'bg-slate-950/60 border-slate-800' : 'bg-slate-50 border-slate-200'
+                  }`}>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className={`block text-xs font-semibold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                          Min Team Size *
+                        </label>
+                        <input
+                          type="number"
+                          min="2"
+                          max="20"
+                          value={minTeamSize}
+                          onChange={(e) => setMinTeamSize(e.target.value)}
+                          className={`w-full px-3 py-2 text-xs rounded-xl border transition ${
+                            isDark ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-900'
+                          }`}
+                          required={isTeamEvent}
+                        />
+                      </div>
+                      <div>
+                        <label className={`block text-xs font-semibold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                          Max Team Size *
+                        </label>
+                        <input
+                          type="number"
+                          min={minTeamSize || '2'}
+                          max="20"
+                          value={maxTeamSize}
+                          onChange={(e) => setMaxTeamSize(e.target.value)}
+                          className={`w-full px-3 py-2 text-xs rounded-xl border transition ${
+                            isDark ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-900'
+                          }`}
+                          required={isTeamEvent}
+                        />
+                      </div>
+                    </div>
+
+                    {isPaid && (
+                      <div>
+                        <label className={`block text-xs font-semibold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                          Team Pricing Model
+                        </label>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-1">
+                          <label className={`flex items-start gap-2.5 p-3 rounded-lg border cursor-pointer transition ${
+                            feeModel === 'PER_TEAM'
+                              ? isDark ? 'border-indigo-500 bg-indigo-500/10' : 'border-indigo-600 bg-indigo-50'
+                              : isDark ? 'border-slate-800' : 'border-slate-200'
+                          }`}>
+                            <input
+                              type="radio"
+                              name="feeModel"
+                              checked={feeModel === 'PER_TEAM'}
+                              onChange={() => setFeeModel('PER_TEAM')}
+                              className="mt-0.5 text-indigo-600 focus:ring-indigo-500"
+                            />
+                            <div>
+                              <p className={`text-xs font-semibold ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                                Flat Fee per Team
+                              </p>
+                              <p className="text-[11px] text-slate-400">
+                                Fixed ₹{fee || '0'} total for the entire team.
+                              </p>
+                            </div>
+                          </label>
+
+                          <label className={`flex items-start gap-2.5 p-3 rounded-lg border cursor-pointer transition ${
+                            feeModel === 'PER_MEMBER'
+                              ? isDark ? 'border-indigo-500 bg-indigo-500/10' : 'border-indigo-600 bg-indigo-50'
+                              : isDark ? 'border-slate-800' : 'border-slate-200'
+                          }`}>
+                            <input
+                              type="radio"
+                              name="feeModel"
+                              checked={feeModel === 'PER_MEMBER'}
+                              onChange={() => setFeeModel('PER_MEMBER')}
+                              className="mt-0.5 text-indigo-600 focus:ring-indigo-500"
+                            />
+                            <div>
+                              <p className={`text-xs font-semibold ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                                Per Member Fee
+                              </p>
+                              <p className="text-[11px] text-slate-400">
+                                ₹{fee || '0'} × total team members ({minTeamSize}–{maxTeamSize} members).
+                              </p>
+                            </div>
+                          </label>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

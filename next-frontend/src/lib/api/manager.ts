@@ -12,6 +12,7 @@ import type {
   EligibleStudentItem,
   PlaceholderConfigItem,
   PredefinedTemplate,
+  CustomFormDefinition,
 } from '@/types/models';
 
 // ============================================================================
@@ -31,7 +32,7 @@ export interface CreateEventInput {
   isPaid?: boolean;
   fee?: number;
   currency?: string;
-  customFormDefinition?: { fields: unknown[] } | null;
+  customFormDefinition?: CustomFormDefinition | null;
   registrationDeadline?: string | null;
 }
 
@@ -48,6 +49,7 @@ export interface EventAttendeeItem {
   participantCollegeName?: string | null;
   homeCollegeId?: string | null;
   isUserDeleted?: boolean;
+  customFormAnswers?: Record<string, unknown> | null;
   paymentTransactionId?: string | null;
   paymentTransaction?: {
     id: string;

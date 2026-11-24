@@ -11,43 +11,81 @@ const HOLD_DURATION_MINUTES = 15;
  * Validates custom form answers against custom form definition.
  */
 function validateFormAnswers(formDefinition, submittedAnswers) {
-  if (!formDefinition || !Array.isArray(formDefinition.fields)) {
+  if (!formDefinition) {
     return submittedAnswers || null;
   }
 
   const answers = submittedAnswers || {};
   const validated = {};
 
-  for (const field of formDefinition.fields) {
-    const fieldKey = field.id || field.name;
-    const val = answers[fieldKey];
+  if (Array.isArray(formDefinition.fields)) {
+    for (const field of formDefinition.fields) {
+      const fieldKey = field.id || field.name;
+      const val = answers[fieldKey];
 
-    if (field.required && (val === undefined || val === null || val === '')) {
-      const err = new Error(`Field "${field.label || fieldKey}" is required`);
-      err.statusCode = 400;
-      throw err;
-    }
-
-    if (val !== undefined && val !== null && val !== '') {
-      if (field.type === 'NUMBER' && isNaN(Number(val))) {
-        const err = new Error(`Field "${field.label || fieldKey}" must be a number`);
+      if (field.required && (val === undefined || val === null || val === '')) {
+        const err = new Error(`Field "${field.label || fieldKey}" is required`);
         err.statusCode = 400;
         throw err;
       }
-      if (
-        (field.type === 'SELECT' || field.type === 'RADIO') &&
-        Array.isArray(field.options) &&
-        !field.options.includes(val)
-      ) {
-        const err = new Error(`Invalid option selected for field "${field.label || fieldKey}"`);
-        err.statusCode = 400;
-        throw err;
+
+      if (val !== undefined && val !== null && val !== '') {
+        if (field.type === 'NUMBER' && isNaN(Number(val))) {
+          const err = new Error(`Field "${field.label || fieldKey}" must be a number`);
+          err.statusCode = 400;
+          throw err;
+        }
+        if (
+          (field.type === 'SELECT' || field.type === 'RADIO') &&
+          Array.isArray(field.options) &&
+          !field.options.includes(val)
+        ) {
+          const err = new Error(`Invalid option selected for field "${field.label || fieldKey}"`);
+          err.statusCode = 400;
+          throw err;
+        }
+        validated[fieldKey] = val;
       }
-      validated[fieldKey] = val;
     }
   }
 
-  return validated;
+  // Handle team registration validation & payload preservation
+  const teamSettings = formDefinition.teamSettings;
+  if (teamSettings && teamSettings.enabled) {
+    if (!answers.isTeamRegistration) {
+      const err = new Error('This event requires team registration. Please register with your team.');
+      err.statusCode = 400;
+      throw err;
+    }
+    const teamName = typeof answers.teamName === 'string' ? answers.teamName.trim() : '';
+    if (!teamName) {
+      const err = new Error('Team name is required');
+      err.statusCode = 400;
+      throw err;
+    }
+    const minSize = teamSettings.minTeamSize || 2;
+    const maxSize = teamSettings.maxTeamSize || 10;
+    const teamMembers = Array.isArray(answers.teamMembers) ? answers.teamMembers : [];
+    const teamSize = Number(answers.teamSize || (teamMembers.length + 1));
+    if (isNaN(teamSize) || teamSize < minSize || teamSize > maxSize) {
+      const err = new Error(`Team size must be between ${minSize} and ${maxSize} members`);
+      err.statusCode = 400;
+      throw err;
+    }
+    validated.isTeamRegistration = true;
+    validated.teamName = teamName;
+    validated.teamSize = teamSize;
+    validated.teamLeader = answers.teamLeader;
+    validated.teamMembers = teamMembers;
+  } else if (answers.isTeamRegistration) {
+    validated.isTeamRegistration = true;
+    validated.teamName = answers.teamName;
+    validated.teamSize = answers.teamSize;
+    validated.teamLeader = answers.teamLeader;
+    validated.teamMembers = answers.teamMembers;
+  }
+
+  return Object.keys(validated).length > 0 ? validated : (submittedAnswers || null);
 }
 
 /**
@@ -350,13 +388,23 @@ class PaymentOrderService {
     const transactionId = crypto.randomUUID();
     const idempotencyKey = crypto.randomUUID();
 
+    // Determine final order amount (handles flat team fee vs per-member team fee)
+    let orderAmount = event.fee;
+    const teamSettings = event.customFormDefinition && event.customFormDefinition.teamSettings;
+    if (teamSettings && teamSettings.enabled && teamSettings.feeModel === 'PER_MEMBER') {
+      const teamSize = Number(formAnswers && (formAnswers.teamSize || (Array.isArray(formAnswers.teamMembers) && (formAnswers.teamMembers.length + 1))));
+      if (!isNaN(teamSize) && teamSize >= (teamSettings.minTeamSize || 2)) {
+        orderAmount = event.fee * teamSize;
+      }
+    }
+
     // 4. Create Gateway Order (Executed OUTSIDE withTenant)
     let gatewayOrderResult;
     try {
       gatewayOrderResult = await adapter.createOrder(
         {
           orderId: transactionId,
-          amount: event.fee,
+          amount: orderAmount,
           currency: event.currency || 'INR',
           receipt: transactionId,
           idempotencyKey,
@@ -405,7 +453,7 @@ class PaymentOrderService {
           participantType: participant.participantType,
           userId,
           externalParticipantId: setupData.resolvedExternalParticipantId,
-          amount: event.fee,
+          amount: orderAmount,
           currency: event.currency || 'INR',
           status: 'PENDING',
           gatewayProvider: config.provider,

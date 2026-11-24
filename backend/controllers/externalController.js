@@ -403,8 +403,8 @@ exports.registerExternalParticipant = asyncHandler(async (req, res) => {
     // 2. Validate custom form answers if applicable
     let validatedAnswers = null;
     const body = req.body || {};
+    const answers = body.formAnswers || {};
     if (event.customFormDefinition && Array.isArray(event.customFormDefinition.fields)) {
-      const answers = body.formAnswers || {};
       validatedAnswers = {};
       for (const field of event.customFormDefinition.fields) {
         const fieldKey = field.id || field.name;
@@ -426,8 +426,65 @@ exports.registerExternalParticipant = asyncHandler(async (req, res) => {
           validatedAnswers[fieldKey] = val;
         }
       }
-    } else if (formAnswers) {
-      validatedAnswers = formAnswers;
+    } else if (body.formAnswers) {
+      validatedAnswers = { ...answers };
+    }
+
+    // Handle team registration validation & payload preservation
+    const teamSettings = event.customFormDefinition?.teamSettings;
+    if (teamSettings && teamSettings.enabled) {
+      if (!answers.isTeamRegistration) {
+        throw new AppError('This event requires team registration. Please provide your team details.', 400);
+      }
+      const teamName = typeof answers.teamName === 'string' ? answers.teamName.trim() : '';
+      if (!teamName) {
+        throw new AppError('Team name is required', 400);
+      }
+      const minSize = teamSettings.minTeamSize || 2;
+      const maxSize = teamSettings.maxTeamSize || 10;
+      const teamMembers = Array.isArray(answers.teamMembers) ? answers.teamMembers : [];
+      const teamSize = Number(answers.teamSize || (teamMembers.length + 1));
+      if (isNaN(teamSize) || teamSize < minSize || teamSize > maxSize) {
+        throw new AppError(`Team size must be between ${minSize} and ${maxSize} members`, 400);
+      }
+
+      const memberEmails = new Set();
+      const leaderEmail = (req.externalUser?.email || '').toLowerCase().trim();
+      if (leaderEmail) memberEmails.add(leaderEmail);
+
+      for (let i = 0; i < teamMembers.length; i++) {
+        const m = teamMembers[i];
+        if (!m || !m.name || !m.name.trim()) {
+          throw new AppError(`Teammate #${i + 2} name is required`, 400);
+        }
+        if (!m || !m.email || !m.email.trim()) {
+          throw new AppError(`Teammate #${i + 2} email is required`, 400);
+        }
+        const mEmail = m.email.toLowerCase().trim();
+        if (memberEmails.has(mEmail)) {
+          throw new AppError(`Duplicate email "${mEmail}" found in team members`, 400);
+        }
+        memberEmails.add(mEmail);
+      }
+
+      if (!validatedAnswers) validatedAnswers = {};
+      validatedAnswers.isTeamRegistration = true;
+      validatedAnswers.teamName = teamName;
+      validatedAnswers.teamSize = teamSize;
+      validatedAnswers.teamLeader = answers.teamLeader || {
+        name: body.name || 'Participant',
+        email: req.externalUser?.email || '',
+        phone: body.phone || null,
+        institutionName: body.institutionName || null,
+      };
+      validatedAnswers.teamMembers = teamMembers;
+    } else if (answers.isTeamRegistration) {
+      if (!validatedAnswers) validatedAnswers = {};
+      validatedAnswers.isTeamRegistration = true;
+      validatedAnswers.teamName = answers.teamName;
+      validatedAnswers.teamSize = answers.teamSize;
+      validatedAnswers.teamLeader = answers.teamLeader;
+      validatedAnswers.teamMembers = answers.teamMembers;
     }
 
     // 3. Upsert ExternalParticipant (scoped to req.collegeId by RLS context)

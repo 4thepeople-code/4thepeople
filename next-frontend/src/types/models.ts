@@ -112,8 +112,33 @@ export interface CustomFormField {
   options?: string[]; // for SELECT, RADIO, CHECKBOX
 }
 
+export interface TeamSettings {
+  enabled: boolean;
+  minTeamSize: number;
+  maxTeamSize: number;
+  feeModel?: 'PER_TEAM' | 'PER_MEMBER';
+}
+
+export interface TeamMember {
+  name: string;
+  email: string;
+  rollNumber?: string;
+  institutionName?: string;
+  phone?: string;
+  isLeader?: boolean;
+}
+
+export interface TeamRegistrationPayload {
+  isTeamRegistration: true;
+  teamName: string;
+  teamSize: number;
+  teamLeader: TeamMember;
+  teamMembers: TeamMember[];
+}
+
 export interface CustomFormDefinition {
-  fields: CustomFormField[];
+  fields?: CustomFormField[];
+  teamSettings?: TeamSettings | null;
 }
 
 export type EventVisibility = 'COLLEGE' | 'PUBLIC';

@@ -16,6 +16,7 @@ import {
   deleteEventCover,
   uploadEventGallery,
   deleteEventGalleryImage,
+  type EventAttendeeItem,
 } from '@/lib/api/manager';
 import { apiClient } from '@/lib/api/axios';
 import ManagerLayout from '@/components/manager/ManagerLayout';
@@ -128,6 +129,11 @@ export function ManagerEventDetailClient({
   const [customRegistrationDeadline, setCustomRegistrationDeadline] = useState<string | null>(null);
   const [customRegistrationUrl, setCustomRegistrationUrl] = useState<string | null>(null);
   const [customVisibility, setCustomVisibility] = useState<EventVisibility | null>(null);
+  const [customIsTeamEvent, setCustomIsTeamEvent] = useState<boolean | null>(null);
+  const [customMinTeamSize, setCustomMinTeamSize] = useState<string | null>(null);
+  const [customMaxTeamSize, setCustomMaxTeamSize] = useState<string | null>(null);
+  const [customFeeModel, setCustomFeeModel] = useState<'PER_TEAM' | 'PER_MEMBER' | null>(null);
+  const [viewingRosterAttendee, setViewingRosterAttendee] = useState<EventAttendeeItem | null>(null);
   const [isVisibilityConfirmOpen, setIsVisibilityConfirmOpen] = useState(false);
   const [formError, setFormError] = useState('');
 
@@ -146,6 +152,12 @@ export function ManagerEventDetailClient({
       '');
   const currentVisibility: EventVisibility = event?.visibility || 'COLLEGE';
   const visibility: EventVisibility = customVisibility ?? currentVisibility;
+
+  const existingTeamSettings = event?.customFormDefinition?.teamSettings;
+  const isTeamEvent = customIsTeamEvent ?? (existingTeamSettings?.enabled ?? false);
+  const minTeamSize = customMinTeamSize ?? (existingTeamSettings?.minTeamSize?.toString() || '2');
+  const maxTeamSize = customMaxTeamSize ?? (existingTeamSettings?.maxTeamSize?.toString() || '4');
+  const feeModel = customFeeModel ?? (existingTeamSettings?.feeModel || 'PER_TEAM');
 
   // Cover Image State
   const [coverUploading, setCoverUploading] = useState(false);
@@ -213,6 +225,23 @@ export function ManagerEventDetailClient({
       }
     }
 
+    if (isTeamEvent) {
+      const min = parseInt(minTeamSize, 10);
+      const max = parseInt(maxTeamSize, 10);
+      if (isNaN(min) || min < 2) {
+        setFormError('Minimum team size must be at least 2.');
+        return;
+      }
+      if (isNaN(max) || max < min) {
+        setFormError('Maximum team size must be greater than or equal to minimum team size.');
+        return;
+      }
+      if (max > 20) {
+        setFormError('Maximum team size cannot exceed 20 members.');
+        return;
+      }
+    }
+
     // Check if visibility changed relative to the loaded event
     if (customVisibility !== null && customVisibility !== currentVisibility) {
       setIsVisibilityConfirmOpen(true);
@@ -236,6 +265,21 @@ export function ManagerEventDetailClient({
           endAt: endAt ? new Date(endAt).toISOString() : null,
           registrationDeadline: registrationDeadline ? new Date(registrationDeadline).toISOString() : null,
           visibility,
+          customFormDefinition: isTeamEvent
+            ? {
+                ...(event?.customFormDefinition || {}),
+                teamSettings: {
+                  enabled: true,
+                  minTeamSize: parseInt(minTeamSize, 10),
+                  maxTeamSize: parseInt(maxTeamSize, 10),
+                  feeModel: event?.isPaid ? feeModel : 'PER_TEAM',
+                },
+                fields: event?.customFormDefinition?.fields || [],
+              }
+            : (event?.customFormDefinition?.fields?.length ? {
+                ...event.customFormDefinition,
+                teamSettings: null,
+              } : null),
         },
       });
 
@@ -248,6 +292,10 @@ export function ManagerEventDetailClient({
       setCustomRegistrationDeadline(null);
       setCustomRegistrationUrl(null);
       setCustomVisibility(null);
+      setCustomIsTeamEvent(null);
+      setCustomMinTeamSize(null);
+      setCustomMaxTeamSize(null);
+      setCustomFeeModel(null);
       setIsVisibilityConfirmOpen(false);
       queryClient.invalidateQueries({
         queryKey: queryKeys.tenant(slug).events.detail(clubId, eventId),
@@ -738,6 +786,131 @@ export function ManagerEventDetailClient({
                       </p>
                     </div>
                   </div>
+
+                  {/* Team Registration Settings */}
+                  <div
+                    className={`md:col-span-2 pt-2 border-t ${
+                      isDark ? 'border-white/10' : 'border-[#E8E6DF]'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-3">
+                      <div>
+                        <span className={`block text-xs font-semibold uppercase tracking-wider ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                          Team Registration
+                        </span>
+                        <p className="text-[11px] text-slate-400">
+                          Allow participants to register as a team with a team leader and teammates.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setCustomIsTeamEvent(!isTeamEvent)}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors cursor-pointer ${
+                          isTeamEvent ? 'bg-indigo-600' : isDark ? 'bg-slate-800' : 'bg-slate-300'
+                        }`}
+                      >
+                        <span
+                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                            isTeamEvent ? 'translate-x-6' : 'translate-x-1'
+                          }`}
+                        />
+                      </button>
+                    </div>
+
+                    {isTeamEvent && (
+                      <div className={`p-4 rounded-xl border space-y-4 ${
+                        isDark ? 'bg-white/5 border-white/10' : 'bg-slate-50 border-slate-200'
+                      }`}>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div>
+                            <label className={`block text-xs font-semibold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                              Min Team Size *
+                            </label>
+                            <input
+                              type="number"
+                              min="2"
+                              max="20"
+                              value={minTeamSize}
+                              onChange={(e) => setCustomMinTeamSize(e.target.value)}
+                              className={`w-full px-3 py-2 text-xs rounded-xl border transition ${
+                                isDark ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-900'
+                              }`}
+                              required={isTeamEvent}
+                            />
+                          </div>
+                          <div>
+                            <label className={`block text-xs font-semibold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                              Max Team Size *
+                            </label>
+                            <input
+                              type="number"
+                              min={minTeamSize || '2'}
+                              max="20"
+                              value={maxTeamSize}
+                              onChange={(e) => setCustomMaxTeamSize(e.target.value)}
+                              className={`w-full px-3 py-2 text-xs rounded-xl border transition ${
+                                isDark ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-900'
+                              }`}
+                              required={isTeamEvent}
+                            />
+                          </div>
+                        </div>
+
+                        {event?.isPaid && (
+                          <div>
+                            <label className={`block text-xs font-semibold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                              Team Pricing Model
+                            </label>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-1">
+                              <label className={`flex items-start gap-2.5 p-3 rounded-lg border cursor-pointer transition ${
+                                feeModel === 'PER_TEAM'
+                                  ? isDark ? 'border-indigo-500 bg-indigo-500/10' : 'border-indigo-600 bg-indigo-50'
+                                  : isDark ? 'border-slate-800' : 'border-slate-200'
+                              }`}>
+                                <input
+                                  type="radio"
+                                  name="editFeeModel"
+                                  checked={feeModel === 'PER_TEAM'}
+                                  onChange={() => setCustomFeeModel('PER_TEAM')}
+                                  className="mt-0.5 text-indigo-600 focus:ring-indigo-500"
+                                />
+                                <div>
+                                  <p className={`text-xs font-semibold ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                                    Flat Fee per Team
+                                  </p>
+                                  <p className="text-[11px] text-slate-400">
+                                    Fixed ₹{event?.fee || 0} total for the entire team.
+                                  </p>
+                                </div>
+                              </label>
+
+                              <label className={`flex items-start gap-2.5 p-3 rounded-lg border cursor-pointer transition ${
+                                feeModel === 'PER_MEMBER'
+                                  ? isDark ? 'border-indigo-500 bg-indigo-500/10' : 'border-indigo-600 bg-indigo-50'
+                                  : isDark ? 'border-slate-800' : 'border-slate-200'
+                              }`}>
+                                <input
+                                  type="radio"
+                                  name="editFeeModel"
+                                  checked={feeModel === 'PER_MEMBER'}
+                                  onChange={() => setCustomFeeModel('PER_MEMBER')}
+                                  className="mt-0.5 text-indigo-600 focus:ring-indigo-500"
+                                />
+                                <div>
+                                  <p className={`text-xs font-semibold ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                                    Per Member Fee
+                                  </p>
+                                  <p className="text-[11px] text-slate-400">
+                                    ₹{event?.fee || 0} × total team members ({minTeamSize}–{maxTeamSize} members).
+                                  </p>
+                                </div>
+                              </label>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 <div className="flex justify-end pt-2">
@@ -1095,6 +1268,11 @@ export function ManagerEventDetailClient({
                             });
                           };
 
+                          const answers = (reg.formAnswers || reg.customFormAnswers) as Record<string, any> | null;
+                          const isTeam = Boolean(answers?.isTeamRegistration);
+                          const teamName = answers?.teamName;
+                          const teamSize = answers?.teamSize || (Array.isArray(answers?.teamMembers) ? answers.teamMembers.length + 1 : undefined);
+
                           return (
                             <tr
                               key={reg.id}
@@ -1104,23 +1282,37 @@ export function ManagerEventDetailClient({
                                   : 'hover:bg-slate-50 text-[#0F172A]'
                               }`}
                             >
-                              <td className="py-3 px-4 flex items-center gap-3">
-                                {reg.user?.avatarUrl ? (
-                                  <img
-                                    src={reg.user.avatarUrl}
-                                    alt={displayName}
-                                    className="w-8 h-8 rounded-full object-cover border border-white/10"
-                                  />
-                                ) : (
-                                  <div
-                                    className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs uppercase ${
-                                      isExternal ? 'bg-orange-500 text-white' : 'bg-[#FF5733] text-white'
-                                    }`}
-                                  >
-                                    {displayInitials}
+                              <td className="py-3 px-4">
+                                <div className="flex items-center gap-3">
+                                  {reg.user?.avatarUrl ? (
+                                    <img
+                                      src={reg.user.avatarUrl}
+                                      alt={displayName}
+                                      className="w-8 h-8 rounded-full object-cover border border-white/10 shrink-0"
+                                    />
+                                  ) : (
+                                    <div
+                                      className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs uppercase shrink-0 ${
+                                        isExternal ? 'bg-orange-500 text-white' : 'bg-[#FF5733] text-white'
+                                      }`}
+                                    >
+                                      {displayInitials}
+                                    </div>
+                                  )}
+                                  <div>
+                                    <span className="font-bold block">{displayName}</span>
+                                    {isTeam && (
+                                      <button
+                                        type="button"
+                                        onClick={() => setViewingRosterAttendee(reg)}
+                                        className="inline-flex items-center gap-1 mt-0.5 px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 hover:bg-indigo-500/30 transition cursor-pointer"
+                                      >
+                                        <Users className="w-3 h-3" />
+                                        <span>Team: {teamName || 'Team'} ({teamSize || 1})</span>
+                                      </button>
+                                    )}
                                   </div>
-                                )}
-                                <span className="font-bold">{displayName}</span>
+                                </div>
                               </td>
                               <td className="py-3 px-4">
                                 {isExternal ? (
@@ -1373,6 +1565,92 @@ export function ManagerEventDetailClient({
               </button>
             </div>
           </div>
+        </Modal>
+
+        {/* Team Roster Modal */}
+        <Modal
+          isOpen={Boolean(viewingRosterAttendee)}
+          onClose={() => setViewingRosterAttendee(null)}
+          title="Team Registration Details"
+          maxWidth="max-w-lg"
+        >
+          {viewingRosterAttendee && (() => {
+            const formAns = (viewingRosterAttendee.formAnswers || viewingRosterAttendee.customFormAnswers) as Record<string, any> | null;
+            const tName = formAns?.teamName || 'Unnamed Team';
+            const leader = (formAns?.teamLeader || {
+              name: viewingRosterAttendee.participantName || viewingRosterAttendee.user?.name || 'Leader',
+              email: viewingRosterAttendee.participantEmail || viewingRosterAttendee.user?.email || '—',
+              rollNumber: viewingRosterAttendee.participantRollNumber || null,
+            }) as { name?: string; email?: string; rollNumber?: string };
+            const members = (Array.isArray(formAns?.teamMembers) ? formAns.teamMembers : []) as Array<{
+              name: string;
+              email: string;
+              rollNumber?: string;
+            }>;
+
+            return (
+              <div className="space-y-4 text-xs">
+                <div className={`p-3.5 rounded-xl border ${isDark ? 'bg-indigo-500/10 border-indigo-500/20' : 'bg-indigo-50 border-indigo-200'}`}>
+                  <div className="flex items-center gap-2 mb-1">
+                    <Users className="w-4 h-4 text-indigo-400" />
+                    <span className="font-bold text-sm text-indigo-400">{tName}</span>
+                  </div>
+                  <p className="text-[11px] text-slate-400">
+                    Total Team Size: {members.length + 1} members
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <h4 className="font-bold uppercase tracking-wider text-[10px] text-slate-400">Team Leader</h4>
+                  <div className={`p-3 rounded-xl border flex items-center justify-between ${isDark ? 'bg-white/5 border-white/10' : 'bg-slate-50 border-slate-200'}`}>
+                    <div>
+                      <p className="font-bold text-sm">{leader.name || 'Leader'}</p>
+                      <p className="text-slate-400 text-[11px]">{leader.email || '—'}</p>
+                    </div>
+                    {leader.rollNumber && (
+                      <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-white/10 text-slate-300">
+                        {leader.rollNumber}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {members.length > 0 && (
+                  <div className="space-y-2">
+                    <h4 className="font-bold uppercase tracking-wider text-[10px] text-slate-400">Teammates ({members.length})</h4>
+                    <div className="space-y-2 max-h-60 overflow-y-auto">
+                      {members.map((m, idx) => (
+                        <div
+                          key={idx}
+                          className={`p-3 rounded-xl border flex items-center justify-between ${isDark ? 'bg-white/5 border-white/10' : 'bg-slate-50 border-slate-200'}`}
+                        >
+                          <div>
+                            <p className="font-semibold text-xs">{m.name || `Member ${idx + 2}`}</p>
+                            <p className="text-slate-400 text-[11px]">{m.email}</p>
+                          </div>
+                          {m.rollNumber && (
+                            <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-white/10 text-slate-300">
+                              {m.rollNumber}
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex justify-end pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setViewingRosterAttendee(null)}
+                    className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl transition cursor-pointer"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            );
+          })()}
         </Modal>
       </div>
     </ManagerLayout>
