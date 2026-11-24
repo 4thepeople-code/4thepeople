@@ -13,6 +13,7 @@ import type { AuthUser } from '@/types/auth';
 import PublicLayout from '@/components/public/PublicLayout';
 import {
   ShieldCheck,
+  Shield,
   Mail,
   Lock,
   Eye,
@@ -500,19 +501,32 @@ export function ManagerLoginClient({ slug, initialReturnUrl }: ManagerLoginClien
               </form>
             )}
 
-            {/* Toggle to Student Portal Login */}
+            {/* Quick Links */}
             <div
-              className={`mt-6 pt-6 border-t text-center text-xs ${
+              className={`mt-6 pt-6 border-t space-y-3 text-xs ${
                 isDark ? 'border-white/10 text-gray-400' : 'border-slate-200 text-slate-600'
               }`}
             >
-              <span>Are you an enrolled student? </span>
-              <Link
-                href={`/college/${slug}/login`}
-                className="font-bold text-[#00F0FF] hover:underline"
-              >
-                Go to Student Login
-              </Link>
+              <div className="flex items-center justify-between">
+                <span>Are you an enrolled student?</span>
+                <Link
+                  href={`/college/${slug}/login`}
+                  className="font-bold text-[#00F0FF] hover:underline"
+                >
+                  Student Login
+                </Link>
+              </div>
+
+              <div className="flex items-center justify-between pt-1">
+                <span>College Administrator?</span>
+                <Link
+                  href={`/college/${slug}/login/admin`}
+                  className="font-semibold text-[#B08D57] hover:underline inline-flex items-center gap-1"
+                >
+                  <Shield className="w-3.5 h-3.5 text-[#B08D57]" />
+                  <span>Admin Portal</span>
+                </Link>
+              </div>
             </div>
           </div>
         </div>

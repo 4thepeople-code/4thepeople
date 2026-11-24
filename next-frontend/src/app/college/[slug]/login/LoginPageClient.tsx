@@ -527,11 +527,22 @@ export function LoginPageClient({
                   <div className="flex items-center justify-between text-xs pt-1">
                     <span className={isDark ? 'text-gray-400' : 'text-slate-500'}>Club Manager or Staff?</span>
                     <Link
-                      href={`/college/${slug}/manager/login`}
+                      href={`/college/${slug}/login/manager`}
                       className="font-semibold text-gray-300 hover:text-white inline-flex items-center gap-1"
                     >
                       <Shield className="w-3.5 h-3.5 text-purple-400" />
                       <span>Manager Portal</span>
+                    </Link>
+                  </div>
+
+                  <div className="flex items-center justify-between text-xs pt-1">
+                    <span className={isDark ? 'text-gray-400' : 'text-slate-500'}>College Administrator?</span>
+                    <Link
+                      href={`/college/${slug}/login/admin`}
+                      className="font-semibold text-[#B08D57] hover:underline inline-flex items-center gap-1"
+                    >
+                      <Shield className="w-3.5 h-3.5 text-[#B08D57]" />
+                      <span>Admin Portal</span>
                     </Link>
                   </div>
                 </div>
