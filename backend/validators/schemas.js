@@ -83,8 +83,17 @@ const createEventBody = z.object({
   is_paid: z.boolean().optional(),
   fee: z.number().int().min(0, 'Fee must be a non-negative integer').default(0).optional(),
   currency: z.string().trim().toUpperCase().default('INR').optional(),
+  registrationDeadline: z.coerce.date().nullable().optional(),
+  customFormDefinition: z.any().nullable().optional(),
 }).refine((value) => !value.endAt || value.endAt > value.startAt, {
   message: 'endAt must be after startAt', path: ['endAt'],
+}).refine((value) => {
+  if (value.registrationDeadline && value.startAt && value.registrationDeadline > value.startAt) {
+    return false;
+  }
+  return true;
+}, {
+  message: 'registrationDeadline cannot be after startAt', path: ['registrationDeadline'],
 }).refine((value) => {
   const isPaid = Boolean(value.isPaid || value.is_paid);
   if (isPaid) {
@@ -108,7 +117,17 @@ const updateEventBody = z.object({
   is_paid: z.boolean().optional(),
   fee: z.number().int().min(0, 'Fee must be a non-negative integer').optional(),
   currency: z.string().trim().toUpperCase().optional(),
+  registrationDeadline: z.coerce.date().nullable().optional(),
+  customFormDefinition: z.any().nullable().optional(),
 }).refine((value) => Object.keys(value).length > 0, 'At least one event field is required')
+  .refine((value) => {
+    if (value.registrationDeadline && value.startAt && value.registrationDeadline > value.startAt) {
+      return false;
+    }
+    return true;
+  }, {
+    message: 'registrationDeadline cannot be after startAt', path: ['registrationDeadline'],
+  })
   .refine((value) => {
     const isPaid = value.isPaid !== undefined ? value.isPaid : value.is_paid;
     if (isPaid === true && value.fee !== undefined) {
