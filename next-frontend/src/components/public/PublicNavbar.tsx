@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Compass, Menu, X, ArrowUpRight, LogIn, Sun, Moon, UserCheck } from 'lucide-react';
+import { Compass, Menu, X, ArrowUpRight, LogIn, Sun, Moon, UserCheck, Building2 } from 'lucide-react';
 import { useTheme } from '@/context/ThemeContext';
 import { useAuth } from '@/context/AuthContext';
 
@@ -18,6 +18,8 @@ export function PublicNavbar({ collegeSlug, collegeName }: PublicNavbarProps) {
   const pathname = usePathname();
   const { isDark, toggleTheme } = useTheme();
   const { user, isAuthenticated } = useAuth();
+
+  const isRootLanding = !collegeSlug;
 
   useEffect(() => {
     const handleScroll = () => {
@@ -101,50 +103,69 @@ export function PublicNavbar({ collegeSlug, collegeName }: PublicNavbarProps) {
               Home
             </Link>
 
-            <a
-              href={eventsHref}
-              onClick={(e) => {
-                if (pathname === homeHref || pathname === '/') {
-                  e.preventDefault();
-                  document.getElementById('upcoming-events')?.scrollIntoView({ behavior: 'smooth' });
-                }
-              }}
-              className={`transition-colors ${
-                isDark ? 'text-gray-300 hover:text-[#00F0FF]' : 'text-slate-600 hover:text-cyan-600'
-              }`}
-            >
-              Events
-            </a>
+            {isRootLanding ? (
+              <a
+                href="#campuses"
+                onClick={(e) => {
+                  if (pathname === '/') {
+                    e.preventDefault();
+                    document.getElementById('campuses')?.scrollIntoView({ behavior: 'smooth' });
+                  }
+                }}
+                className={`transition-colors ${
+                  isDark ? 'text-gray-300 hover:text-[#00F0FF]' : 'text-slate-600 hover:text-cyan-600'
+                }`}
+              >
+                Partner Campuses
+              </a>
+            ) : (
+              <>
+                <a
+                  href={eventsHref}
+                  onClick={(e) => {
+                    if (pathname === homeHref || pathname === '/') {
+                      e.preventDefault();
+                      document.getElementById('upcoming-events')?.scrollIntoView({ behavior: 'smooth' });
+                    }
+                  }}
+                  className={`transition-colors ${
+                    isDark ? 'text-gray-300 hover:text-[#00F0FF]' : 'text-slate-600 hover:text-cyan-600'
+                  }`}
+                >
+                  Events
+                </a>
 
-            <Link
-              href={clubsHref}
-              className={`transition-colors ${
-                pathname.includes('/clubs')
-                  ? isDark
-                    ? 'text-[#00F0FF]'
-                    : 'text-cyan-600 font-extrabold'
-                  : isDark
-                    ? 'text-gray-300 hover:text-[#00F0FF]'
-                    : 'text-slate-600 hover:text-cyan-600'
-              }`}
-            >
-              Clubs Directory
-            </Link>
+                <Link
+                  href={clubsHref}
+                  className={`transition-colors ${
+                    pathname.includes('/clubs')
+                      ? isDark
+                        ? 'text-[#00F0FF]'
+                        : 'text-cyan-600 font-extrabold'
+                      : isDark
+                        ? 'text-gray-300 hover:text-[#00F0FF]'
+                        : 'text-slate-600 hover:text-cyan-600'
+                  }`}
+                >
+                  Clubs Directory
+                </Link>
 
-            <Link
-              href={departmentsHref}
-              className={`transition-colors ${
-                pathname.includes('/departments')
-                  ? isDark
-                    ? 'text-[#00F0FF]'
-                    : 'text-cyan-600 font-extrabold'
-                  : isDark
-                    ? 'text-gray-300 hover:text-[#00F0FF]'
-                    : 'text-slate-600 hover:text-cyan-600'
-              }`}
-            >
-              Departments
-            </Link>
+                <Link
+                  href={departmentsHref}
+                  className={`transition-colors ${
+                    pathname.includes('/departments')
+                      ? isDark
+                        ? 'text-[#00F0FF]'
+                        : 'text-cyan-600 font-extrabold'
+                      : isDark
+                        ? 'text-gray-300 hover:text-[#00F0FF]'
+                        : 'text-slate-600 hover:text-cyan-600'
+                  }`}
+                >
+                  Departments
+                </Link>
+              </>
+            )}
           </nav>
 
           {/* Right Action, Theme Toggle & Portal Links */}
@@ -167,56 +188,75 @@ export function PublicNavbar({ collegeSlug, collegeName }: PublicNavbarProps) {
               </span>
             </button>
 
-            {isAuthenticated && (user?.role === 'MANAGER' || user?.role === 'COLLEGE_ADMIN') ? (
-              <Link
-                href={managerHref}
-                className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider border transition-all ${
-                  pathname.includes('/manager')
-                    ? 'bg-[#FF5733]/15 border-[#FF5733]/40 text-[#FF5733]'
-                    : isDark
-                      ? 'text-orange-400 hover:text-white hover:bg-white/5 border-orange-500/30'
-                      : 'text-orange-600 hover:text-orange-800 hover:bg-orange-50 border-orange-200'
-                }`}
+            {isRootLanding ? (
+              <a
+                href="#campuses"
+                onClick={(e) => {
+                  if (pathname === '/') {
+                    e.preventDefault();
+                    document.getElementById('campuses')?.scrollIntoView({ behavior: 'smooth' });
+                  }
+                }}
+                className="group relative inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#00F0FF] text-black font-extrabold text-xs uppercase tracking-wider overflow-hidden hover:bg-[#38f2ff] transition-all shadow-lg shadow-cyan-500/25 hover:shadow-cyan-500/40 active:scale-95 cursor-pointer"
               >
-                <UserCheck className="w-3.5 h-3.5 text-[#FF5733]" />
-                <span>Manager Portal</span>
-              </Link>
-            ) : isAuthenticated && user?.role === 'USER' ? (
-              <Link
-                href={studentHref}
-                className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider border transition-all ${
-                  pathname.includes('/student')
-                    ? 'bg-[#00F0FF]/15 border-[#00F0FF]/40 text-[#00F0FF]'
-                    : isDark
-                      ? 'text-cyan-300 hover:text-white hover:bg-white/5 border-cyan-500/30'
-                      : 'text-cyan-700 hover:text-cyan-900 hover:bg-cyan-50 border-cyan-200'
-                }`}
-              >
-                <UserCheck className="w-3.5 h-3.5 text-[#00F0FF]" />
-                <span>Student Portal</span>
-              </Link>
+                <Building2 className="w-4 h-4 text-black group-hover:scale-110 transition-transform" />
+                <span>Select Campus</span>
+                <ArrowUpRight className="w-4 h-4 text-black group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+              </a>
             ) : (
-              <Link
-                href={loginHref}
-                className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider border transition-all ${
-                  isDark
-                    ? 'text-gray-300 hover:text-white hover:bg-white/5 border-transparent hover:border-white/10'
-                    : 'text-slate-700 hover:text-slate-900 hover:bg-slate-100 border-transparent hover:border-slate-200'
-                }`}
-              >
-                <LogIn className="w-3.5 h-3.5" />
-                <span>Portal Login</span>
-              </Link>
-            )}
+              <>
+                {isAuthenticated && (user?.role === 'MANAGER' || user?.role === 'COLLEGE_ADMIN') ? (
+                  <Link
+                    href={managerHref}
+                    className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider border transition-all ${
+                      pathname.includes('/manager')
+                        ? 'bg-[#FF5733]/15 border-[#FF5733]/40 text-[#FF5733]'
+                        : isDark
+                          ? 'text-orange-400 hover:text-white hover:bg-white/5 border-orange-500/30'
+                          : 'text-orange-600 hover:text-orange-800 hover:bg-orange-50 border-orange-200'
+                    }`}
+                  >
+                    <UserCheck className="w-3.5 h-3.5 text-[#FF5733]" />
+                    <span>Manager Portal</span>
+                  </Link>
+                ) : isAuthenticated && user?.role === 'USER' ? (
+                  <Link
+                    href={studentHref}
+                    className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider border transition-all ${
+                      pathname.includes('/student')
+                        ? 'bg-[#00F0FF]/15 border-[#00F0FF]/40 text-[#00F0FF]'
+                        : isDark
+                          ? 'text-cyan-300 hover:text-white hover:bg-white/5 border-cyan-500/30'
+                          : 'text-cyan-700 hover:text-cyan-900 hover:bg-cyan-50 border-cyan-200'
+                    }`}
+                  >
+                    <UserCheck className="w-3.5 h-3.5 text-[#00F0FF]" />
+                    <span>Student Portal</span>
+                  </Link>
+                ) : (
+                  <Link
+                    href={loginHref}
+                    className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider border transition-all ${
+                      isDark
+                        ? 'text-gray-300 hover:text-white hover:bg-white/5 border-transparent hover:border-white/10'
+                        : 'text-slate-700 hover:text-slate-900 hover:bg-slate-100 border-transparent hover:border-slate-200'
+                    }`}
+                  >
+                    <LogIn className="w-3.5 h-3.5" />
+                    <span>Portal Login</span>
+                  </Link>
+                )}
 
-            <Link
-              href={clubsHref}
-              className="group relative inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#00F0FF] text-black font-extrabold text-xs uppercase tracking-wider overflow-hidden hover:bg-[#38f2ff] transition-all shadow-lg shadow-cyan-500/25 hover:shadow-cyan-500/40 active:scale-95 cursor-pointer"
-            >
-              <Compass className="w-4 h-4 text-black group-hover:rotate-45 transition-transform" />
-              <span>Explore Clubs</span>
-              <ArrowUpRight className="w-4 h-4 text-black group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
-            </Link>
+                <Link
+                  href={clubsHref}
+                  className="group relative inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#00F0FF] text-black font-extrabold text-xs uppercase tracking-wider overflow-hidden hover:bg-[#38f2ff] transition-all shadow-lg shadow-cyan-500/25 hover:shadow-cyan-500/40 active:scale-95 cursor-pointer"
+                >
+                  <Compass className="w-4 h-4 text-black group-hover:rotate-45 transition-transform" />
+                  <span>Explore Clubs</span>
+                  <ArrowUpRight className="w-4 h-4 text-black group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+                </Link>
+              </>
+            )}
           </div>
 
           {/* Mobile Hamburger Toggle & Mobile Theme Toggle */}
@@ -273,97 +313,115 @@ export function PublicNavbar({ collegeSlug, collegeName }: PublicNavbarProps) {
             >
               Home
             </Link>
-            <a
-              href={eventsHref}
-              onClick={(e) => {
-                setMobileMenuOpen(false);
-                if (pathname === homeHref || pathname === '/') {
-                  e.preventDefault();
-                  document.getElementById('upcoming-events')?.scrollIntoView({ behavior: 'smooth' });
-                }
-              }}
-              className={`block py-2 px-3 rounded-lg font-semibold transition-colors ${
-                isDark
-                  ? 'text-gray-200 hover:bg-white/5 hover:text-[#00F0FF]'
-                  : 'text-slate-700 hover:bg-slate-100 hover:text-cyan-600'
-              }`}
-            >
-              Events
-            </a>
-            <Link
-              href={clubsHref}
-              onClick={() => setMobileMenuOpen(false)}
-              className={`block py-2 px-3 rounded-lg font-semibold transition-colors ${
-                pathname.includes('/clubs')
-                  ? isDark
-                    ? 'text-[#00F0FF] bg-white/5'
-                    : 'text-cyan-600 bg-slate-100 font-bold'
-                  : isDark
-                    ? 'text-gray-200 hover:bg-white/5 hover:text-[#00F0FF]'
-                    : 'text-slate-700 hover:bg-slate-100 hover:text-cyan-600'
-              }`}
-            >
-              Clubs Directory
-            </Link>
-            <Link
-              href={departmentsHref}
-              onClick={() => setMobileMenuOpen(false)}
-              className={`block py-2 px-3 rounded-lg font-semibold transition-colors ${
-                pathname.includes('/departments')
-                  ? isDark
-                    ? 'text-[#00F0FF] bg-white/5'
-                    : 'text-cyan-600 bg-slate-100 font-bold'
-                  : isDark
-                    ? 'text-gray-200 hover:bg-white/5 hover:text-[#00F0FF]'
-                    : 'text-slate-700 hover:bg-slate-100 hover:text-cyan-600'
-              }`}
-            >
-              Departments
-            </Link>
-            {isAuthenticated && (user?.role === 'MANAGER' || user?.role === 'COLLEGE_ADMIN') ? (
-              <Link
-                href={managerHref}
-                onClick={() => setMobileMenuOpen(false)}
-                className={`block py-2 px-3 rounded-lg font-semibold transition-colors ${
-                  pathname.includes('/manager')
-                    ? isDark
-                      ? 'text-[#FF5733] bg-white/5'
-                      : 'text-orange-600 bg-slate-100 font-bold'
-                    : isDark
-                      ? 'text-orange-400 hover:bg-white/5 hover:text-white'
-                      : 'text-orange-600 hover:bg-slate-100 hover:text-orange-800'
-                }`}
-              >
-                Manager Portal
-              </Link>
-            ) : isAuthenticated && user?.role === 'USER' ? (
-              <Link
-                href={studentHref}
-                onClick={() => setMobileMenuOpen(false)}
-                className={`block py-2 px-3 rounded-lg font-semibold transition-colors ${
-                  pathname.includes('/student')
-                    ? isDark
-                      ? 'text-[#00F0FF] bg-white/5'
-                      : 'text-cyan-600 bg-slate-100 font-bold'
-                    : isDark
-                      ? 'text-cyan-300 hover:bg-white/5 hover:text-white'
-                      : 'text-cyan-700 hover:bg-slate-100 hover:text-cyan-900'
-                }`}
-              >
-                Student Portal
-              </Link>
-            ) : (
-              <Link
-                href={loginHref}
-                onClick={() => setMobileMenuOpen(false)}
+            {isRootLanding ? (
+              <a
+                href="#campuses"
+                onClick={(e) => {
+                  setMobileMenuOpen(false);
+                  if (pathname === '/') {
+                    e.preventDefault();
+                    document.getElementById('campuses')?.scrollIntoView({ behavior: 'smooth' });
+                  }
+                }}
                 className={`block py-2 px-3 rounded-lg font-semibold transition-colors ${
                   isDark
-                    ? 'text-gray-400 hover:bg-white/5 hover:text-white'
-                    : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                    ? 'text-gray-200 hover:bg-white/5 hover:text-[#00F0FF]'
+                    : 'text-slate-700 hover:bg-slate-100 hover:text-cyan-600'
                 }`}
               >
-                Portal Login
-              </Link>
+                Partner Campuses
+              </a>
+            ) : (
+              <>
+                <a
+                  href={eventsHref}
+                  onClick={(e) => {
+                    setMobileMenuOpen(false);
+                    if (pathname === homeHref || pathname === '/') {
+                      e.preventDefault();
+                      document.getElementById('upcoming-events')?.scrollIntoView({ behavior: 'smooth' });
+                    }
+                  }}
+                  className={`block py-2 px-3 rounded-lg font-semibold transition-colors ${
+                    isDark
+                      ? 'text-gray-200 hover:bg-white/5 hover:text-[#00F0FF]'
+                      : 'text-slate-700 hover:bg-slate-100 hover:text-cyan-600'
+                  }`}
+                >
+                  Events
+                </a>
+                <Link
+                  href={clubsHref}
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={`block py-2 px-3 rounded-lg font-semibold transition-colors ${
+                    pathname.includes('/clubs')
+                      ? isDark
+                        ? 'text-[#00F0FF] bg-white/5'
+                        : 'text-cyan-600 bg-slate-100 font-bold'
+                      : isDark
+                        ? 'text-gray-200 hover:bg-white/5 hover:text-[#00F0FF]'
+                        : 'text-slate-700 hover:bg-slate-100 hover:text-cyan-600'
+                  }`}
+                >
+                  Clubs Directory
+                </Link>
+                <Link
+                  href={departmentsHref}
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={`block py-2 px-3 rounded-lg font-semibold transition-colors ${
+                    pathname.includes('/departments')
+                      ? isDark
+                        ? 'text-[#00F0FF] bg-white/5'
+                        : 'text-cyan-600 bg-slate-100 font-bold'
+                      : isDark
+                        ? 'text-gray-200 hover:bg-white/5 hover:text-[#00F0FF]'
+                        : 'text-slate-700 hover:bg-slate-100 hover:text-cyan-600'
+                  }`}
+                >
+                  Departments
+                </Link>
+                {isAuthenticated && (user?.role === 'MANAGER' || user?.role === 'COLLEGE_ADMIN') ? (
+                  <Link
+                    href={managerHref}
+                    onClick={() => setMobileMenuOpen(false)}
+                    className={`block py-2 px-3 rounded-lg font-semibold transition-colors ${
+                      pathname.includes('/manager')
+                        ? 'bg-[#FF5733]/15 text-[#FF5733]'
+                        : isDark
+                          ? 'text-orange-400 hover:bg-white/5 hover:text-white'
+                          : 'text-orange-600 hover:bg-slate-100 hover:text-orange-800'
+                    }`}
+                  >
+                    Manager Portal
+                  </Link>
+                ) : isAuthenticated && user?.role === 'USER' ? (
+                  <Link
+                    href={studentHref}
+                    onClick={() => setMobileMenuOpen(false)}
+                    className={`block py-2 px-3 rounded-lg font-semibold transition-colors ${
+                      pathname.includes('/student')
+                        ? 'bg-[#00F0FF]/15 text-[#00F0FF]'
+                        : isDark
+                          ? 'text-cyan-300 hover:bg-white/5 hover:text-white'
+                          : 'text-cyan-700 hover:bg-slate-100 hover:text-cyan-900'
+                    }`}
+                  >
+                    Student Portal
+                  </Link>
+                ) : (
+                  <Link
+                    href={loginHref}
+                    onClick={() => setMobileMenuOpen(false)}
+                    className={`block py-2 px-3 rounded-lg font-semibold transition-colors ${
+                      isDark
+                        ? 'text-gray-400 hover:bg-white/5 hover:text-white'
+                        : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                    }`}
+                  >
+                    Portal Login
+                  </Link>
+                )}
+              </>
             )}
 
             {/* Mobile Drawer Theme Switch */}
@@ -394,14 +452,31 @@ export function PublicNavbar({ collegeSlug, collegeName }: PublicNavbarProps) {
             </div>
 
             <div className={`pt-3 border-t ${isDark ? 'border-white/10' : 'border-slate-200'}`}>
-              <Link
-                href={clubsHref}
-                onClick={() => setMobileMenuOpen(false)}
-                className="w-full flex items-center justify-center gap-2 py-3 rounded-full bg-[#00F0FF] text-black font-extrabold text-xs uppercase tracking-wider shadow-lg shadow-cyan-500/20"
-              >
-                <Compass className="w-4 h-4 text-black" />
-                <span>Explore Clubs</span>
-              </Link>
+              {isRootLanding ? (
+                <a
+                  href="#campuses"
+                  onClick={(e) => {
+                    setMobileMenuOpen(false);
+                    if (pathname === '/') {
+                      e.preventDefault();
+                      document.getElementById('campuses')?.scrollIntoView({ behavior: 'smooth' });
+                    }
+                  }}
+                  className="w-full flex items-center justify-center gap-2 py-3 rounded-full bg-[#00F0FF] text-black font-extrabold text-xs uppercase tracking-wider shadow-lg shadow-cyan-500/20"
+                >
+                  <Building2 className="w-4 h-4 text-black" />
+                  <span>Select Campus</span>
+                </a>
+              ) : (
+                <Link
+                  href={clubsHref}
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="w-full flex items-center justify-center gap-2 py-3 rounded-full bg-[#00F0FF] text-black font-extrabold text-xs uppercase tracking-wider shadow-lg shadow-cyan-500/20"
+                >
+                  <Compass className="w-4 h-4 text-black" />
+                  <span>Explore Clubs</span>
+                </Link>
+              )}
             </div>
           </div>
         </div>

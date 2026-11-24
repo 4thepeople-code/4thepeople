@@ -14,6 +14,8 @@ export function PublicFooter({ collegeSlug, collegeName }: PublicFooterProps) {
   const { isDark } = useTheme();
   const pathname = usePathname();
 
+  const isRootLanding = !collegeSlug;
+
   const getPath = (subPath: string) => {
     if (pathname.startsWith(`/college/${collegeSlug}`)) {
       return `/college/${collegeSlug}${subPath === '/' ? '' : subPath}`;
@@ -82,11 +84,19 @@ export function PublicFooter({ collegeSlug, collegeName }: PublicFooterProps) {
                   Home
                 </Link>
               </li>
-              <li>
-                <Link href={clubsHref} className="hover:text-[#00F0FF] transition-colors">
-                  Clubs Directory
-                </Link>
-              </li>
+              {isRootLanding ? (
+                <li>
+                  <a href="#campuses" className="hover:text-[#00F0FF] transition-colors">
+                    Partner Campuses
+                  </a>
+                </li>
+              ) : (
+                <li>
+                  <Link href={clubsHref} className="hover:text-[#00F0FF] transition-colors">
+                    Clubs Directory
+                  </Link>
+                </li>
+              )}
             </ul>
           </div>
 
@@ -97,13 +107,19 @@ export function PublicFooter({ collegeSlug, collegeName }: PublicFooterProps) {
                 isDark ? 'text-white' : 'text-[#0F172A]'
               }`}
             >
-              Manager Access
+              {isRootLanding ? 'Campus Portals' : 'Manager Access'}
             </h4>
             <ul className="space-y-2 text-xs font-semibold">
               <li>
-                <Link href={loginHref} className="hover:text-[#00F0FF] transition-colors">
-                  Manager Portal Login
-                </Link>
+                {isRootLanding ? (
+                  <a href="#campuses" className="hover:text-[#00F0FF] transition-colors">
+                    Select Campus to Sign In
+                  </a>
+                ) : (
+                  <Link href={loginHref} className="hover:text-[#00F0FF] transition-colors">
+                    Manager Portal Login
+                  </Link>
+                )}
               </li>
             </ul>
           </div>
