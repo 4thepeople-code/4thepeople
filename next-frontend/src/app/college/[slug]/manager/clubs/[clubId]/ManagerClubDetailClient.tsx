@@ -141,6 +141,7 @@ export function ManagerClubDetailClient({ slug, clubId }: ManagerClubDetailClien
   const [eventLocation, setEventLocation] = useState('');
   const [eventStartAt, setEventStartAt] = useState('');
   const [eventEndAt, setEventEndAt] = useState('');
+  const [eventRegistrationDeadline, setEventRegistrationDeadline] = useState('');
   const [eventUrl, setEventUrl] = useState('');
   const [eventVisibility, setEventVisibility] = useState<EventVisibility>('COLLEGE');
   const [isPaid, setIsPaid] = useState<boolean>(false);
@@ -291,6 +292,18 @@ export function ManagerClubDetailClient({ slug, clubId }: ManagerClubDetailClien
       }
     }
 
+    if (eventRegistrationDeadline) {
+      const deadline = new Date(eventRegistrationDeadline);
+      if (isNaN(deadline.getTime())) {
+        setEventError('Registration deadline date/time is invalid.');
+        return;
+      }
+      if (deadline > start) {
+        setEventError('Registration deadline cannot be after the event start date/time.');
+        return;
+      }
+    }
+
     if (isPaid) {
       if (gatewayReadiness && !gatewayReadiness.isReady) {
         setEventError(
@@ -315,6 +328,7 @@ export function ManagerClubDetailClient({ slug, clubId }: ManagerClubDetailClien
           registrationUrl: eventUrl.trim() || undefined,
           startAt: new Date(eventStartAt).toISOString(),
           endAt: eventEndAt ? new Date(eventEndAt).toISOString() : undefined,
+          registrationDeadline: eventRegistrationDeadline ? new Date(eventRegistrationDeadline).toISOString() : undefined,
           visibility: eventVisibility,
           isPaid,
           fee: isPaid ? parseInt(fee, 10) : 0,
@@ -328,6 +342,7 @@ export function ManagerClubDetailClient({ slug, clubId }: ManagerClubDetailClien
       setEventLocation('');
       setEventStartAt('');
       setEventEndAt('');
+      setEventRegistrationDeadline('');
       setEventUrl('');
       setEventVisibility('COLLEGE');
       setIsPaid(false);
@@ -1450,6 +1465,18 @@ export function ManagerClubDetailClient({ slug, clubId }: ManagerClubDetailClien
                   onChange={setEventEndAt}
                   min={eventStartAt}
                 />
+
+                <div className="md:col-span-2">
+                  <DateTimePicker
+                    label="Registration Deadline (Optional)"
+                    value={eventRegistrationDeadline}
+                    onChange={setEventRegistrationDeadline}
+                    max={eventStartAt || undefined}
+                  />
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    When student registrations and ticket sales automatically close. Defaults to event start time if omitted.
+                  </p>
+                </div>
               </div>
             </div>
 

@@ -125,6 +125,7 @@ export function ManagerEventDetailClient({
   const [customLocation, setCustomLocation] = useState<string | null>(null);
   const [customStartAt, setCustomStartAt] = useState<string | null>(null);
   const [customEndAt, setCustomEndAt] = useState<string | null>(null);
+  const [customRegistrationDeadline, setCustomRegistrationDeadline] = useState<string | null>(null);
   const [customRegistrationUrl, setCustomRegistrationUrl] = useState<string | null>(null);
   const [customVisibility, setCustomVisibility] = useState<EventVisibility | null>(null);
   const [isVisibilityConfirmOpen, setIsVisibilityConfirmOpen] = useState(false);
@@ -135,6 +136,8 @@ export function ManagerEventDetailClient({
   const location = customLocation ?? (event?.location || '');
   const startAt = customStartAt ?? formatDateForInput(event?.startAt);
   const endAt = customEndAt ?? formatDateForInput(event?.endAt);
+  const registrationDeadline =
+    customRegistrationDeadline ?? formatDateForInput(event?.registrationDeadline);
   const registrationUrl =
     customRegistrationUrl ??
     (event?.registrationUrl ||
@@ -198,6 +201,18 @@ export function ManagerEventDetailClient({
       }
     }
 
+    if (registrationDeadline) {
+      const deadline = new Date(registrationDeadline);
+      if (isNaN(deadline.getTime())) {
+        setFormError('Registration deadline date/time is invalid.');
+        return;
+      }
+      if (deadline > start) {
+        setFormError('Registration deadline cannot be after the event start date/time.');
+        return;
+      }
+    }
+
     // Check if visibility changed relative to the loaded event
     if (customVisibility !== null && customVisibility !== currentVisibility) {
       setIsVisibilityConfirmOpen(true);
@@ -219,6 +234,7 @@ export function ManagerEventDetailClient({
           registrationUrl: registrationUrl.trim() || undefined,
           startAt: new Date(startAt).toISOString(),
           endAt: endAt ? new Date(endAt).toISOString() : null,
+          registrationDeadline: registrationDeadline ? new Date(registrationDeadline).toISOString() : null,
           visibility,
         },
       });
@@ -229,6 +245,7 @@ export function ManagerEventDetailClient({
       setCustomLocation(null);
       setCustomStartAt(null);
       setCustomEndAt(null);
+      setCustomRegistrationDeadline(null);
       setCustomRegistrationUrl(null);
       setCustomVisibility(null);
       setIsVisibilityConfirmOpen(false);
@@ -708,6 +725,18 @@ export function ManagerEventDetailClient({
                       onChange={(val) => setCustomEndAt(val)}
                       min={startAt}
                     />
+
+                    <div className="md:col-span-2">
+                      <DateTimePicker
+                        label="Registration Deadline (Optional)"
+                        value={registrationDeadline}
+                        onChange={(val) => setCustomRegistrationDeadline(val)}
+                        max={startAt || undefined}
+                      />
+                      <p className="text-[11px] text-slate-400 mt-1">
+                        When student registrations and ticket sales automatically close. Defaults to event start time if omitted.
+                      </p>
+                    </div>
                   </div>
                 </div>
 

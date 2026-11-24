@@ -38,6 +38,7 @@ import {
   Globe,
   Image as ImageIcon,
   CreditCard,
+  Hourglass,
 } from 'lucide-react';
 import { launchPaymentCheckout } from '@/lib/payment/paymentSdk';
 import {
@@ -136,6 +137,10 @@ export function EventDetailPageClient({ slug, eventId, clubId: propClubId }: Eve
   const isCrossCollege = Boolean(user && user.collegeId && hostCollegeId && user.collegeId !== hostCollegeId);
   const isRegistered = Boolean(regStatus?.isRegistered || externalRegStatus?.isRegistered);
 
+  const isDeadlinePassed = Boolean(
+    event?.registrationDeadline && new Date() > new Date(event.registrationDeadline)
+  );
+
   const dateInfo = formatDateParts(event?.startAt || event?.startDate || event?.date);
   const eventTime = formatEventTime(
     event?.startAt || event?.startDate || event?.date,
@@ -148,6 +153,10 @@ export function EventDetailPageClient({ slug, eventId, clubId: propClubId }: Eve
 
   const executePaidCheckout = async (submittedAnswers?: Record<string, unknown>) => {
     if (!event?.id || !user) return;
+    if (isDeadlinePassed) {
+      setRegError('Registration deadline has passed for this event.');
+      return;
+    }
     try {
       setIsCheckingOut(true);
       setRegError(null);
@@ -198,6 +207,10 @@ export function EventDetailPageClient({ slug, eventId, clubId: propClubId }: Eve
 
   const executeExternalRegistration = async (submittedAnswers?: Record<string, unknown>) => {
     if (!event?.id) return;
+    if (isDeadlinePassed) {
+      setRegError('Registration deadline has passed for this event.');
+      return;
+    }
     const activeToken = externalToken || getStoredExternalToken();
     if (!activeToken) {
       const returnPath = `/college/${slug}/events/${eventId}`;
@@ -284,6 +297,11 @@ export function EventDetailPageClient({ slug, eventId, clubId: propClubId }: Eve
   const handleRegister = async () => {
     if (validRegistrationUrl) {
       window.open(validRegistrationUrl, '_blank', 'noopener,noreferrer');
+      return;
+    }
+
+    if (isDeadlinePassed) {
+      setRegError('Registration deadline has passed for this event.');
       return;
     }
 
@@ -645,6 +663,47 @@ export function EventDetailPageClient({ slug, eventId, clubId: propClubId }: Eve
                         <span className="font-extrabold text-sm">{event.venue || event.location || 'Campus Main Venue'}</span>
                       </div>
                     </div>
+
+                    {event.registrationDeadline && (
+                      <div
+                        className={`sm:col-span-2 p-3.5 rounded-2xl border flex items-start gap-3 ${
+                          isDeadlinePassed
+                            ? 'bg-rose-500/10 border-rose-500/25 text-rose-300'
+                            : isDark
+                              ? 'bg-amber-500/10 border-amber-500/20 text-amber-200'
+                              : 'bg-amber-50 border-amber-200 text-amber-800'
+                        }`}
+                      >
+                        <div
+                          className={`p-2 rounded-xl shrink-0 ${
+                            isDeadlinePassed
+                              ? 'bg-rose-500/20 text-rose-400'
+                              : 'bg-amber-500/20 text-amber-500 dark:text-amber-400'
+                          }`}
+                        >
+                          <Hourglass className="w-4 h-4" />
+                        </div>
+                        <div className="flex-1 flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
+                          <div>
+                            <span className="block text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                              Registration Deadline
+                            </span>
+                            <span className="font-extrabold text-sm">
+                              {formatDateParts(event.registrationDeadline).full} • {formatEventTime(event.registrationDeadline)}
+                            </span>
+                          </div>
+                          {isDeadlinePassed ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-rose-500/20 text-rose-400 text-[10px] font-bold uppercase tracking-wider">
+                              Registration Closed
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400 text-[10px] font-bold uppercase tracking-wider">
+                              Registration Open
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Action CTA Buttons */}
@@ -710,6 +769,11 @@ export function EventDetailPageClient({ slug, eventId, clubId: propClubId }: Eve
                           >
                             {cancelMutation.isPending || cancelExternalMutation.isPending ? 'Cancelling...' : 'Cancel RSVP'}
                           </button>
+                        </div>
+                      ) : isDeadlinePassed ? (
+                        <div className="flex-1 min-w-[200px] py-3.5 px-6 rounded-full font-extrabold text-xs uppercase tracking-wider shadow-lg bg-rose-500/10 border border-rose-500/30 text-rose-400 flex items-center justify-center gap-2 cursor-not-allowed">
+                          <AlertCircle className="w-4 h-4 shrink-0" />
+                          <span>Registration Closed (Deadline Passed)</span>
                         </div>
                       ) : (
                         <button

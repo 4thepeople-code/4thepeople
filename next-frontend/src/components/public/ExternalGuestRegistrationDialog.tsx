@@ -97,6 +97,12 @@ export function ExternalGuestRegistrationDialog({
   // Validation for Step 1
   const validateDetails = (): boolean => {
     setErrorMessage(null);
+
+    if (event.registrationDeadline && new Date() > new Date(event.registrationDeadline)) {
+      setErrorMessage('Registration deadline has passed for this event.');
+      return false;
+    }
+
     const trimmedEmail = email.trim().toLowerCase();
     const trimmedName = name.trim();
 
