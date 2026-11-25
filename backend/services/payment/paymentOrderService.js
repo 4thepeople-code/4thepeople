@@ -86,6 +86,17 @@ function validateFormAnswers(formDefinition, submittedAnswers) {
     validated.teamMembers = answers.teamMembers;
   }
 
+  // Preserve standardized participant registration fields
+  const standardFields = [
+    'rollNumber', 'name', 'email', 'phone', 'department', 'gender',
+    'yearOfStudy', 'collegeName', 'institutionName'
+  ];
+  for (const sf of standardFields) {
+    if (answers[sf] !== undefined && answers[sf] !== null && answers[sf] !== '') {
+      validated[sf] = answers[sf];
+    }
+  }
+
   return Object.keys(validated).length > 0 ? validated : (submittedAnswers || null);
 }
 

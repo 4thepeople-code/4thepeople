@@ -100,10 +100,17 @@ export async function externalCheckout(
   input: {
     externalParticipantId?: string;
     name: string;
-    phone?: string;
+    rollNumber?: string;
+    email?: string;
+    department?: string;
+    gender?: string;
+    yearOfStudy?: string;
     institutionName?: string;
+    collegeName?: string;
+    phone?: string;
     formAnswers?: Record<string, unknown>;
     returnUrl?: string;
+    [key: string]: unknown;
   },
   externalToken?: string
 ): Promise<CheckoutSessionData> {

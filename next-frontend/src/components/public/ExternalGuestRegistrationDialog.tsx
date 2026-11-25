@@ -51,6 +51,10 @@ export function ExternalGuestRegistrationDialog({
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [institutionName, setInstitutionName] = useState('');
+  const [rollNumber, setRollNumber] = useState('');
+  const [department, setDepartment] = useState('');
+  const [gender, setGender] = useState('');
+  const [yearOfStudy, setYearOfStudy] = useState('');
   const [formAnswers, setFormAnswers] = useState<Record<string, unknown>>({});
 
   // OTP State (6 separate digit boxes)
@@ -243,9 +247,24 @@ export function ExternalGuestRegistrationDialog({
       // 2. Complete registration using the external JWT
       const input: ExternalRegisterInput = {
         name: name.trim(),
+        rollNumber: rollNumber.trim() || undefined,
+        email: email.trim().toLowerCase(),
+        department: department.trim() || undefined,
+        gender: gender.trim() || undefined,
+        yearOfStudy: yearOfStudy.trim() || undefined,
         phone: phone.trim() || undefined,
         institutionName: institutionName.trim() || undefined,
-        formAnswers: Object.keys(formAnswers).length > 0 ? formAnswers : undefined,
+        formAnswers: {
+          ...formAnswers,
+          rollNumber: rollNumber.trim() || undefined,
+          name: name.trim(),
+          email: email.trim().toLowerCase(),
+          department: department.trim() || undefined,
+          gender: gender.trim() || undefined,
+          yearOfStudy: yearOfStudy.trim() || undefined,
+          phone: phone.trim() || undefined,
+          institutionName: institutionName.trim() || undefined,
+        },
       };
 
       if (event.isPaid) {
@@ -253,8 +272,24 @@ export function ExternalGuestRegistrationDialog({
           event.id,
           {
             name: name.trim(),
+            rollNumber: rollNumber.trim() || undefined,
+            email: email.trim().toLowerCase(),
+            department: department.trim() || undefined,
+            gender: gender.trim() || undefined,
+            yearOfStudy: yearOfStudy.trim() || undefined,
             phone: phone.trim() || undefined,
-            formAnswers: Object.keys(formAnswers).length > 0 ? formAnswers : undefined,
+            institutionName: institutionName.trim() || undefined,
+            formAnswers: {
+              ...formAnswers,
+              rollNumber: rollNumber.trim() || undefined,
+              name: name.trim(),
+              email: email.trim().toLowerCase(),
+              department: department.trim() || undefined,
+              gender: gender.trim() || undefined,
+              yearOfStudy: yearOfStudy.trim() || undefined,
+              phone: phone.trim() || undefined,
+              institutionName: institutionName.trim() || undefined,
+            },
             returnUrl: window.location.href,
           },
           token
@@ -464,6 +499,87 @@ export function ExternalGuestRegistrationDialog({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                    Roll No / Student ID
+                  </label>
+                  <input
+                    type="text"
+                    value={rollNumber}
+                    onChange={(e) => setRollNumber(e.target.value)}
+                    placeholder="e.g. 21CS101"
+                    className={`w-full px-4 py-2.5 rounded-2xl border text-sm font-medium outline-none transition-all ${
+                      isDark
+                        ? 'bg-slate-950 border-white/10 focus:border-[#FF5733] text-white'
+                        : 'bg-white border-[#E2E0D5] focus:border-[#FF5733] text-[#0F172A]'
+                    }`}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                    Department
+                  </label>
+                  <input
+                    type="text"
+                    value={department}
+                    onChange={(e) => setDepartment(e.target.value)}
+                    placeholder="e.g. Computer Science"
+                    className={`w-full px-4 py-2.5 rounded-2xl border text-sm font-medium outline-none transition-all ${
+                      isDark
+                        ? 'bg-slate-950 border-white/10 focus:border-[#FF5733] text-white'
+                        : 'bg-white border-[#E2E0D5] focus:border-[#FF5733] text-[#0F172A]'
+                    }`}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                    Gender
+                  </label>
+                  <select
+                    value={gender}
+                    onChange={(e) => setGender(e.target.value)}
+                    className={`w-full px-4 py-2.5 rounded-2xl border text-sm font-medium outline-none transition-all ${
+                      isDark
+                        ? 'bg-slate-950 border-white/10 focus:border-[#FF5733] text-white'
+                        : 'bg-white border-[#E2E0D5] focus:border-[#FF5733] text-[#0F172A]'
+                    }`}
+                  >
+                    <option value="">Select Gender</option>
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                    <option value="Other">Other</option>
+                    <option value="Prefer not to say">Prefer not to say</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                    Year of Study
+                  </label>
+                  <select
+                    value={yearOfStudy}
+                    onChange={(e) => setYearOfStudy(e.target.value)}
+                    className={`w-full px-4 py-2.5 rounded-2xl border text-sm font-medium outline-none transition-all ${
+                      isDark
+                        ? 'bg-slate-950 border-white/10 focus:border-[#FF5733] text-white'
+                        : 'bg-white border-[#E2E0D5] focus:border-[#FF5733] text-[#0F172A]'
+                    }`}
+                  >
+                    <option value="">Select Year</option>
+                    <option value="1st Year">1st Year</option>
+                    <option value="2nd Year">2nd Year</option>
+                    <option value="3rd Year">3rd Year</option>
+                    <option value="4th Year">4th Year</option>
+                    <option value="Post Graduate">Post Graduate</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">
                     Phone Number <span className="text-[10px] text-slate-500 font-normal">(Optional)</span>
                   </label>
                   <div className="relative">
@@ -484,7 +600,7 @@ export function ExternalGuestRegistrationDialog({
 
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">
-                    Institution / Org <span className="text-[10px] text-slate-500 font-normal">(Optional)</span>
+                    College / Institution <span className="text-[10px] text-slate-500 font-normal">(Optional)</span>
                   </label>
                   <div className="relative">
                     <Building className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -492,7 +608,7 @@ export function ExternalGuestRegistrationDialog({
                       type="text"
                       value={institutionName}
                       onChange={(e) => setInstitutionName(e.target.value)}
-                      placeholder="University / Company"
+                      placeholder="University / College"
                       className={`w-full pl-10 pr-4 py-2.5 rounded-2xl border text-sm font-medium outline-none transition-all ${
                         isDark
                           ? 'bg-slate-950 border-white/10 focus:border-[#FF5733] text-white'

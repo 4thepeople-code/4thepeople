@@ -47,6 +47,10 @@ export interface EventAttendeeItem {
   participantEmail?: string | null;
   participantRollNumber?: string | null;
   participantCollegeName?: string | null;
+  participantDepartment?: string | null;
+  participantGender?: string | null;
+  participantYearOfStudy?: string | null;
+  participantPhone?: string | null;
   homeCollegeId?: string | null;
   isUserDeleted?: boolean;
   customFormAnswers?: Record<string, unknown> | null;

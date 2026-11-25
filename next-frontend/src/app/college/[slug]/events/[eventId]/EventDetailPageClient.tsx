@@ -116,6 +116,17 @@ export function EventDetailPageClient({ slug, eventId, clubId: propClubId }: Eve
   const [showTeamModal, setShowTeamModal] = useState(false);
   const [showCrossCollegeModal, setShowCrossCollegeModal] = useState(false);
   const [isCheckingOut, setIsCheckingOut] = useState(false);
+
+  // Standard 8 Student Registration Fields
+  const [studentRollNumber, setStudentRollNumber] = useState('');
+  const [studentName, setStudentName] = useState('');
+  const [studentEmail, setStudentEmail] = useState('');
+  const [studentDepartment, setStudentDepartment] = useState('');
+  const [studentGender, setStudentGender] = useState('');
+  const [studentYearOfStudy, setStudentYearOfStudy] = useState('');
+  const [studentCollege, setStudentCollege] = useState('');
+  const [studentPhone, setStudentPhone] = useState('');
+
   const [formAnswers, setFormAnswers] = useState<Record<string, unknown>>({});
   const [formValidationError, setFormValidationError] = useState<string | null>(null);
   const [teamName, setTeamName] = useState('');
@@ -155,6 +166,28 @@ export function EventDetailPageClient({ slug, eventId, clubId: propClubId }: Eve
       }
     }
   }, [showTeamModal, teamSettings]);
+
+  // Pre-fill standard fields from user or external session
+  useEffect(() => {
+    if (user) {
+      if (user.name) setStudentName((prev) => prev || user.name || '');
+      if (user.email) setStudentEmail((prev) => prev || user.email || '');
+      if (user.rollNumber) setStudentRollNumber((prev) => prev || user.rollNumber || '');
+      const userWithCollege = user as unknown as { college?: { name?: string }; collegeName?: string };
+      const cName = userWithCollege.college?.name || userWithCollege.collegeName || event?.college?.name;
+      if (cName) setStudentCollege((prev) => prev || cName || '');
+      const userDept = (user as unknown as { department?: { name?: string } })?.department?.name;
+      if (userDept) setStudentDepartment((prev) => prev || userDept || '');
+    } else {
+      const ext = getStoredExternalUser();
+      if (ext) {
+        if (ext.name) setStudentName((prev) => prev || ext.name || '');
+        if (ext.email) setStudentEmail((prev) => prev || ext.email || '');
+        if (ext.institutionName) setStudentCollege((prev) => prev || ext.institutionName || '');
+        if (ext.phone) setStudentPhone((prev) => prev || ext.phone || '');
+      }
+    }
+  }, [user, event]);
 
   const collegeDisplay = slug.toUpperCase();
 
@@ -251,10 +284,15 @@ export function EventDetailPageClient({ slug, eventId, clubId: propClubId }: Eve
     }
 
     const storedUser = getStoredExternalUser();
-    const participantName = user?.name || storedUser?.name || 'Guest Participant';
-    const participantEmail = user?.email || storedUser?.email || '';
-    const participantPhone = storedUser?.phone;
-    const participantInstitution = storedUser?.institutionName;
+    const ans = submittedAnswers || {};
+    const participantName = (typeof ans.name === 'string' && ans.name) || studentName || user?.name || storedUser?.name || 'Guest Participant';
+    const participantEmail = (typeof ans.email === 'string' && ans.email) || studentEmail || user?.email || storedUser?.email || '';
+    const participantRollNumber = (typeof ans.rollNumber === 'string' && ans.rollNumber) || studentRollNumber || undefined;
+    const participantDepartment = (typeof ans.department === 'string' && ans.department) || studentDepartment || undefined;
+    const participantGender = (typeof ans.gender === 'string' && ans.gender) || studentGender || undefined;
+    const participantYearOfStudy = (typeof ans.yearOfStudy === 'string' && ans.yearOfStudy) || studentYearOfStudy || undefined;
+    const participantPhone = (typeof ans.phone === 'string' && ans.phone) || studentPhone || storedUser?.phone || undefined;
+    const participantInstitution = (typeof ans.institutionName === 'string' && ans.institutionName) || (typeof ans.collegeName === 'string' && ans.collegeName) || studentCollege || storedUser?.institutionName || undefined;
 
     try {
       setRegError(null);
@@ -265,8 +303,14 @@ export function EventDetailPageClient({ slug, eventId, clubId: propClubId }: Eve
           event.id,
           {
             name: participantName,
+            rollNumber: participantRollNumber,
+            email: participantEmail,
+            department: participantDepartment,
+            gender: participantGender,
+            yearOfStudy: participantYearOfStudy,
             phone: participantPhone,
             institutionName: participantInstitution,
+            collegeName: participantInstitution,
             formAnswers: submittedAnswers,
             returnUrl: window.location.href,
           },
@@ -305,8 +349,14 @@ export function EventDetailPageClient({ slug, eventId, clubId: propClubId }: Eve
         event.id,
         {
           name: participantName,
+          rollNumber: participantRollNumber,
+          email: participantEmail,
+          department: participantDepartment,
+          gender: participantGender,
+          yearOfStudy: participantYearOfStudy,
           phone: participantPhone,
           institutionName: participantInstitution,
+          collegeName: participantInstitution,
           formAnswers: submittedAnswers,
         },
         activeToken
@@ -350,104 +400,93 @@ export function EventDetailPageClient({ slug, eventId, clubId: propClubId }: Eve
 
     if (!event?.id) return;
 
+    // Check visibility permissions
+    const isExternalParticipant = user?.role === 'EXTERNAL' || (!user && Boolean(externalToken));
+    if ((isExternalParticipant || isCrossCollege) && event.visibility !== 'PUBLIC') {
+      setRegError('This event is exclusive to students of this institution.');
+      return;
+    }
+
+    // Populate registration form fields from known session before showing modal
+    if (user) {
+      if (user.name) setStudentName((prev) => prev || user.name || '');
+      if (user.email) setStudentEmail((prev) => prev || user.email || '');
+      if (user.rollNumber) setStudentRollNumber((prev) => prev || user.rollNumber || '');
+      const userWithCollege = user as unknown as { college?: { name?: string }; collegeName?: string };
+      const cName = userWithCollege.college?.name || userWithCollege.collegeName || event?.college?.name;
+      if (cName) setStudentCollege((prev) => prev || cName || '');
+      const userDept = (user as unknown as { department?: { name?: string } })?.department?.name;
+      if (userDept) setStudentDepartment((prev) => prev || userDept || '');
+    } else {
+      const ext = getStoredExternalUser();
+      if (ext) {
+        if (ext.name) setStudentName((prev) => prev || ext.name || '');
+        if (ext.email) setStudentEmail((prev) => prev || ext.email || '');
+        if (ext.institutionName) setStudentCollege((prev) => prev || ext.institutionName || '');
+        if (ext.phone) setStudentPhone((prev) => prev || ext.phone || '');
+      }
+    }
+
     // 2. Team event registration flow
     if (isTeamEvent) {
-      if (isCrossCollege && event.visibility !== 'PUBLIC') {
-        setRegError('Cross-college registration is only available for public events.');
-        return;
-      }
-      const isExternalParticipant = user?.role === 'EXTERNAL' || (!user && Boolean(externalToken));
-      if (isExternalParticipant && event.visibility !== 'PUBLIC') {
-        setRegError('This event is exclusive to students of this institution.');
-        return;
-      }
       setShowTeamModal(true);
       return;
     }
 
-    // 2. External participant flow
-    const isExternalParticipant = user?.role === 'EXTERNAL' || (!user && Boolean(externalToken));
-    if (isExternalParticipant) {
-      if (event.visibility !== 'PUBLIC') {
-        setRegError('This event is exclusive to students of this institution.');
-        return;
-      }
-
-      const fields = event.customFormDefinition?.fields;
-      if (fields && Array.isArray(fields) && fields.length > 0) {
-        setShowFormModal(true);
-        return;
-      }
-
-      await executeExternalRegistration();
-      return;
-    }
-
-    // 3. Cross-college student
+    // 3. Cross-college student confirmation
     if (isCrossCollege) {
-      if (event.visibility !== 'PUBLIC') {
-        setRegError('Cross-college registration is only available for public events.');
-        return;
-      }
       setShowCrossCollegeModal(true);
       return;
     }
 
-    // 4. Same-college student flow
-    const fields = event.customFormDefinition?.fields;
-    if (fields && Array.isArray(fields) && fields.length > 0) {
-      setShowFormModal(true);
-      return;
-    }
-
-    // If event is paid, initiate checkout
-    if (event.isPaid) {
-      await executePaidCheckout();
-      return;
-    }
-
-    try {
-      setRegError(null);
-      await registerMutation.mutateAsync({ eventId: event.id });
-      setShowModal(true);
-    } catch (err: unknown) {
-      const msg =
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
-        (err instanceof Error ? err.message : 'Failed to register for event.');
-      setRegError(msg);
-    }
+    // 4. Standard Student Registration form
+    setShowFormModal(true);
   };
 
-  const handleConfirmCrossCollege = async () => {
+  const handleConfirmCrossCollege = () => {
     setShowCrossCollegeModal(false);
-    if (!event?.id) return;
-
-    const fields = event.customFormDefinition?.fields;
-    if (fields && Array.isArray(fields) && fields.length > 0) {
-      setShowFormModal(true);
-      return;
-    }
-
-    if (event.isPaid) {
-      await executePaidCheckout();
-      return;
-    }
-
-    try {
-      setRegError(null);
-      await registerMutation.mutateAsync({ eventId: event.id });
-      setShowModal(true);
-    } catch (err: unknown) {
-      const msg =
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
-        (err instanceof Error ? err.message : 'Failed to register for event.');
-      setRegError(msg);
-    }
+    setShowFormModal(true);
   };
 
   const handleCustomFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!event?.id) return;
+
+    setFormValidationError(null);
+
+    // Validate standard 8 fields
+    if (!studentRollNumber.trim()) {
+      setFormValidationError('Roll Number / Student ID is required.');
+      return;
+    }
+    if (!studentName.trim()) {
+      setFormValidationError('Full Name is required.');
+      return;
+    }
+    if (!studentEmail.trim()) {
+      setFormValidationError('Email is required.');
+      return;
+    }
+    if (!studentDepartment.trim()) {
+      setFormValidationError('Department is required.');
+      return;
+    }
+    if (!studentGender.trim()) {
+      setFormValidationError('Gender is required.');
+      return;
+    }
+    if (!studentYearOfStudy.trim()) {
+      setFormValidationError('Year of Study is required.');
+      return;
+    }
+    if (!studentCollege.trim()) {
+      setFormValidationError('College / Institution is required.');
+      return;
+    }
+    if (!studentPhone.trim()) {
+      setFormValidationError('Phone number is required.');
+      return;
+    }
 
     const fields = event.customFormDefinition?.fields || [];
     for (const f of fields) {
@@ -460,23 +499,47 @@ export function EventDetailPageClient({ slug, eventId, clubId: propClubId }: Eve
       }
     }
 
+    const payload = {
+      rollNumber: studentRollNumber.trim(),
+      name: studentName.trim(),
+      email: studentEmail.trim().toLowerCase(),
+      department: studentDepartment.trim(),
+      gender: studentGender.trim(),
+      yearOfStudy: studentYearOfStudy.trim(),
+      collegeName: studentCollege.trim(),
+      institutionName: studentCollege.trim(),
+      phone: studentPhone.trim(),
+      formAnswers: {
+        ...formAnswers,
+        rollNumber: studentRollNumber.trim(),
+        name: studentName.trim(),
+        email: studentEmail.trim().toLowerCase(),
+        department: studentDepartment.trim(),
+        gender: studentGender.trim(),
+        yearOfStudy: studentYearOfStudy.trim(),
+        collegeName: studentCollege.trim(),
+        institutionName: studentCollege.trim(),
+        phone: studentPhone.trim(),
+      },
+    };
+
     const isExternalParticipant = user?.role === 'EXTERNAL' || (!user && Boolean(externalToken));
     if (isExternalParticipant) {
       setShowFormModal(false);
-      await executeExternalRegistration(formAnswers);
+      await executeExternalRegistration(payload);
       return;
     }
 
     if (event.isPaid) {
       setShowFormModal(false);
-      await executePaidCheckout(formAnswers);
+      await executePaidCheckout(payload);
       return;
     }
 
     try {
       setFormValidationError(null);
       setRegError(null);
-      await registerMutation.mutateAsync({ eventId: event.id, formAnswers });
+      await registerMutation.mutateAsync({ eventId: event.id, ...payload });
       setShowFormModal(false);
       setShowModal(true);
     } catch (err: unknown) {
@@ -491,6 +554,35 @@ export function EventDetailPageClient({ slug, eventId, clubId: propClubId }: Eve
     e.preventDefault();
     setTeamValidationError(null);
     if (!event?.id) return;
+
+    if (!studentRollNumber.trim()) {
+      setTeamValidationError('Leader Roll Number is required.');
+      return;
+    }
+    if (!studentName.trim()) {
+      setTeamValidationError('Leader Full Name is required.');
+      return;
+    }
+    if (!studentDepartment.trim()) {
+      setTeamValidationError('Leader Department is required.');
+      return;
+    }
+    if (!studentGender.trim()) {
+      setTeamValidationError('Leader Gender is required.');
+      return;
+    }
+    if (!studentYearOfStudy.trim()) {
+      setTeamValidationError('Leader Year of Study is required.');
+      return;
+    }
+    if (!studentCollege.trim()) {
+      setTeamValidationError('Leader College / Institution is required.');
+      return;
+    }
+    if (!studentPhone.trim()) {
+      setTeamValidationError('Leader Phone number is required.');
+      return;
+    }
 
     const trimmedTeamName = teamName.trim();
     if (!trimmedTeamName) {
@@ -507,7 +599,7 @@ export function EventDetailPageClient({ slug, eventId, clubId: propClubId }: Eve
       return;
     }
 
-    const leaderEmail = (user?.email || getStoredExternalUser()?.email || '').toLowerCase().trim();
+    const leaderEmail = (studentEmail || user?.email || getStoredExternalUser()?.email || '').toLowerCase().trim();
     const emailSet = new Set<string>();
     if (leaderEmail) emailSet.add(leaderEmail);
 
@@ -553,20 +645,63 @@ export function EventDetailPageClient({ slug, eventId, clubId: propClubId }: Eve
     }
 
     const teamPayload = {
-      ...formAnswers,
+      rollNumber: studentRollNumber.trim(),
+      name: studentName.trim(),
+      email: leaderEmail,
+      department: studentDepartment.trim(),
+      gender: studentGender.trim(),
+      yearOfStudy: studentYearOfStudy.trim(),
+      collegeName: studentCollege.trim(),
+      institutionName: studentCollege.trim(),
+      phone: studentPhone.trim(),
       isTeamRegistration: true,
       teamName: trimmedTeamName,
       teamSize: totalMembers,
       teamLeader: {
-        name: user?.name || getStoredExternalUser()?.name || 'Leader',
-        email: user?.email || getStoredExternalUser()?.email || '',
-        rollNumber: user?.rollNumber || null,
+        name: studentName.trim() || user?.name || 'Leader',
+        email: leaderEmail,
+        rollNumber: studentRollNumber.trim() || user?.rollNumber || null,
+        phone: studentPhone.trim() || null,
+        department: studentDepartment.trim() || null,
+        gender: studentGender.trim() || null,
+        yearOfStudy: studentYearOfStudy.trim() || null,
+        collegeName: studentCollege.trim() || null,
       },
       teamMembers: teamMembers.map((m) => ({
         name: m.name.trim(),
         email: m.email.trim().toLowerCase(),
         rollNumber: m.rollNumber?.trim() || null,
       })),
+      formAnswers: {
+        ...formAnswers,
+        rollNumber: studentRollNumber.trim(),
+        name: studentName.trim(),
+        email: leaderEmail,
+        department: studentDepartment.trim(),
+        gender: studentGender.trim(),
+        yearOfStudy: studentYearOfStudy.trim(),
+        collegeName: studentCollege.trim(),
+        institutionName: studentCollege.trim(),
+        phone: studentPhone.trim(),
+        isTeamRegistration: true,
+        teamName: trimmedTeamName,
+        teamSize: totalMembers,
+        teamLeader: {
+          name: studentName.trim() || user?.name || 'Leader',
+          email: leaderEmail,
+          rollNumber: studentRollNumber.trim() || user?.rollNumber || null,
+          phone: studentPhone.trim() || null,
+          department: studentDepartment.trim() || null,
+          gender: studentGender.trim() || null,
+          yearOfStudy: studentYearOfStudy.trim() || null,
+          collegeName: studentCollege.trim() || null,
+        },
+        teamMembers: teamMembers.map((m) => ({
+          name: m.name.trim(),
+          email: m.email.trim().toLowerCase(),
+          rollNumber: m.rollNumber?.trim() || null,
+        })),
+      },
     };
 
     const isExternalParticipant = user?.role === 'EXTERNAL' || (!user && Boolean(externalToken));
@@ -1326,21 +1461,122 @@ export function EventDetailPageClient({ slug, eventId, clubId: propClubId }: Eve
                 />
               </div>
 
-              {/* Leader Snapshot Card */}
-              <div className="space-y-1.5">
-                <label className={`block text-xs font-bold uppercase tracking-wider ${isDark ? 'text-gray-200' : 'text-slate-700'}`}>
-                  Team Leader (You)
-                </label>
-                <div className={`p-3 rounded-xl border flex items-center justify-between ${
-                  isDark ? 'bg-white/5 border-white/10' : 'bg-slate-50 border-slate-200'
-                }`}>
-                  <div>
-                    <p className="font-bold text-xs">{user?.name || getStoredExternalUser()?.name || 'Participant'}</p>
-                    <p className="text-[11px] text-slate-400">{user?.email || getStoredExternalUser()?.email || '—'}</p>
-                  </div>
+              {/* Leader Snapshot & Profile Card */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className={`block text-xs font-bold uppercase tracking-wider ${isDark ? 'text-gray-200' : 'text-slate-700'}`}>
+                    Team Leader Details (You)
+                  </label>
                   <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">
                     Leader
                   </span>
+                </div>
+                
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                      Roll Number <span className="text-red-400">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={studentRollNumber}
+                      onChange={(e) => setStudentRollNumber(e.target.value)}
+                      placeholder="e.g. 21CS101"
+                      className={`w-full px-3 py-2 rounded-xl border text-xs transition-all focus:outline-hidden focus:border-[#00F0FF] ${
+                        isDark ? 'bg-[#0B0C10] border-white/10 text-white' : 'bg-slate-50 border-slate-200 text-slate-900'
+                      }`}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                      Phone Number <span className="text-red-400">*</span>
+                    </label>
+                    <input
+                      type="tel"
+                      required
+                      value={studentPhone}
+                      onChange={(e) => setStudentPhone(e.target.value)}
+                      placeholder="+91 9876543210"
+                      className={`w-full px-3 py-2 rounded-xl border text-xs transition-all focus:outline-hidden focus:border-[#00F0FF] ${
+                        isDark ? 'bg-[#0B0C10] border-white/10 text-white' : 'bg-slate-50 border-slate-200 text-slate-900'
+                      }`}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                      Department <span className="text-red-400">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={studentDepartment}
+                      onChange={(e) => setStudentDepartment(e.target.value)}
+                      placeholder="e.g. Computer Science"
+                      className={`w-full px-3 py-2 rounded-xl border text-xs transition-all focus:outline-hidden focus:border-[#00F0FF] ${
+                        isDark ? 'bg-[#0B0C10] border-white/10 text-white' : 'bg-slate-50 border-slate-200 text-slate-900'
+                      }`}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                      Gender <span className="text-red-400">*</span>
+                    </label>
+                    <select
+                      required
+                      value={studentGender}
+                      onChange={(e) => setStudentGender(e.target.value)}
+                      className={`w-full px-3 py-2 rounded-xl border text-xs transition-all focus:outline-hidden focus:border-[#00F0FF] ${
+                        isDark ? 'bg-[#0B0C10] border-white/10 text-white' : 'bg-slate-50 border-slate-200 text-slate-900'
+                      }`}
+                    >
+                      <option value="">Select Gender</option>
+                      <option value="Male">Male</option>
+                      <option value="Female">Female</option>
+                      <option value="Other">Other</option>
+                      <option value="Prefer not to say">Prefer not to say</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                      Year of Study <span className="text-red-400">*</span>
+                    </label>
+                    <select
+                      required
+                      value={studentYearOfStudy}
+                      onChange={(e) => setStudentYearOfStudy(e.target.value)}
+                      className={`w-full px-3 py-2 rounded-xl border text-xs transition-all focus:outline-hidden focus:border-[#00F0FF] ${
+                        isDark ? 'bg-[#0B0C10] border-white/10 text-white' : 'bg-slate-50 border-slate-200 text-slate-900'
+                      }`}
+                    >
+                      <option value="">Select Year</option>
+                      <option value="1st Year">1st Year</option>
+                      <option value="2nd Year">2nd Year</option>
+                      <option value="3rd Year">3rd Year</option>
+                      <option value="4th Year">4th Year</option>
+                      <option value="Post Graduate">Post Graduate</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                      College / Institution <span className="text-red-400">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={studentCollege}
+                      onChange={(e) => setStudentCollege(e.target.value)}
+                      placeholder="College / Institution"
+                      className={`w-full px-3 py-2 rounded-xl border text-xs transition-all focus:outline-hidden focus:border-[#00F0FF] ${
+                        isDark ? 'bg-[#0B0C10] border-white/10 text-white' : 'bg-slate-50 border-slate-200 text-slate-900'
+                      }`}
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -1610,111 +1846,293 @@ export function EventDetailPageClient({ slug, eventId, clubId: propClubId }: Eve
         </div>
       )}
 
-      {/* Custom Questions Registration Modal */}
-      {showFormModal && event?.customFormDefinition?.fields && (
+      {/* Student Registration Form Modal */}
+      {showFormModal && event && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
           <div
-            className={`border rounded-3xl max-w-lg w-full p-6 sm:p-8 space-y-5 shadow-2xl ${
+            className={`border rounded-3xl max-w-xl w-full p-6 sm:p-8 space-y-5 shadow-2xl flex flex-col max-h-[90vh] ${
               isDark ? 'bg-[#12141C] border-white/15 text-white' : 'bg-white border-slate-200 text-[#0F172A]'
             }`}
           >
-            <div className="space-y-1">
-              <span className="text-[10px] font-bold tracking-widest text-[#00F0FF] uppercase">
-                Registration Questions
-              </span>
+            <div className="space-y-1 shrink-0">
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-bold tracking-widest text-[#00F0FF] uppercase">
+                  Student Registration Form
+                </span>
+                {event.isPaid ? (
+                  <span className="px-2.5 py-0.5 rounded-full bg-purple-500/20 text-purple-300 text-[10px] font-black uppercase tracking-wider font-mono">
+                    ₹{event.fee || 0}
+                  </span>
+                ) : (
+                  <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-black uppercase tracking-wider">
+                    Free RSVP
+                  </span>
+                )}
+              </div>
               <h3 className={`font-['Syne',sans-serif] text-xl font-extrabold uppercase ${isDark ? 'text-white' : 'text-[#0F172A]'}`}>
                 {event.title}
               </h3>
               <p className={`text-xs ${isDark ? 'text-gray-400' : 'text-slate-600'}`}>
-                Please complete these organizer questions to finalize your registration.
+                Please verify and complete your student registration details below.
               </p>
             </div>
 
             {formValidationError && (
-              <div className="p-3 rounded-xl bg-red-500/15 border border-red-500/30 text-xs font-semibold text-red-400 flex items-center gap-2">
+              <div className="p-3 rounded-xl bg-red-500/15 border border-red-500/30 text-xs font-semibold text-red-400 flex items-center gap-2 shrink-0">
                 <AlertCircle className="w-4 h-4 shrink-0" />
                 <span>{formValidationError}</span>
               </div>
             )}
 
-            <form onSubmit={handleCustomFormSubmit} className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
-              {event.customFormDefinition.fields.map((field, idx) => {
-                const fieldKey: string = field.id || field.name || `field_${idx}`;
-                const value = formAnswers[fieldKey] !== undefined ? String(formAnswers[fieldKey]) : '';
+            <form onSubmit={handleCustomFormSubmit} className="space-y-4 overflow-y-auto pr-1 flex-1">
+              {/* Standard 8 Fields */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                {/* 1. Roll No */}
+                <div className="space-y-1">
+                  <label className={`block text-xs font-bold uppercase tracking-wider ${isDark ? 'text-gray-200' : 'text-slate-700'}`}>
+                    Roll Number / Student ID <span className="text-red-400">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={studentRollNumber}
+                    onChange={(e) => setStudentRollNumber(e.target.value)}
+                    placeholder="e.g. 21CS101"
+                    className={`w-full px-3.5 py-2.5 rounded-xl border text-sm transition-all focus:outline-hidden focus:border-[#00F0FF] ${
+                      isDark
+                        ? 'bg-[#0B0C10] border-white/10 text-white placeholder-gray-600'
+                        : 'bg-slate-50 border-slate-200 text-slate-900 placeholder-slate-400'
+                    }`}
+                  />
+                </div>
 
-                return (
-                  <div key={fieldKey} className="space-y-1.5">
-                    <label className={`block text-xs font-bold uppercase tracking-wider ${isDark ? 'text-gray-200' : 'text-slate-700'}`}>
-                      {field.label || fieldKey} {field.required && <span className="text-red-400">*</span>}
-                    </label>
+                {/* 2. Full Name */}
+                <div className="space-y-1">
+                  <label className={`block text-xs font-bold uppercase tracking-wider ${isDark ? 'text-gray-200' : 'text-slate-700'}`}>
+                    Full Name <span className="text-red-400">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={studentName}
+                    onChange={(e) => setStudentName(e.target.value)}
+                    placeholder="Your legal or display name"
+                    className={`w-full px-3.5 py-2.5 rounded-xl border text-sm transition-all focus:outline-hidden focus:border-[#00F0FF] ${
+                      isDark
+                        ? 'bg-[#0B0C10] border-white/10 text-white placeholder-gray-600'
+                        : 'bg-slate-50 border-slate-200 text-slate-900 placeholder-slate-400'
+                    }`}
+                  />
+                </div>
 
-                    {field.type === 'SELECT' ? (
-                      <select
-                        value={value}
-                        onChange={(e) =>
-                          setFormAnswers((prev) => ({ ...prev, [fieldKey]: e.target.value }))
-                        }
-                        className={`w-full px-4 py-2.5 rounded-xl border text-sm transition-all focus:outline-hidden focus:border-[#00F0FF] ${
-                          isDark
-                            ? 'bg-[#0B0C10] border-white/10 text-white'
-                            : 'bg-slate-50 border-slate-200 text-slate-900'
-                        }`}
-                        required={field.required}
-                      >
-                        <option value="">Select an option...</option>
-                        {field.options?.map((opt) => (
-                          <option key={opt} value={opt}>
-                            {opt}
-                          </option>
-                        ))}
-                      </select>
-                    ) : field.type === 'RADIO' ? (
-                      <div className="space-y-1.5 pt-1">
-                        {field.options?.map((opt) => (
-                          <label key={opt} className="flex items-center gap-2 text-xs cursor-pointer">
-                            <input
-                              type="radio"
-                              name={fieldKey}
-                              value={opt}
-                              checked={value === opt}
-                              onChange={(e) =>
-                                setFormAnswers((prev) => ({ ...prev, [fieldKey]: e.target.value }))
-                              }
-                              required={field.required}
-                              className="text-cyan-500 focus:ring-cyan-500"
-                            />
-                            <span>{opt}</span>
-                          </label>
-                        ))}
+                {/* 3. Email */}
+                <div className="space-y-1">
+                  <label className={`block text-xs font-bold uppercase tracking-wider ${isDark ? 'text-gray-200' : 'text-slate-700'}`}>
+                    Email Address <span className="text-red-400">*</span>
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    readOnly
+                    value={studentEmail}
+                    className={`w-full px-3.5 py-2.5 rounded-xl border text-sm transition-all cursor-not-allowed opacity-80 ${
+                      isDark
+                        ? 'bg-[#08090C] border-white/10 text-gray-300'
+                        : 'bg-slate-100 border-slate-200 text-slate-600'
+                    }`}
+                  />
+                </div>
+
+                {/* 4. Phone Number */}
+                <div className="space-y-1">
+                  <label className={`block text-xs font-bold uppercase tracking-wider ${isDark ? 'text-gray-200' : 'text-slate-700'}`}>
+                    Phone Number <span className="text-red-400">*</span>
+                  </label>
+                  <input
+                    type="tel"
+                    required
+                    value={studentPhone}
+                    onChange={(e) => setStudentPhone(e.target.value)}
+                    placeholder="e.g. +91 9876543210"
+                    className={`w-full px-3.5 py-2.5 rounded-xl border text-sm transition-all focus:outline-hidden focus:border-[#00F0FF] ${
+                      isDark
+                        ? 'bg-[#0B0C10] border-white/10 text-white placeholder-gray-600'
+                        : 'bg-slate-50 border-slate-200 text-slate-900 placeholder-slate-400'
+                    }`}
+                  />
+                </div>
+
+                {/* 5. Department */}
+                <div className="space-y-1">
+                  <label className={`block text-xs font-bold uppercase tracking-wider ${isDark ? 'text-gray-200' : 'text-slate-700'}`}>
+                    Department <span className="text-red-400">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={studentDepartment}
+                    onChange={(e) => setStudentDepartment(e.target.value)}
+                    placeholder="e.g. Computer Science"
+                    className={`w-full px-3.5 py-2.5 rounded-xl border text-sm transition-all focus:outline-hidden focus:border-[#00F0FF] ${
+                      isDark
+                        ? 'bg-[#0B0C10] border-white/10 text-white placeholder-gray-600'
+                        : 'bg-slate-50 border-slate-200 text-slate-900 placeholder-slate-400'
+                    }`}
+                  />
+                </div>
+
+                {/* 6. Gender */}
+                <div className="space-y-1">
+                  <label className={`block text-xs font-bold uppercase tracking-wider ${isDark ? 'text-gray-200' : 'text-slate-700'}`}>
+                    Gender <span className="text-red-400">*</span>
+                  </label>
+                  <select
+                    required
+                    value={studentGender}
+                    onChange={(e) => setStudentGender(e.target.value)}
+                    className={`w-full px-3.5 py-2.5 rounded-xl border text-sm transition-all focus:outline-hidden focus:border-[#00F0FF] ${
+                      isDark
+                        ? 'bg-[#0B0C10] border-white/10 text-white'
+                        : 'bg-slate-50 border-slate-200 text-slate-900'
+                    }`}
+                  >
+                    <option value="">Select Gender</option>
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                    <option value="Other">Other</option>
+                    <option value="Prefer not to say">Prefer not to say</option>
+                  </select>
+                </div>
+
+                {/* 7. Year of Study */}
+                <div className="space-y-1">
+                  <label className={`block text-xs font-bold uppercase tracking-wider ${isDark ? 'text-gray-200' : 'text-slate-700'}`}>
+                    Year of Study <span className="text-red-400">*</span>
+                  </label>
+                  <select
+                    required
+                    value={studentYearOfStudy}
+                    onChange={(e) => setStudentYearOfStudy(e.target.value)}
+                    className={`w-full px-3.5 py-2.5 rounded-xl border text-sm transition-all focus:outline-hidden focus:border-[#00F0FF] ${
+                      isDark
+                        ? 'bg-[#0B0C10] border-white/10 text-white'
+                        : 'bg-slate-50 border-slate-200 text-slate-900'
+                    }`}
+                  >
+                    <option value="">Select Year of Study</option>
+                    <option value="1st Year">1st Year</option>
+                    <option value="2nd Year">2nd Year</option>
+                    <option value="3rd Year">3rd Year</option>
+                    <option value="4th Year">4th Year</option>
+                    <option value="Post Graduate">Post Graduate</option>
+                  </select>
+                </div>
+
+                {/* 8. College / Institution */}
+                <div className="space-y-1">
+                  <label className={`block text-xs font-bold uppercase tracking-wider ${isDark ? 'text-gray-200' : 'text-slate-700'}`}>
+                    College / Institution <span className="text-red-400">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={studentCollege}
+                    onChange={(e) => setStudentCollege(e.target.value)}
+                    placeholder="College or Institution Name"
+                    className={`w-full px-3.5 py-2.5 rounded-xl border text-sm transition-all focus:outline-hidden focus:border-[#00F0FF] ${
+                      isDark
+                        ? 'bg-[#0B0C10] border-white/10 text-white placeholder-gray-600'
+                        : 'bg-slate-50 border-slate-200 text-slate-900 placeholder-slate-400'
+                    }`}
+                  />
+                </div>
+              </div>
+
+              {/* Additional Organizer Questions if customFormDefinition exists */}
+              {event.customFormDefinition?.fields && Array.isArray(event.customFormDefinition.fields) && event.customFormDefinition.fields.length > 0 && (
+                <div className="pt-3 border-t border-white/10 space-y-3">
+                  <p className="text-xs font-bold uppercase tracking-wider text-[#00F0FF]">
+                    Additional Organizer Questions
+                  </p>
+                  {event.customFormDefinition.fields.map((field, idx) => {
+                    const fieldKey: string = field.id || field.name || `field_${idx}`;
+                    const value = formAnswers[fieldKey] !== undefined ? String(formAnswers[fieldKey]) : '';
+
+                    return (
+                      <div key={fieldKey} className="space-y-1.5">
+                        <label className={`block text-xs font-bold uppercase tracking-wider ${isDark ? 'text-gray-200' : 'text-slate-700'}`}>
+                          {field.label || fieldKey} {field.required && <span className="text-red-400">*</span>}
+                        </label>
+
+                        {field.type === 'SELECT' ? (
+                          <select
+                            value={value}
+                            onChange={(e) =>
+                              setFormAnswers((prev) => ({ ...prev, [fieldKey]: e.target.value }))
+                            }
+                            className={`w-full px-4 py-2.5 rounded-xl border text-sm transition-all focus:outline-hidden focus:border-[#00F0FF] ${
+                              isDark
+                                ? 'bg-[#0B0C10] border-white/10 text-white'
+                                : 'bg-slate-50 border-slate-200 text-slate-900'
+                            }`}
+                            required={field.required}
+                          >
+                            <option value="">Select an option...</option>
+                            {field.options?.map((opt) => (
+                              <option key={opt} value={opt}>
+                                {opt}
+                              </option>
+                            ))}
+                          </select>
+                        ) : field.type === 'RADIO' ? (
+                          <div className="space-y-1.5 pt-1">
+                            {field.options?.map((opt) => (
+                              <label key={opt} className="flex items-center gap-2 text-xs cursor-pointer">
+                                <input
+                                  type="radio"
+                                  name={fieldKey}
+                                  value={opt}
+                                  checked={value === opt}
+                                  onChange={(e) =>
+                                    setFormAnswers((prev) => ({ ...prev, [fieldKey]: e.target.value }))
+                                  }
+                                  required={field.required}
+                                  className="text-cyan-500 focus:ring-cyan-500"
+                                />
+                                <span>{opt}</span>
+                              </label>
+                            ))}
+                          </div>
+                        ) : (
+                          <input
+                            type={field.type === 'NUMBER' ? 'number' : 'text'}
+                            value={value}
+                            onChange={(e) =>
+                              setFormAnswers((prev) => ({
+                                ...prev,
+                                [fieldKey]: field.type === 'NUMBER' ? Number(e.target.value) : e.target.value,
+                              }))
+                            }
+                            placeholder={`Enter ${field.label || fieldKey}...`}
+                            className={`w-full px-4 py-2.5 rounded-xl border text-sm transition-all focus:outline-hidden focus:border-[#00F0FF] ${
+                              isDark
+                                ? 'bg-[#0B0C10] border-white/10 text-white placeholder-gray-600'
+                                : 'bg-slate-50 border-slate-200 text-slate-900 placeholder-slate-400'
+                            }`}
+                            required={field.required}
+                          />
+                        )}
                       </div>
-                    ) : (
-                      <input
-                        type={field.type === 'NUMBER' ? 'number' : 'text'}
-                        value={value}
-                        onChange={(e) =>
-                          setFormAnswers((prev) => ({
-                            ...prev,
-                            [fieldKey]: field.type === 'NUMBER' ? Number(e.target.value) : e.target.value,
-                          }))
-                        }
-                        placeholder={`Enter ${field.label || fieldKey}...`}
-                        className={`w-full px-4 py-2.5 rounded-xl border text-sm transition-all focus:outline-hidden focus:border-[#00F0FF] ${
-                          isDark
-                            ? 'bg-[#0B0C10] border-white/10 text-white placeholder-gray-600'
-                            : 'bg-slate-50 border-slate-200 text-slate-900 placeholder-slate-400'
-                        }`}
-                        required={field.required}
-                      />
-                    )}
-                  </div>
-                );
-              })}
+                    );
+                  })}
+                </div>
+              )}
 
-              <div className="flex items-center justify-end gap-3 pt-3 border-t">
+              <div className="flex items-center justify-end gap-3 pt-3 border-t shrink-0">
                 <button
                   type="button"
                   onClick={() => setShowFormModal(false)}
-                  disabled={registerMutation.isPending}
+                  disabled={registerMutation.isPending || isCheckingOut}
                   className={`px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider border transition cursor-pointer ${
                     isDark ? 'bg-white/5 border-white/10 text-gray-300 hover:text-white' : 'bg-slate-100 border-slate-200 text-slate-700'
                   }`}
@@ -1723,17 +2141,17 @@ export function EventDetailPageClient({ slug, eventId, clubId: propClubId }: Eve
                 </button>
                 <button
                   type="submit"
-                  disabled={registerMutation.isPending}
+                  disabled={registerMutation.isPending || isCheckingOut}
                   className="px-5 py-2.5 rounded-xl bg-[#00F0FF] hover:bg-[#38f2ff] text-black font-extrabold text-xs uppercase tracking-wider transition cursor-pointer flex items-center gap-2"
                 >
-                  {registerMutation.isPending ? (
+                  {registerMutation.isPending || isCheckingOut ? (
                     <>
                       <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                      <span>Submitting...</span>
+                      <span>{isCheckingOut ? 'Initiating Checkout...' : 'Submitting...'}</span>
                     </>
                   ) : (
                     <>
-                      <span>Submit & Register</span>
+                      <span>{event.isPaid ? `Proceed to Pay ₹${event.fee || 0}` : 'Confirm & Register'}</span>
                       <ArrowRight className="w-3.5 h-3.5" />
                     </>
                   )}

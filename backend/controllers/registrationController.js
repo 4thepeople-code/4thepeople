@@ -194,12 +194,29 @@ exports.registerForEvent = asyncHandler(async (req, res) => {
     const homeCollegeId = req.homeCollegeId || req.collegeId;
     const participantName = req.user.name;
     const participantEmail = req.user.email;
-    const participantRollNumber = req.user.rollNumber || null;
-    const participantCollegeName = req.user.college?.name || null;
+    const participantRollNumber = req.user.rollNumber || body.rollNumber || answers.rollNumber || null;
+    const participantCollegeName = req.user.college?.name || body.collegeName || body.institutionName || answers.collegeName || answers.institutionName || null;
+    const participantDepartment = body.department || body.participantDepartment || answers.department || req.user.department?.name || null;
+    const participantGender = body.gender || body.participantGender || answers.gender || null;
+    const participantYearOfStudy = body.yearOfStudy || body.participantYearOfStudy || answers.yearOfStudy || null;
+    const participantPhone = body.phone || body.participantPhone || answers.phone || null;
+
+    if (!validatedAnswers) validatedAnswers = {};
+    validatedAnswers.rollNumber = participantRollNumber;
+    validatedAnswers.name = participantName;
+    validatedAnswers.email = participantEmail;
+    validatedAnswers.department = participantDepartment;
+    validatedAnswers.gender = participantGender;
+    validatedAnswers.yearOfStudy = participantYearOfStudy;
+    validatedAnswers.collegeName = participantCollegeName;
+    validatedAnswers.phone = participantPhone;
 
     // Ensure teamLeader in validatedAnswers has trusted snapshot roll number
-    if (validatedAnswers && validatedAnswers.isTeamRegistration && validatedAnswers.teamLeader) {
+    if (validatedAnswers.isTeamRegistration && validatedAnswers.teamLeader) {
       validatedAnswers.teamLeader.rollNumber = participantRollNumber;
+      if (participantPhone && !validatedAnswers.teamLeader.phone) {
+        validatedAnswers.teamLeader.phone = participantPhone;
+      }
     }
 
     // 5. Atomically insert registration. PostgreSQL trigger handle_registration_insert
@@ -216,6 +233,10 @@ exports.registerForEvent = asyncHandler(async (req, res) => {
           participantEmail,
           participantRollNumber,
           participantCollegeName,
+          participantDepartment,
+          participantGender,
+          participantYearOfStudy,
+          participantPhone,
           isUserDeleted: false,
           registeredByRole: 'SELF',
           formAnswers: validatedAnswers,
@@ -557,6 +578,10 @@ exports.getEventAttendees = asyncHandler(async (req, res) => {
           participantEmail: true,
           participantRollNumber: true,
           participantCollegeName: true,
+          participantDepartment: true,
+          participantGender: true,
+          participantYearOfStudy: true,
+          participantPhone: true,
           homeCollegeId: true,
           isUserDeleted: true,
           formAnswers: true,
@@ -596,6 +621,10 @@ exports.getEventAttendees = asyncHandler(async (req, res) => {
         participantEmail: r.participantEmail,
         participantRollNumber: r.participantRollNumber || null,
         participantCollegeName: r.participantCollegeName || null,
+        participantDepartment: r.participantDepartment || (r.formAnswers && r.formAnswers.department) || null,
+        participantGender: r.participantGender || (r.formAnswers && r.formAnswers.gender) || null,
+        participantYearOfStudy: r.participantYearOfStudy || (r.formAnswers && r.formAnswers.yearOfStudy) || null,
+        participantPhone: r.participantPhone || (r.formAnswers && r.formAnswers.phone) || null,
         homeCollegeId: r.homeCollegeId || null,
         isUserDeleted: r.isUserDeleted,
         formAnswers: r.formAnswers || null,
@@ -664,6 +693,10 @@ exports.exportEventRegistrations = asyncHandler(async (req, res) => {
         participantEmail: true,
         participantRollNumber: true,
         participantCollegeName: true,
+        participantDepartment: true,
+        participantGender: true,
+        participantYearOfStudy: true,
+        participantPhone: true,
         formAnswers: true,
         user: {
           select: {
@@ -687,21 +720,27 @@ exports.exportEventRegistrations = asyncHandler(async (req, res) => {
         'Registration Type',
         'Team Name',
         'Team Role',
+        'Roll Number',
         'Name',
         'Email',
-        'Roll Number',
-        'Home College / Institution',
+        'Phone Number',
         'Department',
+        'Gender',
+        'Year of Study',
+        'College / Institution',
         'Registered At',
         'Additional Answers',
       ],
     ];
 
     for (const r of registrations) {
-      const dept = r.user && r.user.department
+      const answers = r.formAnswers || {};
+      const dept = r.participantDepartment || (answers && answers.department) || (r.user && r.user.department
         ? (r.user.department.shortCode || r.user.department.name)
-        : '';
-      const answers = r.formAnswers;
+        : '');
+      const gender = r.participantGender || (answers && answers.gender) || '';
+      const yearOfStudy = r.participantYearOfStudy || (answers && answers.yearOfStudy) || '';
+      const phone = r.participantPhone || (answers && answers.phone) || '';
       const isTeam = Boolean(answers && answers.isTeamRegistration);
 
       if (isTeam) {
@@ -709,10 +748,13 @@ exports.exportEventRegistrations = asyncHandler(async (req, res) => {
         const leader = answers.teamLeader || {};
         const members = Array.isArray(answers.teamMembers) ? answers.teamMembers : [];
 
-        // Exclude internal team registration metadata from other answers
-        const otherKeys = Object.keys(answers).filter(
-          (k) => !['isTeamRegistration', 'teamName', 'teamSize', 'teamLeader', 'teamMembers'].includes(k)
-        );
+        // Exclude standard registration fields and team metadata from additional answers
+        const standardKeys = [
+          'isTeamRegistration', 'teamName', 'teamSize', 'teamLeader', 'teamMembers',
+          'rollNumber', 'name', 'email', 'phone', 'department', 'gender', 'yearOfStudy',
+          'collegeName', 'institutionName'
+        ];
+        const otherKeys = Object.keys(answers).filter((k) => !standardKeys.includes(k));
         const otherAnswersStr = otherKeys.length > 0
           ? otherKeys.map((k) => `${k}: ${answers[k]}`).join('; ')
           : '';
@@ -724,11 +766,14 @@ exports.exportEventRegistrations = asyncHandler(async (req, res) => {
           'TEAM',
           teamName,
           'LEADER',
+          r.participantRollNumber || leader.rollNumber || '',
           r.participantName || leader.name || '',
           r.participantEmail || leader.email || '',
-          r.participantRollNumber || leader.rollNumber || '',
-          r.participantCollegeName || '',
-          dept,
+          phone || leader.phone || '',
+          dept || leader.department || '',
+          gender || leader.gender || '',
+          yearOfStudy || leader.yearOfStudy || '',
+          r.participantCollegeName || leader.collegeName || leader.institutionName || '',
           new Date(r.registeredAt).toISOString(),
           otherAnswersStr,
         ]);
@@ -741,30 +786,44 @@ exports.exportEventRegistrations = asyncHandler(async (req, res) => {
             'TEAM',
             teamName,
             'MEMBER',
+            m.rollNumber || '',
             m.name || '',
             m.email || '',
-            m.rollNumber || '',
-            r.participantCollegeName || '',
-            dept,
+            m.phone || '',
+            m.department || dept || '',
+            m.gender || '',
+            m.yearOfStudy || '',
+            m.collegeName || m.institutionName || r.participantCollegeName || '',
             new Date(r.registeredAt).toISOString(),
             '',
           ]);
         }
       } else {
-        const answersStr = answers ? JSON.stringify(answers) : '';
+        const standardKeys = [
+          'rollNumber', 'name', 'email', 'phone', 'department', 'gender', 'yearOfStudy',
+          'collegeName', 'institutionName'
+        ];
+        const otherKeys = Object.keys(answers).filter((k) => !standardKeys.includes(k));
+        const otherAnswersStr = otherKeys.length > 0
+          ? otherKeys.map((k) => `${k}: ${answers[k]}`).join('; ')
+          : '';
+
         rows.push([
           r.id,
           r.participantType || 'STUDENT',
           'INDIVIDUAL',
           '—',
           'INDIVIDUAL',
+          r.participantRollNumber || '',
           r.participantName || '',
           r.participantEmail || '',
-          r.participantRollNumber || '',
-          r.participantCollegeName || '',
+          phone,
           dept,
+          gender,
+          yearOfStudy,
+          r.participantCollegeName || '',
           new Date(r.registeredAt).toISOString(),
-          answersStr,
+          otherAnswersStr,
         ]);
       }
     }

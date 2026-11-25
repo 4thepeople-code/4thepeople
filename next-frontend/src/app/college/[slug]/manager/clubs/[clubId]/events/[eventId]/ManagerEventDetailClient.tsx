@@ -1234,8 +1234,10 @@ export function ManagerEventDetailClient({
                         >
                           <th className="py-3 px-4">Attendee</th>
                           <th className="py-3 px-4">Type</th>
-                          <th className="py-3 px-4">Email</th>
-                          <th className="py-3 px-4">Institution / Roll No</th>
+                          <th className="py-3 px-4">Roll No</th>
+                          <th className="py-3 px-4">Phone</th>
+                          <th className="py-3 px-4">Dept & Year</th>
+                          <th className="py-3 px-4">Institution / College</th>
                           <th className="py-3 px-4">Registered Date</th>
                           <th className="py-3 px-4">Payment & Status</th>
                         </tr>
@@ -1301,6 +1303,7 @@ export function ManagerEventDetailClient({
                                   )}
                                   <div>
                                     <span className="font-bold block">{displayName}</span>
+                                    <span className="text-[10px] text-slate-400 block">{displayEmail}</span>
                                     {isTeam && (
                                       <button
                                         type="button"
@@ -1329,7 +1332,17 @@ export function ManagerEventDetailClient({
                                   </span>
                                 )}
                               </td>
-                              <td className="py-3 px-4 text-slate-400">{displayEmail}</td>
+                              <td className="py-3 px-4">
+                                <span className="font-mono text-[11px] text-slate-300">
+                                  {reg.participantRollNumber || answers?.rollNumber || '—'}
+                                </span>
+                              </td>
+                              <td className="py-3 px-4 text-slate-400">
+                                {reg.participantPhone || answers?.phone || '—'}
+                              </td>
+                              <td className="py-3 px-4 text-slate-400">
+                                {[reg.participantDepartment || answers?.department, reg.participantYearOfStudy || answers?.yearOfStudy].filter(Boolean).join(' • ') || '—'}
+                              </td>
                               <td className="py-3 px-4 text-slate-400">{institutionOrRoll}</td>
                               <td className="py-3 px-4 text-slate-400">
                                 {formatRegisteredDate(reg.registeredAt)}
@@ -1602,16 +1615,35 @@ export function ManagerEventDetailClient({
 
                 <div className="space-y-2">
                   <h4 className="font-bold uppercase tracking-wider text-[10px] text-slate-400">Team Leader</h4>
-                  <div className={`p-3 rounded-xl border flex items-center justify-between ${isDark ? 'bg-white/5 border-white/10' : 'bg-slate-50 border-slate-200'}`}>
-                    <div>
-                      <p className="font-bold text-sm">{leader.name || 'Leader'}</p>
-                      <p className="text-slate-400 text-[11px]">{leader.email || '—'}</p>
+                  <div className={`p-3 rounded-xl border flex flex-col gap-2 ${isDark ? 'bg-white/5 border-white/10' : 'bg-slate-50 border-slate-200'}`}>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-bold text-sm">{leader.name || 'Leader'}</p>
+                        <p className="text-slate-400 text-[11px]">{leader.email || '—'}</p>
+                      </div>
+                      {(leader.rollNumber || viewingRosterAttendee.participantRollNumber) && (
+                        <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-white/10 text-slate-300">
+                          {leader.rollNumber || viewingRosterAttendee.participantRollNumber}
+                        </span>
+                      )}
                     </div>
-                    {leader.rollNumber && (
-                      <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-white/10 text-slate-300">
-                        {leader.rollNumber}
-                      </span>
-                    )}
+                    <div className="flex flex-wrap gap-2 text-[10px] text-slate-400 border-t pt-1.5 border-white/5">
+                      {(viewingRosterAttendee.participantPhone || formAns?.phone) && (
+                        <span className="bg-white/5 px-2 py-0.5 rounded">Phone: {viewingRosterAttendee.participantPhone || formAns?.phone}</span>
+                      )}
+                      {(viewingRosterAttendee.participantDepartment || formAns?.department) && (
+                        <span className="bg-white/5 px-2 py-0.5 rounded">Dept: {viewingRosterAttendee.participantDepartment || formAns?.department}</span>
+                      )}
+                      {(viewingRosterAttendee.participantGender || formAns?.gender) && (
+                        <span className="bg-white/5 px-2 py-0.5 rounded">Gender: {viewingRosterAttendee.participantGender || formAns?.gender}</span>
+                      )}
+                      {(viewingRosterAttendee.participantYearOfStudy || formAns?.yearOfStudy) && (
+                        <span className="bg-white/5 px-2 py-0.5 rounded">Year: {viewingRosterAttendee.participantYearOfStudy || formAns?.yearOfStudy}</span>
+                      )}
+                      {(viewingRosterAttendee.participantCollegeName || formAns?.collegeName || formAns?.institutionName) && (
+                        <span className="bg-white/5 px-2 py-0.5 rounded">College: {viewingRosterAttendee.participantCollegeName || formAns?.collegeName || formAns?.institutionName}</span>
+                      )}
+                    </div>
                   </div>
                 </div>
 

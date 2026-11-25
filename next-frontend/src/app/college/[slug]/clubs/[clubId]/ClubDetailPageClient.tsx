@@ -153,7 +153,9 @@ export function ClubDetailPageClient({ slug, clubId }: ClubDetailPageClientProps
                         : 'bg-slate-100 border-slate-200 text-slate-700'
                     }`}
                   >
-                    {club._count?.members || club.membersCount || club.memberCount || 100}+ Members
+                    {(club._count?.members ?? club.membersCount ?? club.memberCount ?? 0) === 1
+                      ? '1 Member'
+                      : `${club._count?.members ?? club.membersCount ?? club.memberCount ?? 0} Members`}
                   </span>
                 </div>
               </div>

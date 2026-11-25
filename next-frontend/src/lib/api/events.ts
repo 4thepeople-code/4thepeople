@@ -123,16 +123,35 @@ export function useClubEvent(slug: string, clubId: string, eventId: string) {
   });
 }
 
+export interface StudentRegistrationInput {
+  rollNumber?: string | null;
+  name?: string | null;
+  email?: string | null;
+  department?: string | null;
+  gender?: string | null;
+  yearOfStudy?: string | null;
+  collegeName?: string | null;
+  institutionName?: string | null;
+  phone?: string | null;
+  formAnswers?: Record<string, unknown> | null;
+  [key: string]: unknown;
+}
+
 /**
  * Registers the current authenticated user for an event.
  */
 export async function registerForEvent(
   eventId: string,
-  formAnswers?: Record<string, unknown>
+  registrationData?: StudentRegistrationInput | Record<string, unknown>
 ) {
+  const body = registrationData?.formAnswers
+    ? registrationData
+    : registrationData
+    ? { formAnswers: registrationData, ...registrationData }
+    : {};
   const response = await apiClient.post(
     `/events/${eventId}/register`,
-    formAnswers ? { formAnswers } : {}
+    body
   );
   return response.data;
 }
@@ -245,10 +264,10 @@ export function useMyRegistrationsQuery(slug: string, enabled = true) {
 export function useRegisterForEventMutation(slug: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (variables: string | { eventId: string; formAnswers?: Record<string, unknown> }) => {
+    mutationFn: (variables: string | ({ eventId: string; formAnswers?: Record<string, unknown> } & Record<string, unknown>)) => {
       const eventId = typeof variables === 'string' ? variables : variables.eventId;
-      const formAnswers = typeof variables === 'object' ? variables.formAnswers : undefined;
-      return registerForEvent(eventId, formAnswers);
+      const data = typeof variables === 'object' ? variables : undefined;
+      return registerForEvent(eventId, data);
     },
     onSuccess: (_data, variables) => {
       const eventId = typeof variables === 'string' ? variables : variables.eventId;
@@ -334,8 +353,14 @@ export function useVerifyCertificateQuery(slug: string, certificateNumber: strin
 
 export interface ExternalRegisterInput {
   name: string;
-  phone?: string | null;
+  rollNumber?: string | null;
+  email?: string | null;
+  department?: string | null;
+  gender?: string | null;
+  yearOfStudy?: string | null;
   institutionName?: string | null;
+  collegeName?: string | null;
+  phone?: string | null;
   formAnswers?: Record<string, unknown> | null;
 }
 
@@ -402,8 +427,14 @@ export async function registerExternalParticipant(
     `/external/events/${eventId}/register`,
     {
       name: input.name.trim(),
+      rollNumber: input.rollNumber?.trim() || undefined,
+      email: input.email?.trim() || undefined,
+      department: input.department?.trim() || undefined,
+      gender: input.gender?.trim() || undefined,
+      yearOfStudy: input.yearOfStudy?.trim() || undefined,
+      institutionName: (input.institutionName || input.collegeName)?.trim() || undefined,
+      collegeName: (input.collegeName || input.institutionName)?.trim() || undefined,
       phone: input.phone?.trim() || undefined,
-      institutionName: input.institutionName?.trim() || undefined,
       formAnswers: input.formAnswers || undefined,
     },
     {

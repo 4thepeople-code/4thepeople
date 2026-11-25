@@ -158,9 +158,29 @@ const externalOtpVerifyBody = z.object({
 
 const externalRegisterBody = z.object({
   name: z.string().trim().min(1, 'Name is required').max(100),
-  phone: z.string().trim().max(20).optional().nullable(),
+  rollNumber: z.string().trim().max(50).optional().nullable(),
+  email: z.string().trim().email().optional().nullable(),
+  department: z.string().trim().max(100).optional().nullable(),
+  gender: z.string().trim().max(50).optional().nullable(),
+  yearOfStudy: z.string().trim().max(50).optional().nullable(),
   institutionName: z.string().trim().max(200).optional().nullable(),
+  collegeName: z.string().trim().max(200).optional().nullable(),
+  phone: z.string().trim().max(20).optional().nullable(),
   formAnswers: z.record(z.unknown()).optional().nullable(),
+});
+
+const studentEventRegistrationBody = z.object({
+  rollNumber: z.string().trim().max(50).optional().nullable(),
+  name: z.string().trim().max(100).optional().nullable(),
+  email: z.string().trim().email().optional().nullable(),
+  department: z.string().trim().max(100).optional().nullable(),
+  gender: z.string().trim().max(50).optional().nullable(),
+  yearOfStudy: z.string().trim().max(50).optional().nullable(),
+  institutionName: z.string().trim().max(200).optional().nullable(),
+  collegeName: z.string().trim().max(200).optional().nullable(),
+  phone: z.string().trim().max(20).optional().nullable(),
+  formAnswers: z.record(z.unknown()).optional().nullable(),
+  answers: z.record(z.unknown()).optional().nullable(),
 });
 
 module.exports = {
@@ -168,6 +188,6 @@ module.exports = {
   loginBody, forgotPasswordBody, resetPasswordBody, deletionVerificationBody, adminRegisterBody, managerInviteBody,
   createClubBody, updateClubBody, createDepartmentBody, updateDepartmentBody, clubIdsBody, departmentIdsBody,
   membershipBody, existingManagerBody, acceptInviteBody, createEventBody, updateEventBody, attendeeQuery,
-  externalOtpRequestBody, externalOtpVerifyBody, externalRegisterBody,
+  externalOtpRequestBody, externalOtpVerifyBody, externalRegisterBody, studentEventRegistrationBody,
   publicIdParams: z.object({ eventId: uuid, publicId: z.string().min(1).max(500) }),
 };

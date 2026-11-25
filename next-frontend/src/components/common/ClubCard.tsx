@@ -19,13 +19,12 @@ export function ClubCard({ club, onClick }: ClubCardProps) {
   const coverUrl = getCloudinaryUrl(rawCoverUrl, CLOUDINARY_TRANSFORMS.COVER);
 
   const initials = club.name ? club.name.slice(0, 2).toUpperCase() : 'CL';
+  const memberCount = club._count?.members ?? club.membersCount ?? club.memberCount;
   const memberCountText =
-    club.memberCount !== undefined
-      ? `${club.memberCount} Members`
-      : club.membersCount !== undefined
-      ? `${club.membersCount} Members`
-      : club._count?.members !== undefined
-      ? `${club._count.members} Members`
+    typeof memberCount === 'number'
+      ? memberCount === 1
+        ? '1 Member'
+        : `${memberCount} Members`
       : 'Active Club';
 
   const departments = Array.isArray(club.departments) ? club.departments : [];

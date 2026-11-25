@@ -22,6 +22,12 @@ const publicClubSelect = {
   createdAt: true,
   updatedAt: true,
   departments: clubDepartmentsSelect,
+  _count: {
+    select: {
+      members: true,
+      events: true,
+    },
+  },
 };
 
 /**

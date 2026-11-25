@@ -233,6 +233,14 @@ class PaymentRegistrationService {
         };
       }
 
+      const payloadAnswers = finalFormAnswers || {};
+      const participantDepartment = payloadAnswers.department || payloadAnswers.participantDepartment || null;
+      const participantGender = payloadAnswers.gender || payloadAnswers.participantGender || null;
+      const participantYearOfStudy = payloadAnswers.yearOfStudy || payloadAnswers.participantYearOfStudy || null;
+      const participantPhone = payloadAnswers.phone || payloadAnswers.participantPhone || null;
+      const effectiveRollNumber = participantRollNumber || payloadAnswers.rollNumber || null;
+      const effectiveCollegeName = participantCollegeName || payloadAnswers.collegeName || payloadAnswers.institutionName || null;
+
       let registration;
       try {
         registration = await tx.eventRegistration.create({
@@ -246,8 +254,12 @@ class PaymentRegistrationService {
             homeCollegeId,
             participantName,
             participantEmail,
-            participantRollNumber,
-            participantCollegeName,
+            participantRollNumber: effectiveRollNumber,
+            participantCollegeName: effectiveCollegeName,
+            participantDepartment,
+            participantGender,
+            participantYearOfStudy,
+            participantPhone,
             isUserDeleted: false,
             registeredByRole: 'SELF',
             formAnswers: finalFormAnswers,

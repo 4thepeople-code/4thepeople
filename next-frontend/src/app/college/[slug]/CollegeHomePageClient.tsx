@@ -274,18 +274,18 @@ export function CollegeHomePageClient({ slug }: CollegeHomePageClientProps) {
                   <Calendar className="w-4 h-4 text-cyan-600 dark:text-[#00F0FF]" />
                   <span>
                     <strong className={`font-bold text-sm ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                      {events.length}+
+                      {events.length}
                     </strong>{' '}
-                    Events Scheduled
+                    {events.length === 1 ? 'Event Scheduled' : 'Events Scheduled'}
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
                   <Users className="w-4 h-4 text-cyan-600 dark:text-[#00F0FF]" />
                   <span>
                     <strong className={`font-bold text-sm ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                      {clubs.length}+
+                      {clubs.length}
                     </strong>{' '}
-                    Campus Clubs
+                    {clubs.length === 1 ? 'Campus Club' : 'Campus Clubs'}
                   </span>
                 </div>
               </div>
@@ -762,7 +762,11 @@ export function CollegeHomePageClient({ slug }: CollegeHomePageClientProps) {
                     >
                       <span className="flex items-center gap-1.5">
                         <Users className="w-3.5 h-3.5 text-cyan-500" />
-                        <span>{club._count?.members || club.membersCount || club.memberCount || 100}+ Members</span>
+                        <span>
+                          {(club._count?.members ?? club.membersCount ?? club.memberCount ?? 0) === 1
+                            ? '1 Member'
+                            : `${club._count?.members ?? club.membersCount ?? club.memberCount ?? 0} Members`}
+                        </span>
                       </span>
 
                       <span className="inline-flex items-center gap-1 text-cyan-600 dark:text-[#00F0FF] font-extrabold uppercase text-[11px] group-hover:translate-x-1 transition-transform">

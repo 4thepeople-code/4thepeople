@@ -259,6 +259,10 @@ model EventRegistration {
   participantEmail       String              @map("participant_email")
   participantRollNumber  String?             @map("participant_roll_number")
   participantCollegeName String?             @map("participant_college_name")
+  participantDepartment  String?             @map("participant_department")
+  participantGender      String?             @map("participant_gender")
+  participantYearOfStudy String?             @map("participant_year_of_study")
+  participantPhone       String?             @map("participant_phone")
   isUserDeleted          Boolean             @default(false) @map("is_user_deleted")
   registeredByRole       String              @default("SELF") @map("registered_by_role")
   createdByAdminId       String?             @map("created_by_admin_id") @db.Uuid

@@ -32,8 +32,6 @@ const partnerColleges = [
     name: 'Lakireddy Bali Reddy College of Engineering',
     shortName: 'LBRCE',
     location: 'Mylavaram, AP',
-    clubsCount: '20+ Clubs',
-    eventsCount: '15+ Events',
     coverImage:
       'https://images.unsplash.com/photo-1541829070764-84a7d30dd3f3?q=80&w=800&auto=format&fit=crop',
     accent: '#00F0FF',
@@ -43,8 +41,6 @@ const partnerColleges = [
     name: 'Velagapudi Ramakrishna Siddhartha Engineering College',
     shortName: 'VRSEC',
     location: 'Vijayawada, AP',
-    clubsCount: '18+ Clubs',
-    eventsCount: '12+ Events',
     coverImage:
       'https://images.unsplash.com/photo-1523050854058-8df90110c9f1?q=80&w=800&auto=format&fit=crop',
     accent: '#3B82F6',
@@ -119,7 +115,7 @@ export default function PublicDirectoryPage() {
 
                     <div className="absolute bottom-3 left-4 right-4 flex items-center justify-between text-xs text-white">
                       <span className="font-semibold text-cyan-200">{col.location}</span>
-                      <span className="text-[11px] font-mono text-gray-300">{col.eventsCount}</span>
+                      <span className="text-[11px] font-mono text-gray-300">Active Tenant</span>
                     </div>
                   </div>
 
@@ -134,14 +130,10 @@ export default function PublicDirectoryPage() {
                     </div>
 
                     <div className="pt-4 border-t border-slate-100 dark:border-white/10 flex items-center justify-between">
-                      <div className="flex items-center gap-4 text-xs font-semibold text-slate-500 dark:text-gray-400">
-                        <span className="flex items-center gap-1.5">
-                          <Users className="w-3.5 h-3.5 text-cyan-500" />
-                          <span>{col.clubsCount}</span>
-                        </span>
-                        <span className="flex items-center gap-1.5">
-                          <Calendar className="w-3.5 h-3.5 text-purple-400" />
-                          <span>{col.eventsCount}</span>
+                      <div className="flex items-center gap-2 text-xs font-semibold text-slate-500 dark:text-gray-400">
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-cyan-500/10 text-cyan-600 dark:text-[#00F0FF] border border-cyan-500/20 text-xs">
+                          <Compass className="w-3.5 h-3.5 text-cyan-500" />
+                          <span>Student Portal</span>
                         </span>
                       </div>
 

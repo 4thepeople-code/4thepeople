@@ -346,7 +346,17 @@ exports.registerExternalParticipant = asyncHandler(async (req, res) => {
   const { eventId } = req.params;
   validateUUID(eventId, 'event ID');
 
-  const { name, phone, institutionName, formAnswers } = req.body;
+  const {
+    name,
+    phone,
+    institutionName,
+    collegeName,
+    rollNumber,
+    department,
+    gender,
+    yearOfStudy,
+    formAnswers,
+  } = req.body;
 
   const registration = await withTenant(effectiveCollegeId, async (tx) => {
     // 1. Load and validate event (re-validates eligibility at registration time)
@@ -476,7 +486,11 @@ exports.registerExternalParticipant = asyncHandler(async (req, res) => {
         name: body.name || 'Participant',
         email: req.externalUser?.email || '',
         phone: body.phone || null,
-        institutionName: body.institutionName || null,
+        institutionName: body.institutionName || body.collegeName || null,
+        rollNumber: body.rollNumber || null,
+        department: body.department || null,
+        gender: body.gender || null,
+        yearOfStudy: body.yearOfStudy || null,
       };
       validatedAnswers.teamMembers = teamMembers;
     } else if (answers.isTeamRegistration) {
@@ -487,6 +501,17 @@ exports.registerExternalParticipant = asyncHandler(async (req, res) => {
       validatedAnswers.teamLeader = answers.teamLeader;
       validatedAnswers.teamMembers = answers.teamMembers;
     }
+
+    if (!validatedAnswers) validatedAnswers = {};
+    validatedAnswers.rollNumber = rollNumber || null;
+    validatedAnswers.name = name;
+    validatedAnswers.email = normalizedEmail;
+    validatedAnswers.phone = phone || null;
+    validatedAnswers.department = department || null;
+    validatedAnswers.gender = gender || null;
+    validatedAnswers.yearOfStudy = yearOfStudy || null;
+    validatedAnswers.institutionName = institutionName || collegeName || null;
+    validatedAnswers.collegeName = institutionName || collegeName || null;
 
     // 3. Upsert ExternalParticipant (scoped to req.collegeId by RLS context)
     let participant;
@@ -504,7 +529,7 @@ exports.registerExternalParticipant = asyncHandler(async (req, res) => {
             email: normalizedEmail,
             name,
             phone: phone || null,
-            institutionName: institutionName || null,
+            institutionName: institutionName || collegeName || null,
             isEmailVerified: true,
           },
         });
@@ -521,7 +546,7 @@ exports.registerExternalParticipant = asyncHandler(async (req, res) => {
           // Update identity fields since we now have the existing record
           participant = await tx.externalParticipant.update({
             where: { id: participant.id },
-            data: { isEmailVerified: true, name, phone: phone || null, institutionName: institutionName || null },
+            data: { isEmailVerified: true, name, phone: phone || null, institutionName: institutionName || collegeName || null },
           });
         } else {
           throw createErr;
@@ -531,7 +556,7 @@ exports.registerExternalParticipant = asyncHandler(async (req, res) => {
       // Update identity fields on existing participant
       participant = await tx.externalParticipant.update({
         where: { id: participant.id },
-        data: { isEmailVerified: true, name, phone: phone || null, institutionName: institutionName || null },
+        data: { isEmailVerified: true, name, phone: phone || null, institutionName: institutionName || collegeName || null },
       });
     }
 
@@ -563,8 +588,12 @@ exports.registerExternalParticipant = asyncHandler(async (req, res) => {
           homeCollegeId: null,
           participantName: name,                        // snapshot from submitted body
           participantEmail: normalizedEmail,            // snapshot from verified token
-          participantRollNumber: null,
-          participantCollegeName: institutionName || null,
+          participantRollNumber: rollNumber || null,
+          participantCollegeName: institutionName || collegeName || null,
+          participantDepartment: department || null,
+          participantGender: gender || null,
+          participantYearOfStudy: yearOfStudy || null,
+          participantPhone: phone || null,
           isUserDeleted: false,
           registeredByRole: 'SELF',
           formAnswers: validatedAnswers,

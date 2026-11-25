@@ -241,7 +241,11 @@ export function ClubsListPageClient({ slug }: ClubsListPageClientProps) {
                       }`}
                     >
                       <Users className="w-3.5 h-3.5 text-cyan-500" />
-                      <span>{club._count?.members || club.membersCount || club.memberCount || 100}+ Members</span>
+                      <span>
+                        {(club._count?.members ?? club.membersCount ?? club.memberCount ?? 0) === 1
+                          ? '1 Member'
+                          : `${club._count?.members ?? club.membersCount ?? club.memberCount ?? 0} Members`}
+                      </span>
                     </span>
 
                     <span className="inline-flex items-center gap-1 text-xs font-extrabold uppercase tracking-wider text-[#00F0FF] group-hover:translate-x-1 transition-transform">
