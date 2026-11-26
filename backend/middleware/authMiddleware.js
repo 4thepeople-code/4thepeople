@@ -44,15 +44,67 @@ const authenticateToken = async (req, res, next) => {
     }
 
     // Tenant boundary check: if request is on a college subdomain, enforce token matches collegeId
-    if (req.collegeId && decoded.collegeId && decoded.collegeId !== req.collegeId) {
+    const tokenCollegeId = decoded.collegeId || decoded.hostCollegeId;
+    if (req.collegeId && tokenCollegeId && tokenCollegeId !== req.collegeId) {
       return next(new AppError('Access denied: Token belongs to a different college tenant', 403));
     }
 
-    const tenantId = req.collegeId || decoded.collegeId;
+    const tenantId = req.collegeId || tokenCollegeId;
     const userId = decoded.userId || decoded.id;
 
     if (!tenantId || !userId) {
       return next(new AppError('Invalid token claims: Missing tenant or user identity', 401));
+    }
+
+    // Handle EXTERNAL participant token
+    if (decoded.type === 'external' || decoded.role === 'EXTERNAL') {
+      const freshParticipant = await withTenant(tenantId, async (tx) => {
+        return await tx.externalParticipant.findFirst({
+          where: {
+            id: userId,
+            collegeId: tenantId,
+          },
+          select: {
+            id: true,
+            collegeId: true,
+            name: true,
+            email: true,
+            phone: true,
+            institutionName: true,
+            rollNumber: true,
+            department: true,
+            gender: true,
+            yearOfStudy: true,
+            isEmailVerified: true,
+            college: { select: { id: true, name: true, slug: true } },
+          },
+        });
+      });
+
+      if (!freshParticipant) {
+        return next(new AppError('External participant account not found', 401));
+      }
+
+      req.user = {
+        ...decoded,
+        ...freshParticipant,
+        id: freshParticipant.id,
+        userId: freshParticipant.id,
+        collegeId: freshParticipant.collegeId,
+        name: freshParticipant.name,
+        email: freshParticipant.email,
+        phone: freshParticipant.phone,
+        institutionName: freshParticipant.institutionName,
+        collegeName: freshParticipant.institutionName,
+        rollNumber: freshParticipant.rollNumber,
+        department: freshParticipant.department,
+        gender: freshParticipant.gender,
+        yearOfStudy: freshParticipant.yearOfStudy,
+        role: 'EXTERNAL',
+        isActive: true,
+      };
+
+      return next();
     }
 
     // Re-load user inside withTenant under PostgreSQL RLS on every request
@@ -358,6 +410,8 @@ const authenticateExternalToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
   if (authHeader && authHeader.startsWith('Bearer ')) {
     token = authHeader.split(' ')[1];
+  } else if (req.cookies && (req.cookies.token || req.cookies.yuva_token)) {
+    token = req.cookies.token || req.cookies.yuva_token;
   }
 
   if (!token) {

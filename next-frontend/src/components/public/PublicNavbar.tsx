@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Compass, Menu, X, ArrowUpRight, LogIn, Sun, Moon, UserCheck, Building2 } from 'lucide-react';
+import { Compass, Menu, X, ArrowUpRight, LogIn, LogOut, Sun, Moon, UserCheck, Building2 } from 'lucide-react';
 import { useTheme } from '@/context/ThemeContext';
 import { useAuth } from '@/context/AuthContext';
 
@@ -17,7 +17,7 @@ export function PublicNavbar({ collegeSlug, collegeName }: PublicNavbarProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const pathname = usePathname();
   const { isDark, toggleTheme } = useTheme();
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, logout } = useAuth();
 
   const isRootLanding = !collegeSlug;
 
@@ -233,6 +233,30 @@ export function PublicNavbar({ collegeSlug, collegeName }: PublicNavbarProps) {
                     <UserCheck className="w-3.5 h-3.5 text-[#00F0FF]" />
                     <span>Student Portal</span>
                   </Link>
+                ) : isAuthenticated && user?.role === 'EXTERNAL' ? (
+                  <div className="flex items-center gap-2">
+                    <div
+                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold border ${
+                        isDark
+                          ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                          : 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                      }`}
+                    >
+                      <UserCheck className="w-3.5 h-3.5 text-emerald-500" />
+                      <span className="truncate max-w-[120px]">{user.name || 'Guest'}</span>
+                    </div>
+                    <button
+                      onClick={() => logout()}
+                      title="Sign Out"
+                      className={`p-1.5 rounded-full border transition-all text-xs cursor-pointer ${
+                        isDark
+                          ? 'border-white/10 text-gray-400 hover:text-white hover:bg-white/5'
+                          : 'border-slate-200 text-slate-500 hover:text-slate-900 hover:bg-slate-100'
+                      }`}
+                    >
+                      <LogOut className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 ) : (
                   <Link
                     href={loginHref}
@@ -408,6 +432,23 @@ export function PublicNavbar({ collegeSlug, collegeName }: PublicNavbarProps) {
                   >
                     Student Portal
                   </Link>
+                ) : isAuthenticated && user?.role === 'EXTERNAL' ? (
+                  <div className="flex items-center justify-between py-2 px-3 rounded-lg bg-emerald-500/10 text-emerald-400 font-semibold">
+                    <div className="flex items-center gap-2">
+                      <UserCheck className="w-4 h-4 text-emerald-400" />
+                      <span>{user.name || 'External Guest'}</span>
+                    </div>
+                    <button
+                      onClick={() => {
+                        logout();
+                        setMobileMenuOpen(false);
+                      }}
+                      className="text-xs text-red-400 hover:underline flex items-center gap-1 cursor-pointer"
+                    >
+                      <LogOut className="w-3.5 h-3.5" />
+                      <span>Sign Out</span>
+                    </button>
+                  </div>
                 ) : (
                   <Link
                     href={loginHref}

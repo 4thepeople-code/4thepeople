@@ -48,8 +48,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
       if (backendUser) {
         setUser({
-          id: backendUser.id,
-          userId: backendUser.id,
+          ...backendUser,
+          id: backendUser.id || backendUser.userId || '',
+          userId: backendUser.id || backendUser.userId || '',
           name: backendUser.name,
           email: backendUser.email,
           role: backendUser.role,

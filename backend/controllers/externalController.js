@@ -47,25 +47,31 @@ function jitterSleep() {
 
 /**
  * Builds the signed external JWT.
- * Claims: { type: 'external', email, isEmailVerified: true, hostCollegeId }
- * TTL: 15 minutes.
+ * Claims: { type: 'external', userId, id, email, name, role: 'EXTERNAL', isEmailVerified: true, hostCollegeId, collegeId }
+ * TTL: 7 days (persists user session).
  */
-function issueExternalToken(email, hostCollegeId) {
+function issueExternalToken(email, hostCollegeId, participant = null) {
   const jwtSecret = process.env.JWT_SECRET || process.env.JWT_SECRET_TOKEN;
   if (!jwtSecret && process.env.NODE_ENV === 'production') {
     throw new Error('JWT_SECRET configuration missing in production');
   }
   const effectiveSecret = jwtSecret || 'dev_insecure_jwt_secret_fallback_do_not_use_in_prod';
+  const jwtExpiry = process.env.JWT_EXPIRES_IN || '7d';
 
   return jwt.sign(
     {
       type: 'external',
+      userId: participant?.id,
+      id: participant?.id,
       email,
+      name: participant?.name,
+      role: 'EXTERNAL',
       isEmailVerified: true,
       hostCollegeId,
+      collegeId: hostCollegeId,
     },
     effectiveSecret,
-    { expiresIn: '15m' }
+    { expiresIn: jwtExpiry }
   );
 }
 
@@ -367,9 +373,6 @@ exports.verifyExternalOtp = asyncHandler(async (req, res) => {
     throw new AppError('Too many attempts. Please request a new code.', 429);
   }
 
-  // Issue external JWT bound to verified email + hostCollegeId
-  const token = issueExternalToken(email, result.hostCollegeId);
-
   // Upsert or update ExternalParticipant in database with profile details if provided
   const participant = await withTenant(result.hostCollegeId, async (tx) => {
     const normalizedEmail = email.trim().toLowerCase();
@@ -417,10 +420,36 @@ exports.verifyExternalOtp = asyncHandler(async (req, res) => {
     }
   });
 
+  // Issue external JWT bound to verified participant + hostCollegeId
+  const token = issueExternalToken(email, result.hostCollegeId, participant);
+
+  // Set HTTP-only cookie for session persistence across refreshes & navigation
+  res.cookie('token', token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    path: '/',
+  });
+
   return res.status(200).json({
     success: true,
     token,
-    user: participant,
+    user: {
+      id: participant.id,
+      userId: participant.id,
+      name: participant.name,
+      email: participant.email,
+      role: 'EXTERNAL',
+      phone: participant.phone,
+      institutionName: participant.institutionName,
+      collegeName: participant.institutionName,
+      rollNumber: participant.rollNumber,
+      department: participant.department,
+      gender: participant.gender,
+      yearOfStudy: participant.yearOfStudy,
+      collegeId: participant.collegeId,
+    },
   });
 });
 

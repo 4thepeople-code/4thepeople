@@ -118,12 +118,20 @@ async function findParticipantEventMembership(tx, collegeId, eventId, userId, em
 
   const normalizedEmail = (email || '').toLowerCase().trim();
 
-  // 1. Direct registration lookup (Leader or Individual)
+  // 1. Direct registration lookup (Leader or Individual - supporting internal student or external participant)
   const directReg = await tx.eventRegistration.findFirst({
     where: {
       collegeId,
       eventId,
-      ...(userId ? { userId } : { participantEmail: normalizedEmail }),
+      ...(userId
+        ? {
+            OR: [
+              { userId },
+              { externalParticipantId: userId },
+              ...(normalizedEmail ? [{ participantEmail: normalizedEmail }] : []),
+            ],
+          }
+        : { participantEmail: normalizedEmail }),
     },
     select: {
       id: true,

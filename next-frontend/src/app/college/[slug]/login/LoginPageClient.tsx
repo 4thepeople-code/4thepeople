@@ -326,12 +326,20 @@ export function LoginPageClient({
         setStoredExternalUser(externalProfile);
 
         // Populate session
+        const participantId: string =
+          (typeof res?.user?.id === 'string' && res.user.id) ||
+          (res as unknown as { data?: { user?: { id?: string } } })?.data?.user?.id ||
+          `ext_${trimmedEmail}`;
+
         login(
           {
-            id: `ext_${trimmedEmail}`,
+            ...externalProfile,
+            id: participantId,
+            userId: participantId,
             name: externalName.trim(),
             email: trimmedEmail,
             role: 'EXTERNAL',
+            collegeId: slug,
           },
           token
         );

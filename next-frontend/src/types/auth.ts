@@ -8,13 +8,13 @@ export interface DecodedToken {
   collegeId?: string;
   email?: string;
   role?: AnyAuthRole;
-  type?: 'college' | 'platform';
+  type?: 'college' | 'platform' | 'external';
   exp?: number;
   iat?: number;
   [key: string]: unknown;
 }
 
-export interface AuthUser extends Omit<Partial<User>, 'role'> {
+export interface AuthUser extends Omit<Partial<User>, 'role' | 'department'> {
   id: string;
   userId?: string;
   role: AnyAuthRole;
@@ -23,6 +23,14 @@ export interface AuthUser extends Omit<Partial<User>, 'role'> {
   collegeId?: string;
   platformAdminId?: string;
   isPlatformAdmin?: boolean;
+  phone?: string | null;
+  rollNumber?: string | null;
+  gender?: string | null;
+  yearOfStudy?: string | null;
+  departmentId?: string | null;
+  department?: import('./models').Department | string | null;
+  institutionName?: string | null;
+  collegeName?: string | null;
 }
 
 export interface AuthContextState {

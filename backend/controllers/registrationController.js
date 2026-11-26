@@ -418,8 +418,12 @@ exports.listMyRegistrations = asyncHandler(async (req, res) => {
   }
 
   const registrations = await withTenant(req.collegeId, async (tx) => {
+    const isExternal = req.user.role === 'EXTERNAL';
     const list = await tx.eventRegistration.findMany({
-      where: { userId: req.user.id, collegeId: req.collegeId },
+      where: {
+        collegeId: req.collegeId,
+        ...(isExternal ? { externalParticipantId: req.user.id } : { userId: req.user.id }),
+      },
       orderBy: { registeredAt: 'desc' },
       select: {
         id: true,
@@ -455,7 +459,7 @@ exports.listMyRegistrations = asyncHandler(async (req, res) => {
       const otherTeamRegs = await tx.eventRegistration.findMany({
         where: {
           collegeId: req.collegeId,
-          userId: { not: req.user.id },
+          ...(isExternal ? { externalParticipantId: { not: req.user.id } } : { userId: { not: req.user.id } }),
         },
         orderBy: { registeredAt: 'desc' },
         select: {

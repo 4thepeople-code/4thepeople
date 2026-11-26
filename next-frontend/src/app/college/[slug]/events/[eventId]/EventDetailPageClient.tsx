@@ -135,6 +135,7 @@ export function EventDetailPageClient({ slug, eventId, clubId: propClubId }: Eve
   ]);
   const [teamValidationError, setTeamValidationError] = useState<string | null>(null);
   const [isSubmittingTeam, setIsSubmittingTeam] = useState(false);
+  const [isEditingLeaderDetails, setIsEditingLeaderDetails] = useState(false);
   const [shareNotice, setShareNotice] = useState(false);
   const [activeGalleryEvent, setActiveGalleryEvent] = useState<Event | null>(null);
   const [regError, setRegError] = useState<string | null>(null);
@@ -170,21 +171,42 @@ export function EventDetailPageClient({ slug, eventId, clubId: propClubId }: Eve
   // Pre-fill standard fields from user or external session
   useEffect(() => {
     if (user) {
-      if (user.name) setStudentName((prev) => prev || user.name || '');
-      if (user.email) setStudentEmail((prev) => prev || user.email || '');
-      if (user.rollNumber) setStudentRollNumber((prev) => prev || user.rollNumber || '');
-      const userWithCollege = user as unknown as { college?: { name?: string }; collegeName?: string };
-      const cName = userWithCollege.college?.name || userWithCollege.collegeName || event?.college?.name;
-      if (cName) setStudentCollege((prev) => prev || cName || '');
-      const userDept = (user as unknown as { department?: { name?: string } })?.department?.name;
-      if (userDept) setStudentDepartment((prev) => prev || userDept || '');
+      if (user.name) setStudentName(user.name);
+      if (user.email) setStudentEmail(user.email);
+      if (user.rollNumber) setStudentRollNumber(user.rollNumber);
+      if (user.phone) setStudentPhone(user.phone);
+      if (user.gender) setStudentGender(user.gender);
+      if (user.yearOfStudy) setStudentYearOfStudy(user.yearOfStudy);
+
+      const userWithCollege = user as unknown as {
+        college?: { name?: string };
+        collegeName?: string;
+        institutionName?: string;
+      };
+      const cName =
+        userWithCollege.college?.name ||
+        userWithCollege.collegeName ||
+        userWithCollege.institutionName ||
+        event?.college?.name;
+      if (cName) setStudentCollege(cName);
+
+      const rawDept = (user as unknown as { department?: { name?: string } | string })?.department;
+      const deptName =
+        typeof rawDept === 'object' ? rawDept?.name : typeof rawDept === 'string' ? rawDept : '';
+      if (deptName) setStudentDepartment(deptName);
     } else {
       const ext = getStoredExternalUser();
       if (ext) {
-        if (ext.name) setStudentName((prev) => prev || ext.name || '');
-        if (ext.email) setStudentEmail((prev) => prev || ext.email || '');
-        if (ext.institutionName) setStudentCollege((prev) => prev || ext.institutionName || '');
-        if (ext.phone) setStudentPhone((prev) => prev || ext.phone || '');
+        if (ext.name) setStudentName(ext.name);
+        if (ext.email) setStudentEmail(ext.email);
+        if (ext.phone) setStudentPhone(ext.phone);
+        if (ext.rollNumber) setStudentRollNumber(ext.rollNumber);
+        if (ext.department) setStudentDepartment(ext.department);
+        if (ext.gender) setStudentGender(ext.gender);
+        if (ext.yearOfStudy) setStudentYearOfStudy(ext.yearOfStudy);
+        if (ext.institutionName || ext.collegeName) {
+          setStudentCollege(ext.institutionName || ext.collegeName || '');
+        }
       }
     }
   }, [user, event]);
@@ -546,13 +568,45 @@ export function EventDetailPageClient({ slug, eventId, clubId: propClubId }: Eve
     const leaderName = user?.name || studentName.trim() || 'Leader';
     const leaderEmail = (user?.email || studentEmail || getStoredExternalUser()?.email || '').toLowerCase().trim();
     const leaderRoll = user?.rollNumber || studentRollNumber.trim() || '';
-    const userWithCollege = user as unknown as { college?: { name?: string }; collegeName?: string };
-    const leaderCollege = studentCollege.trim() || userWithCollege.college?.name || userWithCollege.collegeName || event?.college?.name || '';
-    const userDept = (user as unknown as { department?: { name?: string } })?.department?.name;
+    const userWithCollege = user as unknown as { college?: { name?: string }; collegeName?: string; institutionName?: string };
+    const leaderCollege = studentCollege.trim() || userWithCollege.college?.name || userWithCollege.collegeName || userWithCollege.institutionName || event?.college?.name || '';
+    const rawDept = (user as unknown as { department?: { name?: string } | string })?.department;
+    const userDept = typeof rawDept === 'object' ? rawDept?.name : (typeof rawDept === 'string' ? rawDept : '');
     const leaderDept = studentDepartment.trim() || userDept || '';
     const leaderGender = studentGender.trim() || user?.gender || '';
     const leaderYear = studentYearOfStudy.trim() || user?.yearOfStudy || '';
     const leaderPhone = studentPhone.trim() || user?.phone || '';
+
+    if (!leaderRoll) {
+      setIsEditingLeaderDetails(true);
+      setTeamValidationError('Please enter your Roll Number / Student ID.');
+      return;
+    }
+    if (!leaderPhone || leaderPhone.replace(/\D/g, '').length < 10) {
+      setIsEditingLeaderDetails(true);
+      setTeamValidationError('Please enter a valid 10-digit Phone Number.');
+      return;
+    }
+    if (!leaderDept) {
+      setIsEditingLeaderDetails(true);
+      setTeamValidationError('Please specify your Department.');
+      return;
+    }
+    if (!leaderGender) {
+      setIsEditingLeaderDetails(true);
+      setTeamValidationError('Please select your Gender.');
+      return;
+    }
+    if (!leaderYear) {
+      setIsEditingLeaderDetails(true);
+      setTeamValidationError('Please select your Year of Study.');
+      return;
+    }
+    if (!leaderCollege) {
+      setIsEditingLeaderDetails(true);
+      setTeamValidationError('Please specify your College / Institution.');
+      return;
+    }
 
     const emailSet = new Set<string>();
     if (leaderEmail) emailSet.add(leaderEmail);
@@ -1421,117 +1475,189 @@ export function EventDetailPageClient({ slug, eventId, clubId: propClubId }: Eve
                   <label className={`block text-xs font-bold uppercase tracking-wider ${isDark ? 'text-gray-200' : 'text-slate-700'}`}>
                     Team Leader Details (You)
                   </label>
-                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">
-                    Leader
-                  </span>
-                </div>
-                
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
-                      Roll Number <span className="text-red-400">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={studentRollNumber}
-                      onChange={(e) => setStudentRollNumber(e.target.value)}
-                      placeholder="e.g. 21CS101"
-                      className={`w-full px-3 py-2 rounded-xl border text-xs transition-all focus:outline-hidden focus:border-[#00F0FF] ${
-                        isDark ? 'bg-[#0B0C10] border-white/10 text-white' : 'bg-slate-50 border-slate-200 text-slate-900'
-                      }`}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
-                      Phone Number <span className="text-red-400">*</span>
-                    </label>
-                    <input
-                      type="tel"
-                      required
-                      value={studentPhone}
-                      onChange={(e) => setStudentPhone(e.target.value)}
-                      placeholder="+91 9876543210"
-                      className={`w-full px-3 py-2 rounded-xl border text-xs transition-all focus:outline-hidden focus:border-[#00F0FF] ${
-                        isDark ? 'bg-[#0B0C10] border-white/10 text-white' : 'bg-slate-50 border-slate-200 text-slate-900'
-                      }`}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
-                      Department <span className="text-red-400">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={studentDepartment}
-                      onChange={(e) => setStudentDepartment(e.target.value)}
-                      placeholder="e.g. Computer Science"
-                      className={`w-full px-3 py-2 rounded-xl border text-xs transition-all focus:outline-hidden focus:border-[#00F0FF] ${
-                        isDark ? 'bg-[#0B0C10] border-white/10 text-white' : 'bg-slate-50 border-slate-200 text-slate-900'
-                      }`}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
-                      Gender <span className="text-red-400">*</span>
-                    </label>
-                    <select
-                      required
-                      value={studentGender}
-                      onChange={(e) => setStudentGender(e.target.value)}
-                      className={`w-full px-3 py-2 rounded-xl border text-xs transition-all focus:outline-hidden focus:border-[#00F0FF] ${
-                        isDark ? 'bg-[#0B0C10] border-white/10 text-white' : 'bg-slate-50 border-slate-200 text-slate-900'
-                      }`}
-                    >
-                      <option value="">Select Gender</option>
-                      <option value="Male">Male</option>
-                      <option value="Female">Female</option>
-                      <option value="Other">Other</option>
-                      <option value="Prefer not to say">Prefer not to say</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
-                      Year of Study <span className="text-red-400">*</span>
-                    </label>
-                    <select
-                      required
-                      value={studentYearOfStudy}
-                      onChange={(e) => setStudentYearOfStudy(e.target.value)}
-                      className={`w-full px-3 py-2 rounded-xl border text-xs transition-all focus:outline-hidden focus:border-[#00F0FF] ${
-                        isDark ? 'bg-[#0B0C10] border-white/10 text-white' : 'bg-slate-50 border-slate-200 text-slate-900'
-                      }`}
-                    >
-                      <option value="">Select Year</option>
-                      <option value="1st Year">1st Year</option>
-                      <option value="2nd Year">2nd Year</option>
-                      <option value="3rd Year">3rd Year</option>
-                      <option value="4th Year">4th Year</option>
-                      <option value="Post Graduate">Post Graduate</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
-                      College / Institution <span className="text-red-400">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={studentCollege}
-                      onChange={(e) => setStudentCollege(e.target.value)}
-                      placeholder="College / Institution"
-                      className={`w-full px-3 py-2 rounded-xl border text-xs transition-all focus:outline-hidden focus:border-[#00F0FF] ${
-                        isDark ? 'bg-[#0B0C10] border-white/10 text-white' : 'bg-slate-50 border-slate-200 text-slate-900'
-                      }`}
-                    />
+                  <div className="flex items-center gap-2">
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">
+                      Leader
+                    </span>
+                    {(user || getStoredExternalUser()) && (
+                      <button
+                        type="button"
+                        onClick={() => setIsEditingLeaderDetails((prev) => !prev)}
+                        className="text-[11px] text-[#00F0FF] hover:underline cursor-pointer"
+                      >
+                        {isEditingLeaderDetails ? 'Done Editing' : 'Edit details'}
+                      </button>
+                    )}
                   </div>
                 </div>
+
+                {(user || getStoredExternalUser()) && !isEditingLeaderDetails ? (
+                  <div
+                    className={`p-4 rounded-2xl border transition-all ${
+                      isDark ? 'bg-white/[0.03] border-white/10' : 'bg-slate-50 border-slate-200'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-3 pb-2.5 border-b border-white/5">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-full bg-[#00F0FF]/15 text-[#00F0FF] font-black text-xs flex items-center justify-center shrink-0">
+                          {(user?.name || studentName || 'TL').slice(0, 2).toUpperCase()}
+                        </div>
+                        <div>
+                          <div className={`text-xs font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                            {user?.name || studentName || 'Team Leader'}
+                          </div>
+                          <div className="text-[11px] text-slate-400">
+                            {user?.email || studentEmail}
+                          </div>
+                        </div>
+                      </div>
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                        <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                        <span>Verified Account</span>
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 text-xs">
+                      <div className={`p-2 rounded-xl border ${isDark ? 'bg-[#0B0C10]/60 border-white/5' : 'bg-white border-slate-200'}`}>
+                        <span className="block text-[9px] uppercase tracking-wider text-slate-400 font-bold">Roll Number</span>
+                        <span className={`font-semibold ${isDark ? 'text-gray-200' : 'text-slate-800'}`}>
+                          {studentRollNumber || user?.rollNumber || <span className="text-amber-400 italic font-normal">Click edit to add</span>}
+                        </span>
+                      </div>
+                      <div className={`p-2 rounded-xl border ${isDark ? 'bg-[#0B0C10]/60 border-white/5' : 'bg-white border-slate-200'}`}>
+                        <span className="block text-[9px] uppercase tracking-wider text-slate-400 font-bold">Phone Number</span>
+                        <span className={`font-semibold ${isDark ? 'text-gray-200' : 'text-slate-800'}`}>
+                          {studentPhone || user?.phone || <span className="text-amber-400 italic font-normal">Click edit to add</span>}
+                        </span>
+                      </div>
+                      <div className={`p-2 rounded-xl border ${isDark ? 'bg-[#0B0C10]/60 border-white/5' : 'bg-white border-slate-200'}`}>
+                        <span className="block text-[9px] uppercase tracking-wider text-slate-400 font-bold">Department</span>
+                        <span className={`font-semibold truncate block ${isDark ? 'text-gray-200' : 'text-slate-800'}`}>
+                          {studentDepartment || (user?.department as { name?: string })?.name || <span className="text-amber-400 italic font-normal">Click edit to add</span>}
+                        </span>
+                      </div>
+                      <div className={`p-2 rounded-xl border ${isDark ? 'bg-[#0B0C10]/60 border-white/5' : 'bg-white border-slate-200'}`}>
+                        <span className="block text-[9px] uppercase tracking-wider text-slate-400 font-bold">Gender</span>
+                        <span className={`font-semibold ${isDark ? 'text-gray-200' : 'text-slate-800'}`}>
+                          {studentGender || user?.gender || <span className="text-amber-400 italic font-normal">Click edit to add</span>}
+                        </span>
+                      </div>
+                      <div className={`p-2 rounded-xl border ${isDark ? 'bg-[#0B0C10]/60 border-white/5' : 'bg-white border-slate-200'}`}>
+                        <span className="block text-[9px] uppercase tracking-wider text-slate-400 font-bold">Year of Study</span>
+                        <span className={`font-semibold ${isDark ? 'text-gray-200' : 'text-slate-800'}`}>
+                          {studentYearOfStudy || user?.yearOfStudy || <span className="text-amber-400 italic font-normal">Click edit to add</span>}
+                        </span>
+                      </div>
+                      <div className={`p-2 rounded-xl border ${isDark ? 'bg-[#0B0C10]/60 border-white/5' : 'bg-white border-slate-200'}`}>
+                        <span className="block text-[9px] uppercase tracking-wider text-slate-400 font-bold">College</span>
+                        <span className={`font-semibold truncate block ${isDark ? 'text-gray-200' : 'text-slate-800'}`}>
+                          {studentCollege || user?.college?.name || event?.college?.name || <span className="text-amber-400 italic font-normal">Click edit to add</span>}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                        Roll Number <span className="text-red-400">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={studentRollNumber}
+                        onChange={(e) => setStudentRollNumber(e.target.value)}
+                        placeholder="e.g. 21CS101"
+                        className={`w-full px-3 py-2 rounded-xl border text-xs transition-all focus:outline-hidden focus:border-[#00F0FF] ${
+                          isDark ? 'bg-[#0B0C10] border-white/10 text-white' : 'bg-slate-50 border-slate-200 text-slate-900'
+                        }`}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                        Phone Number <span className="text-red-400">*</span>
+                      </label>
+                      <input
+                        type="tel"
+                        value={studentPhone}
+                        onChange={(e) => setStudentPhone(e.target.value)}
+                        placeholder="+91 9876543210"
+                        className={`w-full px-3 py-2 rounded-xl border text-xs transition-all focus:outline-hidden focus:border-[#00F0FF] ${
+                          isDark ? 'bg-[#0B0C10] border-white/10 text-white' : 'bg-slate-50 border-slate-200 text-slate-900'
+                        }`}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                        Department <span className="text-red-400">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={studentDepartment}
+                        onChange={(e) => setStudentDepartment(e.target.value)}
+                        placeholder="e.g. Computer Science"
+                        className={`w-full px-3 py-2 rounded-xl border text-xs transition-all focus:outline-hidden focus:border-[#00F0FF] ${
+                          isDark ? 'bg-[#0B0C10] border-white/10 text-white' : 'bg-slate-50 border-slate-200 text-slate-900'
+                        }`}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                        Gender <span className="text-red-400">*</span>
+                      </label>
+                      <select
+                        value={studentGender}
+                        onChange={(e) => setStudentGender(e.target.value)}
+                        className={`w-full px-3 py-2 rounded-xl border text-xs transition-all focus:outline-hidden focus:border-[#00F0FF] ${
+                          isDark ? 'bg-[#0B0C10] border-white/10 text-white' : 'bg-slate-50 border-slate-200 text-slate-900'
+                        }`}
+                      >
+                        <option value="">Select Gender</option>
+                        <option value="Male">Male</option>
+                        <option value="Female">Female</option>
+                        <option value="Other">Other</option>
+                        <option value="Prefer not to say">Prefer not to say</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                        Year of Study <span className="text-red-400">*</span>
+                      </label>
+                      <select
+                        value={studentYearOfStudy}
+                        onChange={(e) => setStudentYearOfStudy(e.target.value)}
+                        className={`w-full px-3 py-2 rounded-xl border text-xs transition-all focus:outline-hidden focus:border-[#00F0FF] ${
+                          isDark ? 'bg-[#0B0C10] border-white/10 text-white' : 'bg-slate-50 border-slate-200 text-slate-900'
+                        }`}
+                      >
+                        <option value="">Select Year</option>
+                        <option value="1st Year">1st Year</option>
+                        <option value="2nd Year">2nd Year</option>
+                        <option value="3rd Year">3rd Year</option>
+                        <option value="4th Year">4th Year</option>
+                        <option value="Post Graduate">Post Graduate</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                        College / Institution <span className="text-red-400">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={studentCollege}
+                        onChange={(e) => setStudentCollege(e.target.value)}
+                        placeholder="College / Institution"
+                        className={`w-full px-3 py-2 rounded-xl border text-xs transition-all focus:outline-hidden focus:border-[#00F0FF] ${
+                          isDark ? 'bg-[#0B0C10] border-white/10 text-white' : 'bg-slate-50 border-slate-200 text-slate-900'
+                        }`}
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Teammates List */}

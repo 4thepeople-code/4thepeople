@@ -63,23 +63,54 @@ export function parseAndValidateToken(token: string | null): AuthUser | null {
       return null;
     }
 
-    const userId = decoded.userId || decoded.id;
-    if (!userId) return null;
-
     const isPlatform =
       decoded.type === 'platform' ||
       decoded.role === 'PLATFORM_ADMIN' ||
       decoded.role === 'PLATFORM_SUPER_ADMIN';
 
+    const isExternal = decoded.type === 'external' || decoded.role === 'EXTERNAL';
+
+    const rawUserId = decoded.userId || decoded.id;
+    const userId = rawUserId || (isExternal && decoded.email ? `ext_${decoded.email}` : null);
+    if (!userId) return null;
+
+    let cachedUser: Record<string, unknown> = {};
+    if (typeof window !== 'undefined' && window.localStorage) {
+      try {
+        const item =
+          window.localStorage.getItem('currentUser') ||
+          (isExternal ? window.localStorage.getItem('externalUser') : null);
+        if (item) cachedUser = JSON.parse(item);
+      } catch {
+        // ignore parse error
+      }
+    }
+
+    const effectiveRole: AuthUser['role'] = isExternal
+      ? 'EXTERNAL'
+      : (decoded.role as AuthUser['role']) || (isPlatform ? 'PLATFORM_ADMIN' : 'USER');
+
     return {
       id: String(userId),
       userId: String(userId),
-      role: (decoded.role as AuthUser['role']) || (isPlatform ? 'PLATFORM_ADMIN' : 'USER'),
-      email: decoded.email || '',
-      collegeId: decoded.collegeId ? String(decoded.collegeId) : undefined,
+      role: effectiveRole,
+      email: decoded.email || (cachedUser.email as string) || '',
+      collegeId: decoded.collegeId
+        ? String(decoded.collegeId)
+        : decoded.hostCollegeId
+        ? String(decoded.hostCollegeId)
+        : undefined,
       platformAdminId: decoded.platformAdminId ? String(decoded.platformAdminId) : undefined,
       isPlatformAdmin: isPlatform,
-      name: typeof decoded.name === 'string' ? decoded.name : undefined,
+      name: typeof decoded.name === 'string' ? decoded.name : (cachedUser.name as string | undefined),
+      phone: (cachedUser.phone as string) || undefined,
+      rollNumber: (cachedUser.rollNumber as string) || undefined,
+      gender: (cachedUser.gender as string) || undefined,
+      yearOfStudy: (cachedUser.yearOfStudy as string) || undefined,
+      institutionName:
+        (cachedUser.institutionName as string) || (cachedUser.collegeName as string) || undefined,
+      collegeName:
+        (cachedUser.collegeName as string) || (cachedUser.institutionName as string) || undefined,
     };
   } catch {
     return null;
@@ -104,7 +135,14 @@ export function setStoredAuth(token: string, userData?: Record<string, unknown> 
   }
 
   // Partition role-specific keys to eliminate collisions
-  if (decoded.isPlatformAdmin) {
+  if (decoded.role === 'EXTERNAL') {
+    window.localStorage.setItem('externalToken', token);
+    if (userData) {
+      window.localStorage.setItem('externalUser', JSON.stringify(userData));
+      setStoredExternalUser(userData as unknown as StoredExternalUser);
+    }
+    setStoredExternalToken(token);
+  } else if (decoded.isPlatformAdmin) {
     window.localStorage.setItem('platformToken', token);
     if (userData) window.localStorage.setItem('platformUser', JSON.stringify(userData));
   } else if (decoded.role === 'COLLEGE_ADMIN') {
