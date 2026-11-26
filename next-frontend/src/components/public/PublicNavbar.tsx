@@ -34,6 +34,9 @@ export function PublicNavbar({ collegeSlug, collegeName }: PublicNavbarProps) {
     if (pathname.startsWith(`/college/${collegeSlug}`)) {
       return `/college/${collegeSlug}${subPath === '/' ? '' : subPath}`;
     }
+    if (collegeSlug) {
+      return `/college/${collegeSlug}${subPath === '/' ? '' : subPath}`;
+    }
     return subPath;
   };
 
@@ -220,31 +223,49 @@ export function PublicNavbar({ collegeSlug, collegeName }: PublicNavbarProps) {
                     <span>Manager Portal</span>
                   </Link>
                 ) : isAuthenticated && user?.role === 'USER' ? (
-                  <Link
-                    href={studentHref}
-                    className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider border transition-all ${
-                      pathname.includes('/student')
-                        ? 'bg-[#00F0FF]/15 border-[#00F0FF]/40 text-[#00F0FF]'
-                        : isDark
-                          ? 'text-cyan-300 hover:text-white hover:bg-white/5 border-cyan-500/30'
-                          : 'text-cyan-700 hover:text-cyan-900 hover:bg-cyan-50 border-cyan-200'
-                    }`}
-                  >
-                    <UserCheck className="w-3.5 h-3.5 text-[#00F0FF]" />
-                    <span>Student Portal</span>
-                  </Link>
-                ) : isAuthenticated && user?.role === 'EXTERNAL' ? (
                   <div className="flex items-center gap-2">
-                    <div
-                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold border ${
-                        isDark
-                          ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
-                          : 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                    <Link
+                      href={studentHref}
+                      title="Open Student Portal"
+                      className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold border transition-all cursor-pointer ${
+                        pathname.includes('/student')
+                          ? 'bg-[#00F0FF]/20 border-[#00F0FF]/50 text-[#00F0FF] ring-2 ring-cyan-500/20'
+                          : isDark
+                            ? 'bg-cyan-500/10 border-cyan-500/30 text-cyan-300 hover:bg-cyan-500/20 hover:text-white'
+                            : 'bg-cyan-50 border-cyan-200 text-cyan-700 hover:bg-cyan-100 hover:text-cyan-900'
                       }`}
                     >
-                      <UserCheck className="w-3.5 h-3.5 text-emerald-500" />
-                      <span className="truncate max-w-[120px]">{user.name || 'Guest'}</span>
-                    </div>
+                      <UserCheck className="w-3.5 h-3.5 text-[#00F0FF] shrink-0" />
+                      <span className="truncate max-w-[140px]">{user.name || 'Student'}</span>
+                    </Link>
+                    <button
+                      onClick={() => logout()}
+                      title="Sign Out"
+                      className={`p-1.5 rounded-full border transition-all text-xs cursor-pointer ${
+                        isDark
+                          ? 'border-white/10 text-gray-400 hover:text-white hover:bg-white/5'
+                          : 'border-slate-200 text-slate-500 hover:text-slate-900 hover:bg-slate-100'
+                      }`}
+                    >
+                      <LogOut className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ) : isAuthenticated && user?.role === 'EXTERNAL' ? (
+                  <div className="flex items-center gap-2">
+                    <Link
+                      href={studentHref}
+                      title="Open Student Portal"
+                      className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold border transition-all cursor-pointer ${
+                        pathname.includes('/student')
+                          ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300 ring-2 ring-emerald-500/20'
+                          : isDark
+                            ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 hover:text-emerald-300'
+                            : 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100'
+                      }`}
+                    >
+                      <UserCheck className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                      <span className="truncate max-w-[140px]">{user.name || 'Guest'}</span>
+                    </Link>
                     <button
                       onClick={() => logout()}
                       title="Sign Out"
@@ -419,31 +440,42 @@ export function PublicNavbar({ collegeSlug, collegeName }: PublicNavbarProps) {
                     Manager Portal
                   </Link>
                 ) : isAuthenticated && user?.role === 'USER' ? (
-                  <Link
-                    href={studentHref}
-                    onClick={() => setMobileMenuOpen(false)}
-                    className={`block py-2 px-3 rounded-lg font-semibold transition-colors ${
-                      pathname.includes('/student')
-                        ? 'bg-[#00F0FF]/15 text-[#00F0FF]'
-                        : isDark
-                          ? 'text-cyan-300 hover:bg-white/5 hover:text-white'
-                          : 'text-cyan-700 hover:bg-slate-100 hover:text-cyan-900'
-                    }`}
-                  >
-                    Student Portal
-                  </Link>
-                ) : isAuthenticated && user?.role === 'EXTERNAL' ? (
-                  <div className="flex items-center justify-between py-2 px-3 rounded-lg bg-emerald-500/10 text-emerald-400 font-semibold">
-                    <div className="flex items-center gap-2">
-                      <UserCheck className="w-4 h-4 text-emerald-400" />
-                      <span>{user.name || 'External Guest'}</span>
-                    </div>
+                  <div className="flex items-center justify-between py-2 px-3 rounded-lg bg-cyan-500/10 text-cyan-400 font-semibold">
+                    <Link
+                      href={studentHref}
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="flex items-center gap-2 flex-1 truncate"
+                    >
+                      <UserCheck className="w-4 h-4 text-cyan-400 shrink-0" />
+                      <span className="truncate">{user.name || 'Student Portal'}</span>
+                    </Link>
                     <button
                       onClick={() => {
                         logout();
                         setMobileMenuOpen(false);
                       }}
-                      className="text-xs text-red-400 hover:underline flex items-center gap-1 cursor-pointer"
+                      className="text-xs text-red-400 hover:underline flex items-center gap-1 cursor-pointer shrink-0 ml-2"
+                    >
+                      <LogOut className="w-3.5 h-3.5" />
+                      <span>Sign Out</span>
+                    </button>
+                  </div>
+                ) : isAuthenticated && user?.role === 'EXTERNAL' ? (
+                  <div className="flex items-center justify-between py-2 px-3 rounded-lg bg-emerald-500/10 text-emerald-400 font-semibold">
+                    <Link
+                      href={studentHref}
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="flex items-center gap-2 flex-1 truncate"
+                    >
+                      <UserCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+                      <span className="truncate">{user.name || 'External Guest'}</span>
+                    </Link>
+                    <button
+                      onClick={() => {
+                        logout();
+                        setMobileMenuOpen(false);
+                      }}
+                      className="text-xs text-red-400 hover:underline flex items-center gap-1 cursor-pointer shrink-0 ml-2"
                     >
                       <LogOut className="w-3.5 h-3.5" />
                       <span>Sign Out</span>
