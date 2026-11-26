@@ -385,6 +385,17 @@ export async function requestExternalOtp(
   return response.data;
 }
 
+export interface ExternalOtpVerifyProfile {
+  name?: string;
+  phone?: string;
+  institutionName?: string;
+  collegeName?: string;
+  rollNumber?: string;
+  department?: string;
+  gender?: string;
+  yearOfStudy?: string;
+}
+
 /**
  * Verifies the 6-digit OTP code submitted by the guest.
  * On success, receives a short-lived signed external JWT and securely caches it in sessionStorage.
@@ -392,21 +403,25 @@ export async function requestExternalOtp(
 export async function verifyExternalOtp(
   email: string,
   code: string,
-  eventId?: string
-): Promise<{ success: boolean; token: string; data?: { token?: string } }> {
+  eventId?: string,
+  profile?: ExternalOtpVerifyProfile
+): Promise<{ success: boolean; token: string; data?: { token?: string; user?: Record<string, unknown> }; user?: Record<string, unknown> }> {
   const response = await apiClient.post('/external/otp/verify', {
     email: email.trim().toLowerCase(),
     code: code.trim(),
     ...(eventId ? { eventId } : {}),
+    ...(profile ? profile : {}),
   });
   const data = response.data;
   const token: string = data?.token || data?.data?.token || '';
   if (token) {
     setStoredExternalToken(token);
   }
+  const user = data?.user || data?.data?.user;
   return {
     ...data,
     token,
+    user,
   };
 }
 

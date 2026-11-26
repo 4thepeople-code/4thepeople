@@ -148,6 +148,11 @@ export interface StoredExternalUser {
   email: string;
   phone?: string;
   institutionName?: string;
+  collegeName?: string;
+  rollNumber?: string;
+  department?: string;
+  gender?: string;
+  yearOfStudy?: string;
 }
 
 /**

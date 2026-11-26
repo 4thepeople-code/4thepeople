@@ -251,7 +251,19 @@ exports.requestExternalOtp = asyncHandler(async (req, res) => {
  *   - Marks consumed_at on success — OTP cannot be reused.
  */
 exports.verifyExternalOtp = asyncHandler(async (req, res) => {
-  const { email, code, eventId } = req.body; // Validated by schema middleware
+  const {
+    email,
+    code,
+    eventId,
+    name,
+    phone,
+    institutionName,
+    collegeName,
+    rollNumber,
+    department,
+    gender,
+    yearOfStudy,
+  } = req.body; // Validated by schema middleware
   let effectiveCollegeId = req.collegeId;
 
   if (!effectiveCollegeId && eventId) {
@@ -358,9 +370,57 @@ exports.verifyExternalOtp = asyncHandler(async (req, res) => {
   // Issue external JWT bound to verified email + hostCollegeId
   const token = issueExternalToken(email, result.hostCollegeId);
 
+  // Upsert or update ExternalParticipant in database with profile details if provided
+  const participant = await withTenant(result.hostCollegeId, async (tx) => {
+    const normalizedEmail = email.trim().toLowerCase();
+    const existing = await tx.externalParticipant.findFirst({
+      where: { collegeId: result.hostCollegeId, email: normalizedEmail },
+    });
+
+    const resolvedInst = (institutionName || collegeName || '').trim() || null;
+    const resolvedPhone = (phone || '').trim() || null;
+    const resolvedRoll = (rollNumber || '').trim() || null;
+    const resolvedDept = (department || '').trim() || null;
+    const resolvedGender = (gender || '').trim() || null;
+    const resolvedYear = (yearOfStudy || '').trim() || null;
+    const resolvedName = (name || '').trim() || (existing ? existing.name : normalizedEmail.split('@')[0]);
+
+    if (!existing) {
+      return await tx.externalParticipant.create({
+        data: {
+          collegeId: result.hostCollegeId,
+          email: normalizedEmail,
+          name: resolvedName,
+          phone: resolvedPhone,
+          institutionName: resolvedInst,
+          rollNumber: resolvedRoll,
+          department: resolvedDept,
+          gender: resolvedGender,
+          yearOfStudy: resolvedYear,
+          isEmailVerified: true,
+        },
+      });
+    } else {
+      return await tx.externalParticipant.update({
+        where: { id: existing.id },
+        data: {
+          isEmailVerified: true,
+          name: (name || '').trim() || existing.name,
+          ...(resolvedPhone ? { phone: resolvedPhone } : {}),
+          ...(resolvedInst ? { institutionName: resolvedInst } : {}),
+          ...(resolvedRoll ? { rollNumber: resolvedRoll } : {}),
+          ...(resolvedDept ? { department: resolvedDept } : {}),
+          ...(resolvedGender ? { gender: resolvedGender } : {}),
+          ...(resolvedYear ? { yearOfStudy: resolvedYear } : {}),
+        },
+      });
+    }
+  });
+
   return res.status(200).json({
     success: true,
     token,
+    user: participant,
   });
 });
 

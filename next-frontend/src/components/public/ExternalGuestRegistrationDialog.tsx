@@ -26,6 +26,7 @@ import {
 } from '@/lib/api/events';
 import { externalCheckout, externalVerifyPayment } from '@/lib/api/payment';
 import { launchPaymentCheckout } from '@/lib/payment/paymentSdk';
+import { getStoredExternalUser } from '@/lib/auth/tokenStorage';
 import type { Event } from '@/types/models';
 
 export interface ExternalGuestRegistrationDialogProps {
@@ -68,9 +69,22 @@ export function ExternalGuestRegistrationDialog({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successData, setSuccessData] = useState<{ id: string; eventId: string; registeredAt: string } | null>(null);
 
-  // Reset state when dialog is opened or closed
+  // Reset state when dialog is opened or closed, prefill with stored profile if present
   useEffect(() => {
     if (isOpen) {
+      const stored = getStoredExternalUser();
+      if (stored) {
+        if (stored.name) setName(stored.name);
+        if (stored.email) setEmail(stored.email);
+        if (stored.phone) setPhone(stored.phone);
+        if (stored.institutionName || stored.collegeName) {
+          setInstitutionName(stored.institutionName || stored.collegeName || '');
+        }
+        if (stored.rollNumber) setRollNumber(stored.rollNumber);
+        if (stored.department) setDepartment(stored.department);
+        if (stored.gender) setGender(stored.gender);
+        if (stored.yearOfStudy) setYearOfStudy(stored.yearOfStudy);
+      }
       setStep('DETAILS');
       setErrorMessage(null);
       setOtpDigits(['', '', '', '', '', '']);

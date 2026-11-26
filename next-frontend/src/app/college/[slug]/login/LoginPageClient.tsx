@@ -135,7 +135,11 @@ export function LoginPageClient({
   const [externalName, setExternalName] = useState(existingExternal?.name || '');
   const [externalEmail, setExternalEmail] = useState(existingExternal?.email || '');
   const [externalPhone, setExternalPhone] = useState(existingExternal?.phone || '');
-  const [externalInstitution, setExternalInstitution] = useState(existingExternal?.institutionName || '');
+  const [externalInstitution, setExternalInstitution] = useState(existingExternal?.institutionName || existingExternal?.collegeName || '');
+  const [externalRollNumber, setExternalRollNumber] = useState(existingExternal?.rollNumber || '');
+  const [externalDepartment, setExternalDepartment] = useState(existingExternal?.department || '');
+  const [externalGender, setExternalGender] = useState(existingExternal?.gender || '');
+  const [externalYearOfStudy, setExternalYearOfStudy] = useState(existingExternal?.yearOfStudy || '');
 
   // OTP inputs
   const [otpDigits, setOtpDigits] = useState<string[]>(['', '', '', '', '', '']);
@@ -256,7 +260,18 @@ export function LoginPageClient({
     try {
       setIsVerifyingOtp(true);
       const trimmedEmail = externalEmail.trim().toLowerCase();
-      const res = await verifyExternalOtp(trimmedEmail, fullCode, inferredEventId || undefined);
+      const profileData = {
+        name: externalName.trim(),
+        phone: externalPhone.trim() || undefined,
+        institutionName: externalInstitution.trim() || undefined,
+        collegeName: externalInstitution.trim() || undefined,
+        rollNumber: externalRollNumber.trim() || undefined,
+        department: externalDepartment.trim() || undefined,
+        gender: externalGender.trim() || undefined,
+        yearOfStudy: externalYearOfStudy.trim() || undefined,
+      };
+
+      const res = await verifyExternalOtp(trimmedEmail, fullCode, inferredEventId || undefined, profileData);
       const token = res?.token || (res as unknown as { data?: { token?: string } })?.data?.token;
 
       if (token) {
@@ -266,6 +281,11 @@ export function LoginPageClient({
           email: trimmedEmail,
           phone: externalPhone.trim() || undefined,
           institutionName: externalInstitution.trim() || undefined,
+          collegeName: externalInstitution.trim() || undefined,
+          rollNumber: externalRollNumber.trim() || undefined,
+          department: externalDepartment.trim() || undefined,
+          gender: externalGender.trim() || undefined,
+          yearOfStudy: externalYearOfStudy.trim() || undefined,
         };
         setStoredExternalUser(externalProfile);
 
@@ -579,67 +599,70 @@ export function LoginPageClient({
                       Sign in with your email to register for public campus events without a college student ID.
                     </div>
 
-                    {/* Name */}
-                    <div className="space-y-1.5">
-                      <label
-                        className={`block text-[11px] font-bold uppercase tracking-wider ${
-                          isDark ? 'text-gray-300' : 'text-slate-700'
-                        }`}
-                      >
-                        Full Name <span className="text-[#FF5733]">*</span>
-                      </label>
-                      <div className="relative">
-                        <User
-                          className={`w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 ${
-                            isDark ? 'text-gray-500' : 'text-slate-400'
+                    {/* Full Name & Email Address */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {/* Name */}
+                      <div className="space-y-1.5">
+                        <label
+                          className={`block text-[11px] font-bold uppercase tracking-wider ${
+                            isDark ? 'text-gray-300' : 'text-slate-700'
                           }`}
-                        />
-                        <input
-                          type="text"
-                          value={externalName}
-                          onChange={(e) => setExternalName(e.target.value)}
-                          placeholder="e.g. Priya Sharma"
-                          className={`w-full pl-10 pr-4 py-3 rounded-xl border text-sm transition-all focus:outline-hidden focus:border-[#FF5733] ${
-                            isDark
-                              ? 'bg-[#0B0C10] border-white/10 text-white placeholder-gray-600'
-                              : 'bg-slate-50 border-slate-200 text-slate-900 placeholder-slate-400'
+                        >
+                          Full Name <span className="text-[#FF5733]">*</span>
+                        </label>
+                        <div className="relative">
+                          <User
+                            className={`w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 ${
+                              isDark ? 'text-gray-500' : 'text-slate-400'
+                            }`}
+                          />
+                          <input
+                            type="text"
+                            value={externalName}
+                            onChange={(e) => setExternalName(e.target.value)}
+                            placeholder="e.g. Priya Sharma"
+                            className={`w-full pl-10 pr-4 py-3 rounded-xl border text-sm transition-all focus:outline-hidden focus:border-[#FF5733] ${
+                              isDark
+                                ? 'bg-[#0B0C10] border-white/10 text-white placeholder-gray-600'
+                                : 'bg-slate-50 border-slate-200 text-slate-900 placeholder-slate-400'
+                            }`}
+                            required
+                          />
+                        </div>
+                      </div>
+
+                      {/* Email */}
+                      <div className="space-y-1.5">
+                        <label
+                          className={`block text-[11px] font-bold uppercase tracking-wider ${
+                            isDark ? 'text-gray-300' : 'text-slate-700'
                           }`}
-                          required
-                        />
+                        >
+                          Email Address <span className="text-[#FF5733]">*</span>
+                        </label>
+                        <div className="relative">
+                          <Mail
+                            className={`w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 ${
+                              isDark ? 'text-gray-500' : 'text-slate-400'
+                            }`}
+                          />
+                          <input
+                            type="email"
+                            value={externalEmail}
+                            onChange={(e) => setExternalEmail(e.target.value)}
+                            placeholder="e.g. priya@gmail.com"
+                            className={`w-full pl-10 pr-4 py-3 rounded-xl border text-sm transition-all focus:outline-hidden focus:border-[#FF5733] ${
+                              isDark
+                                ? 'bg-[#0B0C10] border-white/10 text-white placeholder-gray-600'
+                                : 'bg-slate-50 border-slate-200 text-slate-900 placeholder-slate-400'
+                            }`}
+                            required
+                          />
+                        </div>
                       </div>
                     </div>
 
-                    {/* Email */}
-                    <div className="space-y-1.5">
-                      <label
-                        className={`block text-[11px] font-bold uppercase tracking-wider ${
-                          isDark ? 'text-gray-300' : 'text-slate-700'
-                        }`}
-                      >
-                        Email Address <span className="text-[#FF5733]">*</span>
-                      </label>
-                      <div className="relative">
-                        <Mail
-                          className={`w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 ${
-                            isDark ? 'text-gray-500' : 'text-slate-400'
-                          }`}
-                        />
-                        <input
-                          type="email"
-                          value={externalEmail}
-                          onChange={(e) => setExternalEmail(e.target.value)}
-                          placeholder="e.g. priya@gmail.com"
-                          className={`w-full pl-10 pr-4 py-3 rounded-xl border text-sm transition-all focus:outline-hidden focus:border-[#FF5733] ${
-                            isDark
-                              ? 'bg-[#0B0C10] border-white/10 text-white placeholder-gray-600'
-                              : 'bg-slate-50 border-slate-200 text-slate-900 placeholder-slate-400'
-                          }`}
-                          required
-                        />
-                      </div>
-                    </div>
-
-                    {/* Optional Phone & Institution */}
+                    {/* Roll No. & Department */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div className="space-y-1.5">
                         <label
@@ -647,19 +670,19 @@ export function LoginPageClient({
                             isDark ? 'text-gray-300' : 'text-slate-700'
                           }`}
                         >
-                          Phone <span className="text-gray-500 font-normal">(Optional)</span>
+                          Roll No. / Student ID <span className="text-gray-500 font-normal">(Optional)</span>
                         </label>
                         <div className="relative">
-                          <Phone
+                          <GraduationCap
                             className={`w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 ${
                               isDark ? 'text-gray-500' : 'text-slate-400'
                             }`}
                           />
                           <input
-                            type="tel"
-                            value={externalPhone}
-                            onChange={(e) => setExternalPhone(e.target.value)}
-                            placeholder="9876543210"
+                            type="text"
+                            value={externalRollNumber}
+                            onChange={(e) => setExternalRollNumber(e.target.value)}
+                            placeholder="e.g. 21CS101"
                             className={`w-full pl-10 pr-4 py-3 rounded-xl border text-sm transition-all focus:outline-hidden focus:border-[#FF5733] ${
                               isDark
                                 ? 'bg-[#0B0C10] border-white/10 text-white placeholder-gray-600'
@@ -675,7 +698,92 @@ export function LoginPageClient({
                             isDark ? 'text-gray-300' : 'text-slate-700'
                           }`}
                         >
-                          Institution <span className="text-gray-500 font-normal">(Optional)</span>
+                          Department <span className="text-gray-500 font-normal">(Optional)</span>
+                        </label>
+                        <div className="relative">
+                          <Building
+                            className={`w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 ${
+                              isDark ? 'text-gray-500' : 'text-slate-400'
+                            }`}
+                          />
+                          <input
+                            type="text"
+                            value={externalDepartment}
+                            onChange={(e) => setExternalDepartment(e.target.value)}
+                            placeholder="e.g. Computer Science"
+                            className={`w-full pl-10 pr-4 py-3 rounded-xl border text-sm transition-all focus:outline-hidden focus:border-[#FF5733] ${
+                              isDark
+                                ? 'bg-[#0B0C10] border-white/10 text-white placeholder-gray-600'
+                                : 'bg-slate-50 border-slate-200 text-slate-900 placeholder-slate-400'
+                            }`}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Gender & Year of Study */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="space-y-1.5">
+                        <label
+                          className={`block text-[11px] font-bold uppercase tracking-wider ${
+                            isDark ? 'text-gray-300' : 'text-slate-700'
+                          }`}
+                        >
+                          Gender <span className="text-gray-500 font-normal">(Optional)</span>
+                        </label>
+                        <select
+                          value={externalGender}
+                          onChange={(e) => setExternalGender(e.target.value)}
+                          className={`w-full px-4 py-3 rounded-xl border text-sm transition-all focus:outline-hidden focus:border-[#FF5733] ${
+                            isDark
+                              ? 'bg-[#0B0C10] border-white/10 text-white'
+                              : 'bg-slate-50 border-slate-200 text-slate-900'
+                          }`}
+                        >
+                          <option value="">Select Gender</option>
+                          <option value="Male">Male</option>
+                          <option value="Female">Female</option>
+                          <option value="Other">Other</option>
+                          <option value="Prefer not to say">Prefer not to say</option>
+                        </select>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label
+                          className={`block text-[11px] font-bold uppercase tracking-wider ${
+                            isDark ? 'text-gray-300' : 'text-slate-700'
+                          }`}
+                        >
+                          Year of Study <span className="text-gray-500 font-normal">(Optional)</span>
+                        </label>
+                        <select
+                          value={externalYearOfStudy}
+                          onChange={(e) => setExternalYearOfStudy(e.target.value)}
+                          className={`w-full px-4 py-3 rounded-xl border text-sm transition-all focus:outline-hidden focus:border-[#FF5733] ${
+                            isDark
+                              ? 'bg-[#0B0C10] border-white/10 text-white'
+                              : 'bg-slate-50 border-slate-200 text-slate-900'
+                          }`}
+                        >
+                          <option value="">Select Year</option>
+                          <option value="1st Year">1st Year</option>
+                          <option value="2nd Year">2nd Year</option>
+                          <option value="3rd Year">3rd Year</option>
+                          <option value="4th Year">4th Year</option>
+                          <option value="Post Graduate">Post Graduate</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* College / Institution & Phone */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="space-y-1.5">
+                        <label
+                          className={`block text-[11px] font-bold uppercase tracking-wider ${
+                            isDark ? 'text-gray-300' : 'text-slate-700'
+                          }`}
+                        >
+                          College / Institution <span className="text-gray-500 font-normal">(Optional)</span>
                         </label>
                         <div className="relative">
                           <Building
@@ -687,7 +795,35 @@ export function LoginPageClient({
                             type="text"
                             value={externalInstitution}
                             onChange={(e) => setExternalInstitution(e.target.value)}
-                            placeholder="College / Company"
+                            placeholder="College / University"
+                            className={`w-full pl-10 pr-4 py-3 rounded-xl border text-sm transition-all focus:outline-hidden focus:border-[#FF5733] ${
+                              isDark
+                                ? 'bg-[#0B0C10] border-white/10 text-white placeholder-gray-600'
+                                : 'bg-slate-50 border-slate-200 text-slate-900 placeholder-slate-400'
+                            }`}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label
+                          className={`block text-[11px] font-bold uppercase tracking-wider ${
+                            isDark ? 'text-gray-300' : 'text-slate-700'
+                          }`}
+                        >
+                          Phone Number <span className="text-gray-500 font-normal">(Optional)</span>
+                        </label>
+                        <div className="relative">
+                          <Phone
+                            className={`w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 ${
+                              isDark ? 'text-gray-500' : 'text-slate-400'
+                            }`}
+                          />
+                          <input
+                            type="tel"
+                            value={externalPhone}
+                            onChange={(e) => setExternalPhone(e.target.value)}
+                            placeholder="+91 9876543210"
                             className={`w-full pl-10 pr-4 py-3 rounded-xl border text-sm transition-all focus:outline-hidden focus:border-[#FF5733] ${
                               isDark
                                 ? 'bg-[#0B0C10] border-white/10 text-white placeholder-gray-600'

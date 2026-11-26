@@ -154,6 +154,14 @@ const externalOtpVerifyBody = z.object({
   email: email,
   code: z.string().regex(/^\d{6}$/, 'Code must be exactly 6 digits'),
   eventId: uuid.optional(),
+  name: z.string().trim().min(1).max(100).optional(),
+  phone: z.string().trim().max(20).optional().nullable(),
+  institutionName: z.string().trim().max(200).optional().nullable(),
+  collegeName: z.string().trim().max(200).optional().nullable(),
+  rollNumber: z.string().trim().max(50).optional().nullable(),
+  department: z.string().trim().max(100).optional().nullable(),
+  gender: z.string().trim().max(50).optional().nullable(),
+  yearOfStudy: z.string().trim().max(50).optional().nullable(),
 });
 
 const externalRegisterBody = z.object({
