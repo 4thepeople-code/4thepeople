@@ -123,6 +123,17 @@ export function ExternalGuestRegistrationDialog({
 
     const trimmedEmail = email.trim().toLowerCase();
     const trimmedName = name.trim();
+    const trimmedRoll = rollNumber.trim();
+    const trimmedDept = department.trim();
+    const trimmedGender = gender.trim();
+    const trimmedYear = yearOfStudy.trim();
+    const trimmedInst = institutionName.trim();
+    const trimmedPhone = phone.trim();
+
+    if (!trimmedName || trimmedName.length < 2) {
+      setErrorMessage('Please enter your full name (at least 2 characters).');
+      return false;
+    }
 
     if (!trimmedEmail) {
       setErrorMessage('Please enter your email address.');
@@ -134,8 +145,33 @@ export function ExternalGuestRegistrationDialog({
       return false;
     }
 
-    if (!trimmedName || trimmedName.length < 2) {
-      setErrorMessage('Please enter your full name (at least 2 characters).');
+    if (!trimmedRoll) {
+      setErrorMessage('Please enter your roll number / student ID.');
+      return false;
+    }
+
+    if (!trimmedDept) {
+      setErrorMessage('Please enter your department.');
+      return false;
+    }
+
+    if (!trimmedGender) {
+      setErrorMessage('Please select your gender.');
+      return false;
+    }
+
+    if (!trimmedYear) {
+      setErrorMessage('Please select your year of study.');
+      return false;
+    }
+
+    if (!trimmedPhone || trimmedPhone.replace(/\D/g, '').length < 10) {
+      setErrorMessage('Please enter a valid 10-digit phone number.');
+      return false;
+    }
+
+    if (!trimmedInst) {
+      setErrorMessage('Please enter your college / institution name.');
       return false;
     }
 
@@ -514,10 +550,11 @@ export function ExternalGuestRegistrationDialog({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">
-                    Roll No / Student ID
+                    Roll No / Student ID <span className="text-[#FF5733]">*</span>
                   </label>
                   <input
                     type="text"
+                    required
                     value={rollNumber}
                     onChange={(e) => setRollNumber(e.target.value)}
                     placeholder="e.g. 21CS101"
@@ -531,10 +568,11 @@ export function ExternalGuestRegistrationDialog({
 
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">
-                    Department
+                    Department <span className="text-[#FF5733]">*</span>
                   </label>
                   <input
                     type="text"
+                    required
                     value={department}
                     onChange={(e) => setDepartment(e.target.value)}
                     placeholder="e.g. Computer Science"
@@ -550,9 +588,10 @@ export function ExternalGuestRegistrationDialog({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">
-                    Gender
+                    Gender <span className="text-[#FF5733]">*</span>
                   </label>
                   <select
+                    required
                     value={gender}
                     onChange={(e) => setGender(e.target.value)}
                     className={`w-full px-4 py-2.5 rounded-2xl border text-sm font-medium outline-none transition-all ${
@@ -571,9 +610,10 @@ export function ExternalGuestRegistrationDialog({
 
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">
-                    Year of Study
+                    Year of Study <span className="text-[#FF5733]">*</span>
                   </label>
                   <select
+                    required
                     value={yearOfStudy}
                     onChange={(e) => setYearOfStudy(e.target.value)}
                     className={`w-full px-4 py-2.5 rounded-2xl border text-sm font-medium outline-none transition-all ${
@@ -595,12 +635,13 @@ export function ExternalGuestRegistrationDialog({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">
-                    Phone Number <span className="text-[10px] text-slate-500 font-normal">(Optional)</span>
+                    Phone Number <span className="text-[#FF5733]">*</span>
                   </label>
                   <div className="relative">
                     <Phone className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                     <input
                       type="tel"
+                      required
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
                       placeholder="+91 9876543210"
@@ -615,12 +656,13 @@ export function ExternalGuestRegistrationDialog({
 
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">
-                    College / Institution <span className="text-[10px] text-slate-500 font-normal">(Optional)</span>
+                    College / Institution <span className="text-[#FF5733]">*</span>
                   </label>
                   <div className="relative">
                     <Building className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                     <input
                       type="text"
+                      required
                       value={institutionName}
                       onChange={(e) => setInstitutionName(e.target.value)}
                       placeholder="University / College"

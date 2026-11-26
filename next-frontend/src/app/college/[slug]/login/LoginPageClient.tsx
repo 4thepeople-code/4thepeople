@@ -180,8 +180,19 @@ export function LoginPageClient({
     setExternalErrorMsg(null);
     setExternalNotice(null);
 
-    const trimmedEmail = externalEmail.trim().toLowerCase();
     const trimmedName = externalName.trim();
+    const trimmedEmail = externalEmail.trim().toLowerCase();
+    const trimmedRoll = externalRollNumber.trim();
+    const trimmedDept = externalDepartment.trim();
+    const trimmedGender = externalGender.trim();
+    const trimmedYear = externalYearOfStudy.trim();
+    const trimmedInst = externalInstitution.trim();
+    const trimmedPhone = externalPhone.trim();
+
+    if (!trimmedName || trimmedName.length < 2) {
+      setExternalErrorMsg('Please enter your full name (minimum 2 characters).');
+      return;
+    }
 
     if (!trimmedEmail) {
       setExternalErrorMsg('Please enter your email address.');
@@ -193,8 +204,33 @@ export function LoginPageClient({
       return;
     }
 
-    if (!trimmedName || trimmedName.length < 2) {
-      setExternalErrorMsg('Please enter your full name (minimum 2 characters).');
+    if (!trimmedRoll) {
+      setExternalErrorMsg('Please enter your roll number / student ID.');
+      return;
+    }
+
+    if (!trimmedDept) {
+      setExternalErrorMsg('Please enter your department.');
+      return;
+    }
+
+    if (!trimmedGender) {
+      setExternalErrorMsg('Please select your gender.');
+      return;
+    }
+
+    if (!trimmedYear) {
+      setExternalErrorMsg('Please select your year of study.');
+      return;
+    }
+
+    if (!trimmedInst) {
+      setExternalErrorMsg('Please enter your college / institution name.');
+      return;
+    }
+
+    if (!trimmedPhone || trimmedPhone.replace(/\D/g, '').length < 10) {
+      setExternalErrorMsg('Please enter a valid 10-digit phone number.');
       return;
     }
 
@@ -670,7 +706,7 @@ export function LoginPageClient({
                             isDark ? 'text-gray-300' : 'text-slate-700'
                           }`}
                         >
-                          Roll No. / Student ID <span className="text-gray-500 font-normal">(Optional)</span>
+                          Roll No. / Student ID <span className="text-[#FF5733]">*</span>
                         </label>
                         <div className="relative">
                           <GraduationCap
@@ -680,6 +716,7 @@ export function LoginPageClient({
                           />
                           <input
                             type="text"
+                            required
                             value={externalRollNumber}
                             onChange={(e) => setExternalRollNumber(e.target.value)}
                             placeholder="e.g. 21CS101"
@@ -698,7 +735,7 @@ export function LoginPageClient({
                             isDark ? 'text-gray-300' : 'text-slate-700'
                           }`}
                         >
-                          Department <span className="text-gray-500 font-normal">(Optional)</span>
+                          Department <span className="text-[#FF5733]">*</span>
                         </label>
                         <div className="relative">
                           <Building
@@ -708,6 +745,7 @@ export function LoginPageClient({
                           />
                           <input
                             type="text"
+                            required
                             value={externalDepartment}
                             onChange={(e) => setExternalDepartment(e.target.value)}
                             placeholder="e.g. Computer Science"
@@ -729,9 +767,10 @@ export function LoginPageClient({
                             isDark ? 'text-gray-300' : 'text-slate-700'
                           }`}
                         >
-                          Gender <span className="text-gray-500 font-normal">(Optional)</span>
+                          Gender <span className="text-[#FF5733]">*</span>
                         </label>
                         <select
+                          required
                           value={externalGender}
                           onChange={(e) => setExternalGender(e.target.value)}
                           className={`w-full px-4 py-3 rounded-xl border text-sm transition-all focus:outline-hidden focus:border-[#FF5733] ${
@@ -754,9 +793,10 @@ export function LoginPageClient({
                             isDark ? 'text-gray-300' : 'text-slate-700'
                           }`}
                         >
-                          Year of Study <span className="text-gray-500 font-normal">(Optional)</span>
+                          Year of Study <span className="text-[#FF5733]">*</span>
                         </label>
                         <select
+                          required
                           value={externalYearOfStudy}
                           onChange={(e) => setExternalYearOfStudy(e.target.value)}
                           className={`w-full px-4 py-3 rounded-xl border text-sm transition-all focus:outline-hidden focus:border-[#FF5733] ${
@@ -783,7 +823,7 @@ export function LoginPageClient({
                             isDark ? 'text-gray-300' : 'text-slate-700'
                           }`}
                         >
-                          College / Institution <span className="text-gray-500 font-normal">(Optional)</span>
+                          College / Institution <span className="text-[#FF5733]">*</span>
                         </label>
                         <div className="relative">
                           <Building
@@ -793,6 +833,7 @@ export function LoginPageClient({
                           />
                           <input
                             type="text"
+                            required
                             value={externalInstitution}
                             onChange={(e) => setExternalInstitution(e.target.value)}
                             placeholder="College / University"
@@ -811,7 +852,7 @@ export function LoginPageClient({
                             isDark ? 'text-gray-300' : 'text-slate-700'
                           }`}
                         >
-                          Phone Number <span className="text-gray-500 font-normal">(Optional)</span>
+                          Phone Number <span className="text-[#FF5733]">*</span>
                         </label>
                         <div className="relative">
                           <Phone
@@ -821,6 +862,7 @@ export function LoginPageClient({
                           />
                           <input
                             type="tel"
+                            required
                             value={externalPhone}
                             onChange={(e) => setExternalPhone(e.target.value)}
                             placeholder="+91 9876543210"
