@@ -393,17 +393,21 @@ export async function verifyExternalOtp(
   email: string,
   code: string,
   eventId?: string
-): Promise<{ success: boolean; token: string }> {
+): Promise<{ success: boolean; token: string; data?: { token?: string } }> {
   const response = await apiClient.post('/external/otp/verify', {
     email: email.trim().toLowerCase(),
     code: code.trim(),
     ...(eventId ? { eventId } : {}),
   });
   const data = response.data;
-  if (data?.token) {
-    setStoredExternalToken(data.token);
+  const token: string = data?.token || data?.data?.token || '';
+  if (token) {
+    setStoredExternalToken(token);
   }
-  return data;
+  return {
+    ...data,
+    token,
+  };
 }
 
 /**
@@ -443,7 +447,12 @@ export async function registerExternalParticipant(
       },
     }
   );
-  return response.data;
+  const data = response.data;
+  const registration = data?.registration || data?.data?.registration;
+  return {
+    ...data,
+    registration,
+  };
 }
 
 /**
@@ -489,9 +498,11 @@ export async function getExternalRegistrationStatus(
       },
     });
     const res = response.data;
+    const isRegistered = res.isRegistered !== undefined ? res.isRegistered : res.data?.isRegistered;
+    const registration = res.registration || res.data?.registration || null;
     return {
-      isRegistered: Boolean(res.isRegistered),
-      registration: res.registration || null,
+      isRegistered: Boolean(isRegistered),
+      registration,
     };
   } catch (err: unknown) {
     const status = (err as { status?: number })?.status;

@@ -257,9 +257,10 @@ export function LoginPageClient({
       setIsVerifyingOtp(true);
       const trimmedEmail = externalEmail.trim().toLowerCase();
       const res = await verifyExternalOtp(trimmedEmail, fullCode, inferredEventId || undefined);
+      const token = res?.token || (res as unknown as { data?: { token?: string } })?.data?.token;
 
-      if (res?.token) {
-        setStoredExternalToken(res.token);
+      if (token) {
+        setStoredExternalToken(token);
         const externalProfile = {
           name: externalName.trim(),
           email: trimmedEmail,
@@ -276,7 +277,7 @@ export function LoginPageClient({
             email: trimmedEmail,
             role: 'EXTERNAL',
           },
-          res.token
+          token
         );
 
         // Redirect back to returnUrl or events directory

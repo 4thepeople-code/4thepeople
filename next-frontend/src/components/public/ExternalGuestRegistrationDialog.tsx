@@ -243,7 +243,7 @@ export function ExternalGuestRegistrationDialog({
 
       // 1. Verify OTP and obtain external JWT
       const verifyRes = await verifyExternalOtp(email.trim().toLowerCase(), fullCode, event.id);
-      const token = verifyRes.token;
+      const token = verifyRes.token || (verifyRes as unknown as { data?: { token?: string } })?.data?.token;
 
       // 2. Complete registration using the external JWT
       const input: ExternalRegisterInput = {
