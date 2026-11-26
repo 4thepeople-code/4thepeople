@@ -248,6 +248,13 @@ export function StudentDashboardClient({ slug, initialTab = 'registrations' }: S
                   Roll: {user.rollNumber}
                 </span>
               )}
+              {user.section && (
+                <span className={`px-2.5 py-1 rounded-lg font-mono font-bold uppercase border ${
+                  isDark ? 'bg-white/5 border-white/10 text-emerald-400' : 'bg-slate-100 border-slate-200 text-emerald-700'
+                }`}>
+                  Sec: {user.section}
+                </span>
+              )}
               <span className={`text-xs ${isDark ? 'text-gray-400' : 'text-slate-500'}`}>
                 {user.email}
               </span>
@@ -891,11 +898,18 @@ export function StudentDashboardClient({ slug, initialTab = 'registrations' }: S
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
                       <div className={`p-4 rounded-2xl border ${isDark ? 'bg-white/5 border-white/5' : 'bg-slate-50 border-slate-200'}`}>
                         <span className={`block text-[10px] font-bold uppercase tracking-wider mb-1 ${isDark ? 'text-gray-400' : 'text-slate-500'}`}>
-                          Roll Number
+                          Roll Number &amp; Section
                         </span>
-                        <span className="font-mono font-bold text-sm text-[#00F0FF]">
-                          {studentUser.rollNumber || 'N/A'}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono font-bold text-sm text-[#00F0FF]">
+                            {studentUser.rollNumber || 'N/A'}
+                          </span>
+                          {studentUser.section && (
+                            <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                              Sec {studentUser.section}
+                            </span>
+                          )}
+                        </div>
                       </div>
 
                       <div className={`p-4 rounded-2xl border ${isDark ? 'bg-white/5 border-white/5' : 'bg-slate-50 border-slate-200'}`}>

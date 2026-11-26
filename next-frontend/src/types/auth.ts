@@ -27,6 +27,7 @@ export interface AuthUser extends Omit<Partial<User>, 'role' | 'department'> {
   rollNumber?: string | null;
   gender?: string | null;
   yearOfStudy?: string | null;
+  section?: string | null;
   departmentId?: string | null;
   department?: import('./models').Department | string | null;
   institutionName?: string | null;
@@ -56,6 +57,7 @@ export interface StudentActivationConfirmPayload {
   phone?: string;
   gender?: string;
   yearOfStudy?: string;
+  section?: string;
   departmentId?: string;
   department?: string;
 }

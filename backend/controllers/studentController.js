@@ -251,6 +251,9 @@ exports.uploadStudentRoster = asyncHandler(async (req, res) => {
         email = `${rollNumber.toLowerCase()}@student.local`;
       }
 
+      // Resolve section
+      const section = (item.section || item.sec || '').toString().trim().toUpperCase() || null;
+
       // Check if student exists
       const existingUser = await tx.user.findFirst({
         where: { collegeId: req.collegeId, rollNumber },
@@ -270,6 +273,7 @@ exports.uploadStudentRoster = asyncHandler(async (req, res) => {
             email,
             departmentId,
             admissionYear,
+            section: section || existingUser.section,
           },
         });
         updated++;
@@ -283,6 +287,7 @@ exports.uploadStudentRoster = asyncHandler(async (req, res) => {
             rollNumber,
             departmentId,
             admissionYear,
+            section,
             role: 'USER',
             isActive: false,
             passwordHash: null,
@@ -584,6 +589,7 @@ exports.confirmActivation = asyncHandler(async (req, res) => {
       const cleanPhone = phone && typeof phone === 'string' && phone.trim() ? phone.trim() : null;
       const cleanGender = gender && typeof gender === 'string' && gender.trim() ? gender.trim() : null;
       const cleanYear = yearOfStudy && typeof yearOfStudy === 'string' && yearOfStudy.trim() ? yearOfStudy.trim() : null;
+      const cleanSection = req.body.section && typeof req.body.section === 'string' && req.body.section.trim() ? req.body.section.trim().toUpperCase() : null;
       const cleanName = name && typeof name === 'string' && name.trim() ? name.trim() : null;
 
       // Step C: Activate user account and persist profile details
@@ -595,13 +601,14 @@ exports.confirmActivation = asyncHandler(async (req, res) => {
             phone = COALESCE(${cleanPhone}, phone),
             gender = COALESCE(${cleanGender}, gender),
             year_of_study = COALESCE(${cleanYear}, year_of_study),
+            section = COALESCE(${cleanSection}, section),
             department_id = COALESCE(${effectiveDeptId}::uuid, department_id),
             name = COALESCE(${cleanName}, name)
         WHERE id = ${user.id}::uuid
           AND college_id = ${req.collegeId}::uuid
           AND is_active = false
           AND claimed_at IS NULL
-        RETURNING id, name, email, role, roll_number AS "rollNumber", phone, gender, year_of_study AS "yearOfStudy", department_id AS "departmentId";
+        RETURNING id, name, email, role, roll_number AS "rollNumber", phone, gender, year_of_study AS "yearOfStudy", section, department_id AS "departmentId";
       `;
 
       // BRANCH 4: FAILED USER UPDATE -> MANDATORY ROLLBACK!
@@ -702,6 +709,7 @@ exports.studentLogin = asyncHandler(async (req, res) => {
         phone: true,
         gender: true,
         yearOfStudy: true,
+        section: true,
         departmentId: true,
         department: { select: { id: true, name: true, shortCode: true } },
         college: { select: { id: true, name: true, slug: true } },
@@ -750,6 +758,7 @@ exports.studentLogin = asyncHandler(async (req, res) => {
       phone: user.phone,
       gender: user.gender,
       yearOfStudy: user.yearOfStudy,
+      section: user.section,
       departmentId: user.departmentId,
       department: user.department,
       college: user.college,

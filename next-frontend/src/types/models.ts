@@ -87,6 +87,7 @@ export interface User {
   phone?: string | null;
   gender?: string | null;
   yearOfStudy?: string | null;
+  section?: string | null;
   isActive: boolean;
   claimedAt?: string | null;
   avatar?: UserAvatar | null;

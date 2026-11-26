@@ -10,3 +10,7 @@ node_modules
 seed.js
 
 .env.example
+
+# Raw CSVs and datasets containing personal data (PII)
+data/
+*.csv
