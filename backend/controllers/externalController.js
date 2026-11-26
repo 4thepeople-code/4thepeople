@@ -530,6 +530,10 @@ exports.registerExternalParticipant = asyncHandler(async (req, res) => {
             name,
             phone: phone || null,
             institutionName: institutionName || collegeName || null,
+            rollNumber: rollNumber || null,
+            department: department || null,
+            gender: gender || null,
+            yearOfStudy: yearOfStudy || null,
             isEmailVerified: true,
           },
         });
@@ -546,7 +550,16 @@ exports.registerExternalParticipant = asyncHandler(async (req, res) => {
           // Update identity fields since we now have the existing record
           participant = await tx.externalParticipant.update({
             where: { id: participant.id },
-            data: { isEmailVerified: true, name, phone: phone || null, institutionName: institutionName || collegeName || null },
+            data: {
+              isEmailVerified: true,
+              name: name || participant.name,
+              phone: phone || participant.phone || null,
+              institutionName: institutionName || collegeName || participant.institutionName || null,
+              rollNumber: rollNumber || participant.rollNumber || null,
+              department: department || participant.department || null,
+              gender: gender || participant.gender || null,
+              yearOfStudy: yearOfStudy || participant.yearOfStudy || null,
+            },
           });
         } else {
           throw createErr;
@@ -556,7 +569,16 @@ exports.registerExternalParticipant = asyncHandler(async (req, res) => {
       // Update identity fields on existing participant
       participant = await tx.externalParticipant.update({
         where: { id: participant.id },
-        data: { isEmailVerified: true, name, phone: phone || null, institutionName: institutionName || collegeName || null },
+        data: {
+          isEmailVerified: true,
+          name: name || participant.name,
+          phone: phone || participant.phone || null,
+          institutionName: institutionName || collegeName || participant.institutionName || null,
+          rollNumber: rollNumber || participant.rollNumber || null,
+          department: department || participant.department || null,
+          gender: gender || participant.gender || null,
+          yearOfStudy: yearOfStudy || participant.yearOfStudy || null,
+        },
       });
     }
 
@@ -586,14 +608,14 @@ exports.registerExternalParticipant = asyncHandler(async (req, res) => {
           participantType: 'EXTERNAL',
           externalParticipantId: participant.id,
           homeCollegeId: null,
-          participantName: name,                        // snapshot from submitted body
+          participantName: name || participant.name,                        // snapshot from submitted body or participant record
           participantEmail: normalizedEmail,            // snapshot from verified token
-          participantRollNumber: rollNumber || null,
-          participantCollegeName: institutionName || collegeName || null,
-          participantDepartment: department || null,
-          participantGender: gender || null,
-          participantYearOfStudy: yearOfStudy || null,
-          participantPhone: phone || null,
+          participantRollNumber: rollNumber || participant.rollNumber || null,
+          participantCollegeName: institutionName || collegeName || participant.institutionName || null,
+          participantDepartment: department || participant.department || null,
+          participantGender: gender || participant.gender || null,
+          participantYearOfStudy: yearOfStudy || participant.yearOfStudy || null,
+          participantPhone: phone || participant.phone || null,
           isUserDeleted: false,
           registeredByRole: 'SELF',
           formAnswers: validatedAnswers,

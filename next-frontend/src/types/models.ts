@@ -84,6 +84,9 @@ export interface User {
   rollNumber?: string | null;
   departmentId?: string | null;
   admissionYear?: number | null;
+  phone?: string | null;
+  gender?: string | null;
+  yearOfStudy?: string | null;
   isActive: boolean;
   claimedAt?: string | null;
   avatar?: UserAvatar | null;
@@ -91,6 +94,7 @@ export interface User {
   updatedAt?: string;
   memberships?: Membership[];
   department?: Department | null;
+  college?: College | null;
 }
 
 export interface PlatformAdmin {

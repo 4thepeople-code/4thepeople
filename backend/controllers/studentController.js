@@ -426,7 +426,17 @@ exports.confirmActivation = asyncHandler(async (req, res) => {
     throw new AppError('College tenant context required', 400);
   }
 
-  const { rollNumber, code, password } = req.body;
+  const {
+    rollNumber,
+    code,
+    password,
+    name,
+    phone,
+    gender,
+    yearOfStudy,
+    departmentId,
+    department,
+  } = req.body;
   if (!rollNumber || !code || !password) {
     throw new AppError('Roll number, verification code, and password are required', 400);
   }
@@ -525,17 +535,49 @@ exports.confirmActivation = asyncHandler(async (req, res) => {
         return { success: false, reason: 'EXPIRED_DURING_EXECUTION' };
       }
 
-      // Step B: Activate user account
+      // Step B: Resolve optional department reference
+      let effectiveDeptId = null;
+      const uuidRegex = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+      if (departmentId && uuidRegex.test(departmentId)) {
+        effectiveDeptId = departmentId;
+      } else if (department || departmentId) {
+        const deptSearch = (department || departmentId).trim();
+        const foundDept = await tx.department.findFirst({
+          where: {
+            collegeId: req.collegeId,
+            OR: [
+              { name: { equals: deptSearch, mode: 'insensitive' } },
+              { shortCode: { equals: deptSearch, mode: 'insensitive' } },
+            ],
+          },
+          select: { id: true },
+        });
+        if (foundDept) {
+          effectiveDeptId = foundDept.id;
+        }
+      }
+
+      const cleanPhone = phone && typeof phone === 'string' && phone.trim() ? phone.trim() : null;
+      const cleanGender = gender && typeof gender === 'string' && gender.trim() ? gender.trim() : null;
+      const cleanYear = yearOfStudy && typeof yearOfStudy === 'string' && yearOfStudy.trim() ? yearOfStudy.trim() : null;
+      const cleanName = name && typeof name === 'string' && name.trim() ? name.trim() : null;
+
+      // Step C: Activate user account and persist profile details
       const [activatedUser] = await tx.$queryRaw`
         UPDATE users
         SET password_hash = ${hashedPassword},
             is_active = true,
-            claimed_at = clock_timestamp()
+            claimed_at = clock_timestamp(),
+            phone = COALESCE(${cleanPhone}, phone),
+            gender = COALESCE(${cleanGender}, gender),
+            year_of_study = COALESCE(${cleanYear}, year_of_study),
+            department_id = COALESCE(${effectiveDeptId}::uuid, department_id),
+            name = COALESCE(${cleanName}, name)
         WHERE id = ${user.id}::uuid
           AND college_id = ${req.collegeId}::uuid
           AND is_active = false
           AND claimed_at IS NULL
-        RETURNING id, name, email, role, roll_number AS "rollNumber";
+        RETURNING id, name, email, role, roll_number AS "rollNumber", phone, gender, year_of_study AS "yearOfStudy", department_id AS "departmentId";
       `;
 
       // BRANCH 4: FAILED USER UPDATE -> MANDATORY ROLLBACK!
@@ -633,6 +675,12 @@ exports.studentLogin = asyncHandler(async (req, res) => {
         passwordHash: true,
         role: true,
         isActive: true,
+        phone: true,
+        gender: true,
+        yearOfStudy: true,
+        departmentId: true,
+        department: { select: { id: true, name: true, shortCode: true } },
+        college: { select: { id: true, name: true, slug: true } },
       },
     });
   });
@@ -675,6 +723,13 @@ exports.studentLogin = asyncHandler(async (req, res) => {
       email: user.email,
       rollNumber: user.rollNumber,
       role: user.role,
+      phone: user.phone,
+      gender: user.gender,
+      yearOfStudy: user.yearOfStudy,
+      departmentId: user.departmentId,
+      department: user.department,
+      college: user.college,
+      collegeId: user.collegeId,
     },
   });
 });

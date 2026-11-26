@@ -196,10 +196,10 @@ exports.registerForEvent = asyncHandler(async (req, res) => {
     const participantEmail = req.user.email;
     const participantRollNumber = req.user.rollNumber || body.rollNumber || answers.rollNumber || null;
     const participantCollegeName = req.user.college?.name || body.collegeName || body.institutionName || answers.collegeName || answers.institutionName || null;
-    const participantDepartment = body.department || body.participantDepartment || answers.department || req.user.department?.name || null;
-    const participantGender = body.gender || body.participantGender || answers.gender || null;
-    const participantYearOfStudy = body.yearOfStudy || body.participantYearOfStudy || answers.yearOfStudy || null;
-    const participantPhone = body.phone || body.participantPhone || answers.phone || null;
+    const participantDepartment = req.user.department?.name || body.department || body.participantDepartment || answers.department || null;
+    const participantGender = req.user.gender || body.gender || body.participantGender || answers.gender || null;
+    const participantYearOfStudy = req.user.yearOfStudy || body.yearOfStudy || body.participantYearOfStudy || answers.yearOfStudy || null;
+    const participantPhone = req.user.phone || body.phone || body.participantPhone || answers.phone || null;
 
     if (!validatedAnswers) validatedAnswers = {};
     validatedAnswers.rollNumber = participantRollNumber;

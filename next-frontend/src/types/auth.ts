@@ -44,6 +44,12 @@ export interface StudentActivationConfirmPayload {
   code: string;
   password: string;
   email?: string;
+  name?: string;
+  phone?: string;
+  gender?: string;
+  yearOfStudy?: string;
+  departmentId?: string;
+  department?: string;
 }
 
 export interface StudentLoginPayload {

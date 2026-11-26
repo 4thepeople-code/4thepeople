@@ -69,6 +69,13 @@ const authenticateToken = async (req, res, next) => {
           email: true,
           role: true,
           isActive: true,
+          rollNumber: true,
+          phone: true,
+          gender: true,
+          yearOfStudy: true,
+          departmentId: true,
+          department: { select: { id: true, name: true, shortCode: true } },
+          college: { select: { id: true, name: true, slug: true } },
         },
       });
     });
@@ -87,6 +94,7 @@ const authenticateToken = async (req, res, next) => {
 
     req.user = {
       ...decoded,
+      ...freshUser,
       id: freshUser.id,
       userId: freshUser.id,
       collegeId: freshUser.collegeId,
@@ -285,6 +293,11 @@ const crossCollegeRegisterMiddleware = async (req, res, next) => {
           role: true,
           isActive: true,
           rollNumber: true,
+          phone: true,
+          gender: true,
+          yearOfStudy: true,
+          departmentId: true,
+          department: { select: { id: true, name: true, shortCode: true } },
           college: { select: { name: true } },
         },
       });
@@ -302,6 +315,7 @@ const crossCollegeRegisterMiddleware = async (req, res, next) => {
 
     req.user = {
       ...decoded,
+      ...freshUser,
       id: freshUser.id,
       userId: freshUser.id,
       collegeId: freshUser.collegeId,
@@ -427,10 +441,34 @@ const authenticateAnyParticipant = async (req, res, next) => {
       if (req.collegeId && decoded.hostCollegeId && decoded.hostCollegeId !== req.collegeId) {
         return next(new AppError('Access denied: Token issued for a different college', 403));
       }
+      const effectiveHostId = decoded.hostCollegeId || req.collegeId;
       req.externalUser = {
         email: decoded.email,
-        hostCollegeId: decoded.hostCollegeId || req.collegeId,
+        hostCollegeId: effectiveHostId,
       };
+
+      if (effectiveHostId) {
+        try {
+          const extRecord = await withTenant(effectiveHostId, async (tx) => {
+            return tx.externalParticipant.findFirst({
+              where: { collegeId: effectiveHostId, email: decoded.email },
+            });
+          });
+          if (extRecord) {
+            req.externalUser = {
+              ...req.externalUser,
+              id: extRecord.id,
+              name: extRecord.name,
+              phone: extRecord.phone,
+              institutionName: extRecord.institutionName,
+              rollNumber: extRecord.rollNumber,
+              department: extRecord.department,
+              gender: extRecord.gender,
+              yearOfStudy: extRecord.yearOfStudy,
+            };
+          }
+        } catch (_) {}
+      }
       return next();
     }
 
@@ -450,6 +488,12 @@ const authenticateAnyParticipant = async (req, res, next) => {
           email: true,
           role: true,
           isActive: true,
+          rollNumber: true,
+          phone: true,
+          gender: true,
+          yearOfStudy: true,
+          departmentId: true,
+          department: { select: { id: true, name: true, shortCode: true } },
           college: { select: { name: true } },
         },
       });

@@ -192,18 +192,29 @@ class PaymentRegistrationService {
       let participantEmail = '';
       let participantRollNumber = null;
       let participantCollegeName = null;
+      let profileDepartment = null;
+      let profileGender = null;
+      let profileYearOfStudy = null;
+      let profilePhone = null;
       let homeCollegeId = collegeId;
 
       if (txn.participantType === 'STUDENT' && txn.userId) {
         const user = await tx.user.findUnique({
           where: { id: txn.userId },
-          include: { college: { select: { name: true } } },
+          include: {
+            college: { select: { name: true } },
+            department: { select: { name: true } },
+          },
         });
         if (user) {
           participantName = user.name;
           participantEmail = user.email;
           participantRollNumber = user.rollNumber || null;
           participantCollegeName = user.college ? user.college.name : null;
+          profileDepartment = user.department ? user.department.name : null;
+          profileGender = user.gender || null;
+          profileYearOfStudy = user.yearOfStudy || null;
+          profilePhone = user.phone || null;
           homeCollegeId = user.collegeId;
         }
       } else if (txn.participantType === 'EXTERNAL' && txn.externalParticipantId) {
@@ -213,7 +224,12 @@ class PaymentRegistrationService {
         if (participant) {
           participantName = participant.name;
           participantEmail = participant.email;
+          participantRollNumber = participant.rollNumber || null;
           participantCollegeName = participant.institutionName || null;
+          profileDepartment = participant.department || null;
+          profileGender = participant.gender || null;
+          profileYearOfStudy = participant.yearOfStudy || null;
+          profilePhone = participant.phone || null;
           homeCollegeId = null;
         }
       }
@@ -234,10 +250,10 @@ class PaymentRegistrationService {
       }
 
       const payloadAnswers = finalFormAnswers || {};
-      const participantDepartment = payloadAnswers.department || payloadAnswers.participantDepartment || null;
-      const participantGender = payloadAnswers.gender || payloadAnswers.participantGender || null;
-      const participantYearOfStudy = payloadAnswers.yearOfStudy || payloadAnswers.participantYearOfStudy || null;
-      const participantPhone = payloadAnswers.phone || payloadAnswers.participantPhone || null;
+      const participantDepartment = payloadAnswers.department || payloadAnswers.participantDepartment || profileDepartment || null;
+      const participantGender = payloadAnswers.gender || payloadAnswers.participantGender || profileGender || null;
+      const participantYearOfStudy = payloadAnswers.yearOfStudy || payloadAnswers.participantYearOfStudy || profileYearOfStudy || null;
+      const participantPhone = payloadAnswers.phone || payloadAnswers.participantPhone || profilePhone || null;
       const effectiveRollNumber = participantRollNumber || payloadAnswers.rollNumber || null;
       const effectiveCollegeName = participantCollegeName || payloadAnswers.collegeName || payloadAnswers.institutionName || null;
 

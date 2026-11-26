@@ -81,6 +81,9 @@ model User {
   rollNumber                String?                @map("roll_number") @db.Citext
   departmentId              String?                @map("department_id") @db.Uuid
   admissionYear             Int?                   @map("admission_year")
+  phone                     String?                @map("phone")
+  gender                    String?                @map("gender")
+  yearOfStudy               String?                @map("year_of_study")
   claimedAt                 DateTime?              @map("claimed_at") @db.Timestamptz(6)
   createdAt                 DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt                 DateTime               @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
@@ -607,6 +610,10 @@ model ExternalParticipant {
   email           String              @db.Citext
   phone           String?
   institutionName String?             @map("institution_name")
+  rollNumber      String?             @map("roll_number")
+  department      String?             @map("department")
+  gender          String?             @map("gender")
+  yearOfStudy     String?             @map("year_of_study")
   isEmailVerified Boolean             @default(false) @map("is_email_verified")
   createdAt       DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt       DateTime            @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
