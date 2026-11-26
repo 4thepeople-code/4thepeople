@@ -95,33 +95,27 @@ exports.requestExternalOtp = asyncHandler(async (req, res) => {
 
   if (eventId) {
     try {
-      const eventRow = await withTenant(null, async (tx) => {
+      const eventRow = await withTenant(req.collegeId || null, async (tx) => {
         return tx.eventsWithStatus.findFirst({
           where: {
             id: eventId,
-            visibility: 'PUBLIC',
             cancelledAt: null,
-            status: { in: ['UPCOMING', 'ONGOING'] },
-            registrationMode: 'INTERNAL',
+            ...(req.collegeId ? { collegeId: req.collegeId } : { visibility: 'PUBLIC' }),
           },
           select: { id: true, collegeId: true, title: true },
         });
-      }, { isPublic: true });
+      }, { isPublic: !req.collegeId });
 
       if (eventRow) {
         hostCollegeId = eventRow.collegeId;
         eventTitle = eventRow.title;
-
-        // SAFEGUARD: validate URL slug context against actual event ownership.
-        // If the client navigated to /college/colA/... but the event belongs to colB, reject.
-        if (req.collegeId && hostCollegeId !== req.collegeId) {
-          console.warn(`[externalOtp] Tenant mismatch: req.collegeId=${req.collegeId} event.collegeId=${hostCollegeId} eventId=${eventId}`);
-          hostCollegeId = null; // Treat as not found — silent 200 response
-        }
+      } else if (req.collegeId) {
+        hostCollegeId = req.collegeId;
+        eventTitle = 'Campus Events';
       }
     } catch {
-      // Any error during event lookup → treat as not found, return 200 silently
-      hostCollegeId = null;
+      hostCollegeId = req.collegeId || null;
+      eventTitle = 'Campus Events';
     }
   } else if (req.collegeId) {
     hostCollegeId = req.collegeId;

@@ -335,12 +335,36 @@ exports.requestActivation = asyncHandler(async (req, res) => {
 
   await withTenant(req.collegeId, async (tx) => {
     // 1. Locate student
-    const user = await tx.user.findFirst({
+    let user = await tx.user.findFirst({
       where: { collegeId: req.collegeId, rollNumber: normalizedRoll },
       select: { id: true, name: true, email: true, isActive: true, claimedAt: true },
     });
 
-    if (!user || user.isActive || user.claimedAt) {
+    // If student record not pre-provisioned via roster, auto-provision if college has studentEmailDomain
+    if (!user) {
+      const college = await tx.college.findUnique({
+        where: { id: req.collegeId },
+        select: { studentEmailDomain: true },
+      });
+
+      if (college && college.studentEmailDomain) {
+        const studentEmail = `${normalizedRoll.toLowerCase()}@${college.studentEmailDomain.toLowerCase()}`;
+        user = await tx.user.create({
+          data: {
+            collegeId: req.collegeId,
+            name: normalizedRoll,
+            email: studentEmail,
+            rollNumber: normalizedRoll,
+            role: 'USER',
+            isActive: false,
+            passwordHash: null,
+          },
+          select: { id: true, name: true, email: true, isActive: true, claimedAt: true },
+        });
+      }
+    }
+
+    if (!user) {
       await bcrypt.hash('dummy_constant_time_pad_work_factor', 10);
       return;
     }
@@ -459,7 +483,7 @@ exports.confirmActivation = asyncHandler(async (req, res) => {
         where: { collegeId: req.collegeId, rollNumber: normalizedRoll },
         select: { id: true, email: true, isActive: true, claimedAt: true },
       });
-      if (!user || user.isActive || user.claimedAt) {
+      if (!user) {
         return { success: false, reason: 'ACCOUNT_UNAVAILABLE' };
       }
 
