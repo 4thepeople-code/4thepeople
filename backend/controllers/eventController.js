@@ -453,16 +453,28 @@ exports.deleteEvent = asyncHandler(async (req, res) => {
     });
     if (!event) throw new AppError('Event not found', 404);
 
-    // Enforce past-event safeguard matching events_with_status view:
-    // If endAt is present: completed if now >= endAt
-    // If endAt is NULL: completed if startAt < (now - 24 hours) (24-hour fallback)
-    const now = new Date();
-    const isCompleted = event.endAt
-      ? new Date(event.endAt) <= now
-      : (new Date(event.startAt).getTime() + 24 * 60 * 60 * 1000) <= now.getTime();
+    // Safeguard 1: Financial records protection (Payment Transactions)
+    // Physical deletion of events with payment ledger records is blocked to prevent orphaned financial audit trails.
+    const paymentCount = await tx.paymentTransaction.count({
+      where: { eventId, collegeId: req.collegeId },
+    });
+    if (paymentCount > 0) {
+      throw new AppError(
+        `Cannot delete event: ${paymentCount} payment transaction(s) are recorded for this event. Events with financial records cannot be deleted; cancel the event instead.`,
+        400
+      );
+    }
 
-    if (isCompleted) {
-      throw new AppError('Cannot delete past events. Event has already occurred or completed.', 400);
+    // Safeguard 2: Student credential protection (Issued Certificates)
+    // Physical deletion is blocked if certificates have been issued to students.
+    const certificateCount = await tx.eventCertificate.count({
+      where: { eventId, collegeId: req.collegeId },
+    });
+    if (certificateCount > 0) {
+      throw new AppError(
+        `Cannot delete event: ${certificateCount} certificate(s) have been issued for this event. Revoke them first or cancel the event instead.`,
+        400
+      );
     }
 
     const publicIds = [];

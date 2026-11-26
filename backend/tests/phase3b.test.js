@@ -1239,10 +1239,11 @@ async function runPhase3bTests() {
       assert.strictEqual(adminDeleteRes.status, 200, 'FAIL: Admin can delete any event in college');
       totalRowsChecked += 1;
 
-      // 5. Test past-event deletion safeguards matching events_with_status view
-      let pastWithEndEvent, pastEndlessEvent, ongoingEndlessEvent;
+      // 5. Test event deletion safeguards: past events without certs/payments can be deleted,
+      // but events with payment records or issued certificates are blocked.
+      let pastWithEndEvent, eventWithCert;
       await withTenant(collegeA.id, async (tx) => {
-        // Event with endAt that has passed
+        // Event with endAt that has passed (past event)
         pastWithEndEvent = await tx.event.create({
           data: {
             collegeId: collegeA.id,
@@ -1255,64 +1256,55 @@ async function runPhase3bTests() {
           },
         });
 
-        // End-less event started >24 hours ago (completed per 24h fallback)
-        pastEndlessEvent = await tx.event.create({
+        // Event with issued certificate
+        eventWithCert = await tx.event.create({
           data: {
             collegeId: collegeA.id,
             clubId: clubA1.id,
-            title: 'Past End-less Event',
-            description: 'End-less past event',
-            location: 'Hall B',
-            startAt: new Date(Date.now() - 25 * 3600000),
-            endAt: null,
+            title: 'Event With Certificate',
+            description: 'Event with cert',
+            location: 'Hall D',
+            startAt: new Date(Date.now() + 86400000),
+            endAt: new Date(Date.now() + 86400000 * 2),
           },
         });
 
-        // End-less event started <24 hours ago (ongoing per 24h fallback)
-        ongoingEndlessEvent = await tx.event.create({
+        await tx.eventCertificate.create({
           data: {
             collegeId: collegeA.id,
-            clubId: clubA1.id,
-            title: 'Ongoing End-less Event',
-            description: 'End-less ongoing event',
-            location: 'Hall C',
-            startAt: new Date(Date.now() - 2 * 3600000),
-            endAt: null,
+            eventId: eventWithCert.id,
+            recipientName: 'Test Student',
+            certificateNumber: 'CERT-TEST-P3B-001',
           },
         });
       });
 
-      // Attempt deleting past event with endAt -> 400
+      // Deleting past event with endAt (no certs or payments) -> 200 (allowed!)
       const pastWithEndDelRes = await makeRequest({
         method: 'DELETE',
         path: `/admin/events/${pastWithEndEvent.id}`,
         host: 'lbrce.localhost',
         token: tokenAdminA,
       });
-      assert.strictEqual(pastWithEndDelRes.status, 400, 'FAIL: Deleting past event with endAt must return 400');
+      assert.strictEqual(pastWithEndDelRes.status, 200, 'FAIL: Deleting past event without certs/payments must return 200');
 
-      // Attempt deleting end-less event started >24 hours ago -> 400
-      const pastEndlessDelRes = await makeRequest({
+      // Attempt deleting event with issued certificate -> 400 (blocked!)
+      const certEventDelRes = await makeRequest({
         method: 'DELETE',
-        path: `/admin/events/${pastEndlessEvent.id}`,
+        path: `/admin/events/${eventWithCert.id}`,
         host: 'lbrce.localhost',
         token: tokenAdminA,
       });
-      assert.strictEqual(pastEndlessDelRes.status, 400, 'FAIL: Deleting end-less event older than 24h must return 400');
+      assert.strictEqual(certEventDelRes.status, 400, 'FAIL: Deleting event with issued certificate must return 400');
+      assert.match(certEventDelRes.body.message, /certificate\(s\) have been issued/i);
 
-      // Attempt deleting end-less event started <24 hours ago -> 200 (allowed)
-      const ongoingEndlessDelRes = await makeRequest({
-        method: 'DELETE',
-        path: `/admin/events/${ongoingEndlessEvent.id}`,
-        host: 'lbrce.localhost',
-        token: tokenAdminA,
-      });
-      assert.strictEqual(ongoingEndlessDelRes.status, 200, 'FAIL: Deleting ongoing end-less event within 24h must return 200');
-
-      // Cleanup remaining test events in College A
+      // Cleanup remaining test event in College A
       await withTenant(collegeA.id, async (tx) => {
+        await tx.eventCertificate.deleteMany({
+          where: { eventId: eventWithCert.id, collegeId: collegeA.id },
+        });
         await tx.event.deleteMany({
-          where: { id: { in: [pastWithEndEvent.id, pastEndlessEvent.id] }, collegeId: collegeA.id },
+          where: { id: eventWithCert.id, collegeId: collegeA.id },
         });
       });
 
