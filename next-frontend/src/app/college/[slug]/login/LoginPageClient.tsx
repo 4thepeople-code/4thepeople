@@ -244,6 +244,7 @@ export function LoginPageClient({
 
   const handleVerifyExternalOtp = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
+    if (isVerifyingOtp) return;
     setExternalErrorMsg(null);
 
     const fullCode = otpDigits.join('');

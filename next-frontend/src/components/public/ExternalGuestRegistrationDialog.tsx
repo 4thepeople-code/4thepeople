@@ -230,6 +230,7 @@ export function ExternalGuestRegistrationDialog({
   // Step 2 -> Verify OTP and complete registration
   const handleVerifyAndRegister = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
+    if (isVerifying) return;
     const fullCode = otpDigits.join('');
     if (fullCode.length !== 6) {
       setErrorMessage('Please enter the complete 6-digit verification code.');

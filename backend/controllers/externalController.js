@@ -255,12 +255,15 @@ exports.verifyExternalOtp = asyncHandler(async (req, res) => {
   let effectiveCollegeId = req.collegeId;
 
   if (!effectiveCollegeId && eventId) {
-    const eventRow = await withTenant(null, async (tx) => {
+    const eventRow = await withTenant(req.collegeId || null, async (tx) => {
       return tx.eventsWithStatus.findFirst({
-        where: { id: eventId },
+        where: {
+          id: eventId,
+          ...(req.collegeId ? { collegeId: req.collegeId } : { visibility: 'PUBLIC' }),
+        },
         select: { collegeId: true },
       });
-    }, { isPublic: true });
+    }, { isPublic: !req.collegeId });
     if (eventRow) {
       effectiveCollegeId = eventRow.collegeId;
     }
@@ -273,8 +276,8 @@ exports.verifyExternalOtp = asyncHandler(async (req, res) => {
   const now = new Date();
 
   const result = await withTenant(effectiveCollegeId, async (tx) => {
-    // Find the most recent active OTP for this email within this college
-    const otp = await tx.externalAuthOtp.findFirst({
+    // 1. Look up all active, unconsumed OTPs for this email within this college
+    const activeOtps = await tx.externalAuthOtp.findMany({
       where: {
         email,
         collegeId: effectiveCollegeId,
@@ -284,35 +287,64 @@ exports.verifyExternalOtp = asyncHandler(async (req, res) => {
       orderBy: { createdAt: 'desc' },
     });
 
-    if (!otp) {
-      return { status: 'NOT_FOUND' };
+    if (activeOtps.length > 0) {
+      for (const otp of activeOtps) {
+        if (otp.attempts >= otp.maxAttempts) {
+          continue;
+        }
+
+        // Increment attempts on this candidate record
+        await tx.externalAuthOtp.update({
+          where: { id: otp.id },
+          data: { attempts: { increment: 1 } },
+        });
+
+        // Constant-time comparison using the dedicated verifyExternalOtpCode utility
+        const isValid = verifyExternalOtpCode(otp.salt, code, otp.codeHash);
+
+        if (isValid) {
+          // Mark this OTP and all other pending OTPs for this email as consumed to prevent reuse
+          await tx.externalAuthOtp.updateMany({
+            where: {
+              email,
+              collegeId: effectiveCollegeId,
+              consumedAt: null,
+            },
+            data: { consumedAt: now },
+          });
+
+          return { status: 'OK', hostCollegeId: otp.collegeId };
+        }
+      }
     }
 
-    // Check attempt limit before incrementing
-    if (otp.attempts >= otp.maxAttempts) {
+    // 2. Idempotency fallback: If not matched in active OTPs, check if this exact code
+    // was already verified and consumed within the last 2 minutes (e.g. double-click,
+    // client retry, or form re-submission).
+    const recentConsumedList = await tx.externalAuthOtp.findMany({
+      where: {
+        email,
+        collegeId: effectiveCollegeId,
+        consumedAt: { gte: new Date(now.getTime() - 2 * 60 * 1000) },
+      },
+      orderBy: { consumedAt: 'desc' },
+      take: 5,
+    });
+
+    for (const recent of recentConsumedList) {
+      const isRecentMatch = verifyExternalOtpCode(recent.salt, code, recent.codeHash);
+      if (isRecentMatch) {
+        return { status: 'OK', hostCollegeId: recent.collegeId };
+      }
+    }
+
+    // Check if attempts were exhausted on any candidate OTP
+    const isExhausted = activeOtps.some((o) => o.attempts >= o.maxAttempts);
+    if (isExhausted) {
       return { status: 'EXHAUSTED' };
     }
 
-    // Increment attempts first (record the attempt regardless of correctness)
-    await tx.externalAuthOtp.update({
-      where: { id: otp.id },
-      data: { attempts: { increment: 1 } },
-    });
-
-    // Constant-time comparison using the dedicated verifyExternalOtpCode utility
-    const isValid = verifyExternalOtpCode(otp.salt, code, otp.codeHash);
-
-    if (!isValid) {
-      return { status: 'INVALID' };
-    }
-
-    // Mark OTP as consumed — prevents replay
-    await tx.externalAuthOtp.update({
-      where: { id: otp.id },
-      data: { consumedAt: now },
-    });
-
-    return { status: 'OK', hostCollegeId: otp.collegeId };
+    return { status: 'INVALID' };
   });
 
   if (result.status === 'NOT_FOUND' || result.status === 'INVALID') {
@@ -414,7 +446,7 @@ exports.registerExternalParticipant = asyncHandler(async (req, res) => {
     if (event.status === 'COMPLETED') {
       throw new AppError('Cannot register for a past event', 400);
     }
-    if (event.visibility !== 'PUBLIC') {
+    if (event.visibility !== 'PUBLIC' && !req.collegeId) {
       throw new AppError('External registration is only available for public events', 403);
     }
     if (event.registrationMode !== 'INTERNAL') {
