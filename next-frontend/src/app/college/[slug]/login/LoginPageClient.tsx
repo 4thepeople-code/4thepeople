@@ -32,6 +32,7 @@ import {
   Globe,
   KeyRound,
   ArrowLeft,
+  LogIn,
 } from 'lucide-react';
 
 export interface LoginPageClientProps {
@@ -131,6 +132,7 @@ export function LoginPageClient({
   // Tab 2: External / Guest Participant State
   // -------------------------------------------------------------
   const existingExternal = getStoredExternalUser();
+  const [externalMode, setExternalMode] = useState<'LOGIN' | 'REGISTER'>('LOGIN');
   const [externalStep, setExternalStep] = useState<'DETAILS' | 'OTP'>('DETAILS');
   const [externalName, setExternalName] = useState(existingExternal?.name || '');
   const [externalEmail, setExternalEmail] = useState(existingExternal?.email || '');
@@ -180,19 +182,7 @@ export function LoginPageClient({
     setExternalErrorMsg(null);
     setExternalNotice(null);
 
-    const trimmedName = externalName.trim();
     const trimmedEmail = externalEmail.trim().toLowerCase();
-    const trimmedRoll = externalRollNumber.trim();
-    const trimmedDept = externalDepartment.trim();
-    const trimmedGender = externalGender.trim();
-    const trimmedYear = externalYearOfStudy.trim();
-    const trimmedInst = externalInstitution.trim();
-    const trimmedPhone = externalPhone.trim();
-
-    if (!trimmedName || trimmedName.length < 2) {
-      setExternalErrorMsg('Please enter your full name (minimum 2 characters).');
-      return;
-    }
 
     if (!trimmedEmail) {
       setExternalErrorMsg('Please enter your email address.');
@@ -204,34 +194,49 @@ export function LoginPageClient({
       return;
     }
 
-    if (!trimmedRoll) {
-      setExternalErrorMsg('Please enter your roll number / student ID.');
-      return;
-    }
+    if (externalMode === 'REGISTER') {
+      const trimmedName = externalName.trim();
+      const trimmedRoll = externalRollNumber.trim();
+      const trimmedDept = externalDepartment.trim();
+      const trimmedGender = externalGender.trim();
+      const trimmedYear = externalYearOfStudy.trim();
+      const trimmedInst = externalInstitution.trim();
+      const trimmedPhone = externalPhone.trim();
 
-    if (!trimmedDept) {
-      setExternalErrorMsg('Please enter your department.');
-      return;
-    }
+      if (!trimmedName || trimmedName.length < 2) {
+        setExternalErrorMsg('Please enter your full name (minimum 2 characters).');
+        return;
+      }
 
-    if (!trimmedGender) {
-      setExternalErrorMsg('Please select your gender.');
-      return;
-    }
+      if (!trimmedRoll) {
+        setExternalErrorMsg('Please enter your roll number / student ID.');
+        return;
+      }
 
-    if (!trimmedYear) {
-      setExternalErrorMsg('Please select your year of study.');
-      return;
-    }
+      if (!trimmedDept) {
+        setExternalErrorMsg('Please enter your department.');
+        return;
+      }
 
-    if (!trimmedInst) {
-      setExternalErrorMsg('Please enter your college / institution name.');
-      return;
-    }
+      if (!trimmedGender) {
+        setExternalErrorMsg('Please select your gender.');
+        return;
+      }
 
-    if (!trimmedPhone || trimmedPhone.replace(/\D/g, '').length < 10) {
-      setExternalErrorMsg('Please enter a valid 10-digit phone number.');
-      return;
+      if (!trimmedYear) {
+        setExternalErrorMsg('Please select your year of study.');
+        return;
+      }
+
+      if (!trimmedInst) {
+        setExternalErrorMsg('Please enter your college / institution name.');
+        return;
+      }
+
+      if (!trimmedPhone || trimmedPhone.replace(/\D/g, '').length < 10) {
+        setExternalErrorMsg('Please enter a valid 10-digit phone number.');
+        return;
+      }
     }
 
     try {
@@ -296,39 +301,53 @@ export function LoginPageClient({
     try {
       setIsVerifyingOtp(true);
       const trimmedEmail = externalEmail.trim().toLowerCase();
-      const profileData = {
-        name: externalName.trim(),
-        phone: externalPhone.trim() || undefined,
-        institutionName: externalInstitution.trim() || undefined,
-        collegeName: externalInstitution.trim() || undefined,
-        rollNumber: externalRollNumber.trim() || undefined,
-        department: externalDepartment.trim() || undefined,
-        gender: externalGender.trim() || undefined,
-        yearOfStudy: externalYearOfStudy.trim() || undefined,
-      };
+      const profileData =
+        externalMode === 'REGISTER'
+          ? {
+              name: externalName.trim(),
+              phone: externalPhone.trim() || undefined,
+              institutionName: externalInstitution.trim() || undefined,
+              collegeName: externalInstitution.trim() || undefined,
+              rollNumber: externalRollNumber.trim() || undefined,
+              department: externalDepartment.trim() || undefined,
+              gender: externalGender.trim() || undefined,
+              yearOfStudy: externalYearOfStudy.trim() || undefined,
+            }
+          : undefined;
 
       const res = await verifyExternalOtp(trimmedEmail, fullCode, inferredEventId || undefined, profileData);
       const token = res?.token || (res as unknown as { data?: { token?: string } })?.data?.token;
 
       if (token) {
         setStoredExternalToken(token);
+        const resolvedUser = (res?.user ||
+          (res as unknown as { data?: { user?: Record<string, unknown> } })?.data?.user ||
+          {}) as Record<string, unknown>;
+
         const externalProfile = {
-          name: externalName.trim(),
+          name: (resolvedUser.name as string) || externalName.trim() || trimmedEmail.split('@')[0],
           email: trimmedEmail,
-          phone: externalPhone.trim() || undefined,
-          institutionName: externalInstitution.trim() || undefined,
-          collegeName: externalInstitution.trim() || undefined,
-          rollNumber: externalRollNumber.trim() || undefined,
-          department: externalDepartment.trim() || undefined,
-          gender: externalGender.trim() || undefined,
-          yearOfStudy: externalYearOfStudy.trim() || undefined,
+          phone: (resolvedUser.phone as string) || externalPhone.trim() || undefined,
+          institutionName:
+            (resolvedUser.institutionName as string) ||
+            (resolvedUser.collegeName as string) ||
+            externalInstitution.trim() ||
+            undefined,
+          collegeName:
+            (resolvedUser.collegeName as string) ||
+            (resolvedUser.institutionName as string) ||
+            externalInstitution.trim() ||
+            undefined,
+          rollNumber: (resolvedUser.rollNumber as string) || externalRollNumber.trim() || undefined,
+          department: (resolvedUser.department as string) || externalDepartment.trim() || undefined,
+          gender: (resolvedUser.gender as string) || externalGender.trim() || undefined,
+          yearOfStudy: (resolvedUser.yearOfStudy as string) || externalYearOfStudy.trim() || undefined,
         };
         setStoredExternalUser(externalProfile);
 
         // Populate session
         const participantId: string =
-          (typeof res?.user?.id === 'string' && res.user.id) ||
-          (res as unknown as { data?: { user?: { id?: string } } })?.data?.user?.id ||
+          (typeof resolvedUser.id === 'string' && resolvedUser.id) ||
           `ext_${trimmedEmail}`;
 
         login(
@@ -336,7 +355,7 @@ export function LoginPageClient({
             ...externalProfile,
             id: participantId,
             userId: participantId,
-            name: externalName.trim(),
+            name: externalProfile.name,
             email: trimmedEmail,
             role: 'EXTERNAL',
             collegeId: slug,
@@ -639,12 +658,81 @@ export function LoginPageClient({
                 {/* STEP A: Enter Details & Request OTP */}
                 {externalStep === 'DETAILS' && (
                   <form onSubmit={handleRequestExternalOtp} className="space-y-4">
-                    <div className="text-xs text-slate-500 dark:text-gray-400 pb-1">
-                      Sign in with your email to register for public campus events without a college student ID.
+                    {/* Sub-mode selector: Sign In vs Create Account */}
+                    <div className="flex items-center justify-center p-1 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 mb-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setExternalMode('LOGIN');
+                          setExternalErrorMsg(null);
+                        }}
+                        className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                          externalMode === 'LOGIN'
+                            ? 'bg-white dark:bg-[#1A1D2B] text-[#FF5733] shadow-xs'
+                            : 'text-slate-500 dark:text-gray-400 hover:text-slate-900 dark:hover:text-white'
+                        }`}
+                      >
+                        <LogIn className="w-3.5 h-3.5" />
+                        <span>Sign In</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setExternalMode('REGISTER');
+                          setExternalErrorMsg(null);
+                        }}
+                        className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                          externalMode === 'REGISTER'
+                            ? 'bg-white dark:bg-[#1A1D2B] text-[#FF5733] shadow-xs'
+                            : 'text-slate-500 dark:text-gray-400 hover:text-slate-900 dark:hover:text-white'
+                        }`}
+                      >
+                        <User className="w-3.5 h-3.5" />
+                        <span>Create Account</span>
+                      </button>
                     </div>
 
-                    {/* Full Name & Email Address */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="text-xs text-slate-500 dark:text-gray-400 pb-1">
+                      {externalMode === 'LOGIN'
+                        ? 'Sign in to your external account using your registered email address. A one-time code will be dispatched.'
+                        : 'First-time external student? Enter your details below to create your participant profile.'}
+                    </div>
+
+                    {externalMode === 'LOGIN' ? (
+                      /* Sign In Mode: Email Only */
+                      <div className="space-y-1.5">
+                        <label
+                          className={`block text-[11px] font-bold uppercase tracking-wider ${
+                            isDark ? 'text-gray-300' : 'text-slate-700'
+                          }`}
+                        >
+                          Email Address <span className="text-[#FF5733]">*</span>
+                        </label>
+                        <div className="relative">
+                          <Mail
+                            className={`w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 ${
+                              isDark ? 'text-gray-500' : 'text-slate-400'
+                            }`}
+                          />
+                          <input
+                            type="email"
+                            value={externalEmail}
+                            onChange={(e) => setExternalEmail(e.target.value)}
+                            placeholder="e.g. priya@gmail.com"
+                            className={`w-full pl-10 pr-4 py-3 rounded-xl border text-sm transition-all focus:outline-hidden focus:border-[#FF5733] ${
+                              isDark
+                                ? 'bg-[#0B0C10] border-white/10 text-white placeholder-gray-600'
+                                : 'bg-slate-50 border-slate-200 text-slate-900 placeholder-slate-400'
+                            }`}
+                            required
+                          />
+                        </div>
+                      </div>
+                    ) : (
+                      /* Create Account Mode: All 8 Profile Fields */
+                      <>
+                        {/* Full Name & Email Address */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       {/* Name */}
                       <div className="space-y-1.5">
                         <label
@@ -883,28 +971,65 @@ export function LoginPageClient({
                         </div>
                       </div>
                     </div>
+                  </>
+                )}
 
-                    {/* Send Code CTA */}
-                    <div className="pt-2">
-                      <button
-                        type="submit"
-                        disabled={isRequestingOtp}
-                        className="w-full py-3.5 px-4 rounded-xl bg-[#FF5733] hover:bg-[#E64A26] disabled:opacity-50 text-white font-extrabold text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-md shadow-orange-500/20 active:scale-[0.99] cursor-pointer"
-                      >
-                        {isRequestingOtp ? (
-                          <>
-                            <RefreshCw className="w-4 h-4 animate-spin" />
-                            <span>Sending Access Code...</span>
-                          </>
-                        ) : (
-                          <>
-                            <span>Send Verification Code</span>
-                            <ArrowRight className="w-4 h-4" />
-                          </>
-                        )}
-                      </button>
-                    </div>
-                  </form>
+                  {/* Send Code CTA */}
+                  <div className="pt-2">
+                    <button
+                      type="submit"
+                      disabled={isRequestingOtp}
+                      className="w-full py-3.5 px-4 rounded-xl bg-[#FF5733] hover:bg-[#E64A26] disabled:opacity-50 text-white font-extrabold text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-md shadow-orange-500/20 active:scale-[0.99] cursor-pointer"
+                    >
+                      {isRequestingOtp ? (
+                        <>
+                          <RefreshCw className="w-4 h-4 animate-spin" />
+                          <span>Sending Access Code...</span>
+                        </>
+                      ) : (
+                        <>
+                          <span>
+                            {externalMode === 'LOGIN' ? 'Send Login Code' : 'Create Account & Send Code'}
+                          </span>
+                          <ArrowRight className="w-4 h-4" />
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  {/* Mode Toggle Footer */}
+                  <div className="text-center pt-2">
+                    {externalMode === 'LOGIN' ? (
+                      <p className="text-xs text-slate-500 dark:text-gray-400">
+                        First time here?{' '}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setExternalMode('REGISTER');
+                            setExternalErrorMsg(null);
+                          }}
+                          className="font-bold text-[#FF5733] hover:underline cursor-pointer"
+                        >
+                          Create an external account
+                        </button>
+                      </p>
+                    ) : (
+                      <p className="text-xs text-slate-500 dark:text-gray-400">
+                        Already have an account?{' '}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setExternalMode('LOGIN');
+                            setExternalErrorMsg(null);
+                          }}
+                          className="font-bold text-[#FF5733] hover:underline cursor-pointer"
+                        >
+                          Sign In with Email
+                        </button>
+                      </p>
+                    )}
+                  </div>
+                </form>
                 )}
 
                 {/* STEP B: Enter 6-digit OTP Code */}
