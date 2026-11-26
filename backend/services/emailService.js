@@ -1,7 +1,7 @@
 const dotenv = require('dotenv');
 const { BrevoClient } = require('@getbrevo/brevo');
 
-if (process.env.NODE_ENV !== 'development') {
+if (process.env.NODE_ENV !== 'test') {
   dotenv.config();
 }
 
@@ -44,7 +44,7 @@ const verifyTestDatabaseHost = () => {
 };
 
 const getBrevoClient = () => {
-  if (process.env.NODE_ENV === 'development') {
+  if (process.env.NODE_ENV === 'test') {
     verifyTestDatabaseHost();
     return null;
   }
@@ -68,7 +68,7 @@ const getBrevoClient = () => {
  * Generic Brevo email sender
  */
 const sendEmail = async ({ toEmail, toName, subject, html }) => {
-  if (process.env.NODE_ENV === 'development') {
+  if (process.env.NODE_ENV === 'test') {
     verifyTestDatabaseHost();
     return { messageId: 'test-stub-message-id', success: true };
   }
@@ -382,6 +382,77 @@ const sendStudentActivationEmail = async (
 };
 
 /**
+ * Sends External Participant OTP Email
+ *
+ * @param {string} toEmail
+ * @param {string} code
+ * @param {string} [eventTitle]
+ * @param {number} [expiresInMinutes=10]
+ */
+const sendExternalOtpEmail = async (
+  toEmail,
+  code,
+  eventTitle = 'the event',
+  expiresInMinutes = 10
+) => {
+  const displayEvent = String(eventTitle || 'the event');
+  const displayExpiry = Number(expiresInMinutes) || 10;
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 32px; background-color: #0B0F17; color: #F8FAFC; border: 1px solid #1E293B; border-radius: 20px;">
+
+      <div style="text-align: center; margin-bottom: 24px;">
+        <h1 style="font-size: 34px; font-weight: 900; color: #FFFFFF; letter-spacing: 2px; margin: 0; font-family: 'Syne', Arial, sans-serif;">
+          <span style="color: #FF5733;">4</span> THE PEOPLE<span style="color: #FF5733;">.</span>
+        </h1>
+        <p style="color: #FF5733; font-size: 11px; font-weight: 800; letter-spacing: 3px; text-transform: uppercase; margin-top: 4px;">
+          Campus Events &amp; Club Manager
+        </p>
+      </div>
+
+      <h2 style="color: #FFFFFF; font-size: 20px; font-weight: 800; margin-top: 0;">
+        Your Verification Code
+      </h2>
+
+      <p style="color: #94A3B8; font-size: 14px; line-height: 1.6;">
+        Hello <strong style="color: #F8FAFC;">${toEmail}</strong>,
+      </p>
+
+      <p style="color: #94A3B8; font-size: 14px; line-height: 1.6;">
+        You requested to register for <strong style="color: #F8FAFC;">${displayEvent}</strong>.
+        Use the code below to verify your email address and complete your registration.
+      </p>
+
+      <div style="background: #12141C; border: 2px solid #00F0FF; border-radius: 16px;
+                  padding: 28px 24px; text-align: center; margin: 28px 0;">
+        <p style="color: #94A3B8; font-size: 12px; font-weight: 700; letter-spacing: 2px;
+                  text-transform: uppercase; margin: 0 0 12px;">Verification Code</p>
+        <p style="font-size: 48px; letter-spacing: 12px; font-weight: 900; color: #00F0FF;
+                  margin: 0; font-family: 'Courier New', monospace;">${code}</p>
+      </div>
+
+      <p style="color: #94A3B8; font-size: 13px; line-height: 1.6;">
+        This code is valid for <strong>${displayExpiry} minutes</strong> and can be used only once.
+        Do not share it with anyone.
+      </p>
+
+      <p style="color: #64748B; font-size: 12px; margin-top: 24px; border-top: 1px solid #1E293B; padding-top: 16px;">
+        If you did not request this code, you can safely ignore this email.
+        No account has been created.
+      </p>
+
+    </div>
+  `;
+
+  return sendEmail({
+    toEmail,
+    toName: toEmail,
+    subject: `Your verification code – ${displayEvent}`,
+    html,
+  });
+};
+
+/**
  * Sends a College Administrator Invitation Email
  *
  * @param {Object} options
@@ -469,5 +540,6 @@ module.exports = {
   sendManagerPasswordResetOtp,
   sendDeletionVerificationCode,
   sendStudentActivationEmail,
+  sendExternalOtpEmail,
   verifyTestDatabaseHost,
 };

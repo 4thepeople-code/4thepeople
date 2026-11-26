@@ -25,6 +25,7 @@ const asyncHandler = require('../utils/asyncHandler');
 const { AppError } = require('../middleware/errorHandler');
 const { hashExternalOtp, verifyExternalOtpCode } = require('../utils/cryptoUtils');
 const { enqueueEmail } = require('../services/outboxService');
+const { sendExternalOtpEmail } = require('../services/emailService');
 const { assertNoDuplicateParticipants, findParticipantEventMembership } = require('../utils/teamUtils');
 
 const UUID_REGEX = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
@@ -144,6 +145,7 @@ exports.requestExternalOtp = asyncHandler(async (req, res) => {
     const sixtySecondsAgo = new Date(now.getTime() - 60 * 1000);
 
     let shouldSendOtp = true;
+    let otpDispatchPayload = null;
 
     await withTenant(hostCollegeId, async (tx) => {
       // Daily limit: max 5 OTPs per (email, college_id) in 24h
@@ -196,8 +198,7 @@ exports.requestExternalOtp = asyncHandler(async (req, res) => {
         },
       });
 
-      // 6. Enqueue email via outbox (AES-256-GCM encrypted payload, same pipeline as student activations)
-      //    rawCode enters the encrypted payload here and is never stored in plaintext.
+      // 6. Enqueue email via outbox (AES-256-GCM encrypted payload)
       await enqueueEmail(tx, {
         collegeId: hostCollegeId,
         recipientEmail: email,
@@ -209,8 +210,26 @@ exports.requestExternalOtp = asyncHandler(async (req, res) => {
           expiresInMinutes: 10,
         },
       });
-      // rawCode is now out of scope — it exists only inside the encrypted outbox payload
+
+      otpDispatchPayload = {
+        toEmail: email,
+        code: rawCode,
+        eventTitle: eventTitle || 'the event',
+      };
     });
+
+    // 7. Dispatch OTP email directly via Brevo (strictly outside database transaction)
+    if (otpDispatchPayload) {
+      try {
+        await sendExternalOtpEmail(
+          otpDispatchPayload.toEmail,
+          otpDispatchPayload.code,
+          otpDispatchPayload.eventTitle
+        );
+      } catch (emailErr) {
+        console.error('[externalOtp] Failed to send external OTP email via Brevo:', emailErr.message || emailErr);
+      }
+    }
   } catch (err) {
     // Internal errors must not leak to the client on this endpoint
     console.error('[externalOtp] requestExternalOtp internal error:', err.message);
