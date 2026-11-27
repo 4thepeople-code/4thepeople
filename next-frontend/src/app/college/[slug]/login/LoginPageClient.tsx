@@ -6,19 +6,18 @@ import { useRouter } from 'next/navigation';
 import type { AuthUser } from '@/types/auth';
 import { useAuth } from '@/context/AuthContext';
 import { useStudentLoginMutation } from '@/lib/api/auth';
-import PublicLayout from '@/components/public/PublicLayout';
 import {
-  GraduationCap,
-  Lock,
-  User,
-  Eye,
-  EyeOff,
-  AlertCircle,
-  CheckCircle2,
+  AuthShell,
+  AuthAlert,
+  AuthPasswordInput,
+  authInputBaseClass,
+  authPrimaryButtonClass,
+} from '@/components/auth/AuthShell';
+import {
   Sparkles,
   ArrowRight,
   Shield,
-  RefreshCw,
+  Loader2,
 } from 'lucide-react';
 
 export interface LoginPageClientProps {
@@ -49,7 +48,6 @@ export function LoginPageClient({
 
   const [identifier, setIdentifier] = useState(initialRollNumber);
   const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const studentLoginMutation = useStudentLoginMutation(slug);
@@ -106,184 +104,146 @@ export function LoginPageClient({
   };
 
   return (
-    <PublicLayout collegeSlug={slug} collegeName={collegeDisplay}>
-      <div className="college-scope min-h-[calc(100vh-200px)] bg-[var(--surface-page)] text-[var(--text-primary)] flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-        <div className="w-full max-w-md space-y-6">
-          {/* Header Card */}
-          <div className="text-center space-y-2">
-            <div className="inline-flex items-center gap-1.5 rounded-full border-2 border-[var(--border-strong)] bg-[var(--surface-card)] px-3.5 py-1 text-xs font-bold uppercase tracking-wider text-[var(--accent-strong)] shadow-brutal-xs mb-2">
-              <GraduationCap className="w-3.5 h-3.5" />
-              <span>Student Portal</span>
-            </div>
-
-            <h1 className="font-campus text-4xl sm:text-5xl uppercase leading-[0.95] tracking-wide text-[var(--text-primary)]">
-              STUDENT <span className="text-[var(--accent-strong)]">LOGIN.</span>
-            </h1>
-
-            <p className="text-xs max-w-sm mx-auto text-[var(--text-secondary)] font-medium">
-              Access your {collegeDisplay} event RSVPs, registrations, and campus clubs.
-            </p>
+    <AuthShell
+      sectionIndex="01"
+      sectionLabel="STUDENT PORTAL"
+      collegeDisplay={collegeDisplay}
+      workspaceLabel={slug.toLowerCase()}
+      backHref={`/college/${slug}`}
+      backLabel={`Back to ${collegeDisplay}`}
+      badgeLabel="STUDENT SIGN-IN"
+      title={
+        <>
+          Welcome{' '}
+          <span className="font-serif italic font-normal text-[#4f46e8] dark:text-[#8183ff]">
+            back.
+          </span>
+        </>
+      }
+      subtitle={`Sign in to continue your ${collegeDisplay} campus journey.`}
+      footer={
+        <div className="space-y-4">
+          <div className="relative flex items-center justify-center">
+            <div className="w-full border-t border-[#16181d]/10 dark:border-white/10" />
+            <span className="bg-white dark:bg-[#14171f] px-3 text-[10px] font-bold uppercase tracking-[0.16em] text-[#4b5060]/70 dark:text-[#a7acbb]/70 whitespace-nowrap">
+              OTHER PORTALS
+            </span>
+            <div className="w-full border-t border-[#16181d]/10 dark:border-white/10" />
           </div>
 
-          {/* Activation Success Banner */}
-          {activated && (
-            <div className="p-4 rounded-2xl border-2 border-emerald-500/40 bg-emerald-500/10 flex items-start gap-3 text-emerald-800 dark:text-emerald-200 shadow-brutal-xs">
-              <CheckCircle2 className="w-5 h-5 shrink-0 text-emerald-500 mt-0.5" />
-              <div className="text-xs">
-                <p className="font-bold">Account Activated!</p>
-                <p className="mt-0.5 text-emerald-700 dark:text-emerald-300">
-                  Your password has been configured. Log in below to access your student account.
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* Form Container */}
-          <div className="p-6 sm:p-8 rounded-3xl border-2 border-[var(--border-strong)] bg-[var(--surface-card)] shadow-brutal-md space-y-5">
-            {errorMsg && (
-              <div className="p-4 rounded-2xl border-2 border-red-500/40 bg-red-500/10 flex items-start gap-3 text-red-700 dark:text-red-300 shadow-brutal-xs">
-                <AlertCircle className="w-5 h-5 shrink-0 text-red-500 mt-0.5" />
-                <div className="text-xs flex-1">
-                  <p className="font-bold">{errorMsg}</p>
-                  {errorMsg.toLowerCase().includes('not yet activated') && (
-                    <Link
-                      href={`/college/${slug}/activate`}
-                      className="mt-2 inline-flex items-center gap-1 font-bold text-[var(--accent-strong)] hover:underline"
-                    >
-                      <span>Activate your student account now</span>
-                      <ArrowRight className="w-3 h-3" />
-                    </Link>
-                  )}
-                  {errorMsg.toLowerCase().includes('admin') && (
-                    <Link
-                      href={`/college/${slug}/login/admin`}
-                      className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border-2 border-[var(--border-strong)] bg-[var(--surface-tile)] text-[var(--text-primary)] font-bold tracking-wide shadow-brutal-xs"
-                    >
-                      <Shield className="w-3.5 h-3.5 text-[var(--accent-strong)]" />
-                      <span>Go to College Admin Portal</span>
-                      <ArrowRight className="w-3 h-3" />
-                    </Link>
-                  )}
-                </div>
-              </div>
-            )}
-
-            <form onSubmit={handleSubmit} className="space-y-4">
-              {/* Roll Number or Email Input */}
-              <div className="space-y-1.5">
-                <label
-                  htmlFor="identifier"
-                  className="block text-xs font-bold uppercase tracking-wider text-[var(--text-secondary)]"
-                >
-                  Roll Number or Email
-                </label>
-                <div className="relative">
-                  <User className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
-                  <input
-                    id="identifier"
-                    type="text"
-                    value={identifier}
-                    onChange={(e) => setIdentifier(e.target.value)}
-                    placeholder="e.g. 21A91A0501 or user@lbrce.ac.in"
-                    className="w-full pl-10 pr-4 py-3 rounded-xl border-2 border-[var(--border-strong)] bg-[var(--surface-tile)] text-sm font-semibold text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-hidden focus:border-[var(--accent-strong)] shadow-brutal-xs"
-                    autoComplete="username"
-                    required
-                  />
-                </div>
-              </div>
-
-              {/* Password Input */}
-              <div className="space-y-1.5">
-                <label
-                  htmlFor="password"
-                  className="block text-xs font-bold uppercase tracking-wider text-[var(--text-secondary)]"
-                >
-                  Password
-                </label>
-                <div className="relative">
-                  <Lock className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
-                  <input
-                    id="password"
-                    type={showPassword ? 'text' : 'password'}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••••••"
-                    className="w-full pl-10 pr-11 py-3 rounded-xl border-2 border-[var(--border-strong)] bg-[var(--surface-tile)] text-sm font-semibold text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-hidden focus:border-[var(--accent-strong)] shadow-brutal-xs"
-                    autoComplete="current-password"
-                    required
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3.5 top-1/2 -translate-y-1/2 p-1 text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors cursor-pointer"
-                    aria-label={showPassword ? 'Hide password' : 'Show password'}
-                  >
-                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
-              </div>
-
-              {/* Submit CTA */}
-              <div className="pt-2">
-                <button
-                  type="submit"
-                  disabled={studentLoginMutation.isPending}
-                  className="w-full py-3.5 px-4 rounded-xl bg-[var(--accent-strong)] hover:opacity-95 disabled:opacity-50 text-white font-extrabold text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-transform hover:-translate-y-0.5 shadow-brutal-sm cursor-pointer"
-                >
-                  {studentLoginMutation.isPending ? (
-                    <>
-                      <RefreshCw className="w-4 h-4 animate-spin" />
-                      <span>Signing In...</span>
-                    </>
-                  ) : (
-                    <>
-                      <span>Sign In to Student Portal</span>
-                      <ArrowRight className="w-4 h-4" />
-                    </>
-                  )}
-                </button>
-              </div>
-            </form>
-
-            {/* Quick Links & Switchers */}
-            <div className="mt-6 pt-5 border-t-2 border-[var(--border-soft)] space-y-3">
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-[var(--text-secondary)] font-medium">First time student?</span>
-                <Link
-                  href={`/college/${slug}/activate`}
-                  className="font-bold text-[var(--accent-strong)] hover:underline inline-flex items-center gap-1"
-                >
-                  <Sparkles className="w-3.5 h-3.5" />
-                  <span>Activate Account</span>
-                </Link>
-              </div>
-
-              <div className="flex items-center justify-between text-xs pt-1">
-                <span className="text-[var(--text-secondary)] font-medium">Club Manager or Staff?</span>
-                <Link
-                  href={`/college/${slug}/manager/login`}
-                  className="font-semibold text-[var(--text-primary)] hover:text-[var(--accent-strong)] inline-flex items-center gap-1"
-                >
-                  <Shield className="w-3.5 h-3.5 text-purple-500" />
-                  <span>Manager Portal</span>
-                </Link>
-              </div>
-
-              <div className="flex items-center justify-between text-xs pt-1">
-                <span className="text-[var(--text-secondary)] font-medium">College Administrator?</span>
-                <Link
-                  href={`/college/${slug}/login/admin`}
-                  className="font-semibold text-[#B08D57] hover:underline inline-flex items-center gap-1"
-                >
-                  <Shield className="w-3.5 h-3.5 text-[#B08D57]" />
-                  <span>Admin Portal</span>
-                </Link>
-              </div>
-            </div>
+          <div className="grid grid-cols-2 gap-3">
+            <Link
+              href={`/college/${slug}/login/manager`}
+              className="group flex flex-col items-center justify-center gap-1.5 py-3.5 px-3 rounded-xl border border-[#16181d]/12 dark:border-white/12 bg-white dark:bg-[#14171f] hover:border-[#4f46e8]/45 dark:hover:border-[#8183ff]/45 text-xs font-semibold text-[#16181d] dark:text-[#f2f3f7] shadow-xs transition-all"
+            >
+              <Shield className="w-4 h-4 text-[#4b5060] dark:text-[#a7acbb] group-hover:text-[#4f46e8] dark:group-hover:text-[#8183ff] transition-colors" />
+              <span>Manager Portal</span>
+            </Link>
+            <Link
+              href={`/college/${slug}/activate`}
+              className="group flex flex-col items-center justify-center gap-1.5 py-3.5 px-3 rounded-xl border border-[#16181d]/12 dark:border-white/12 bg-white dark:bg-[#14171f] hover:border-[#4f46e8]/45 dark:hover:border-[#8183ff]/45 text-xs font-semibold text-[#16181d] dark:text-[#f2f3f7] shadow-xs transition-all"
+            >
+              <Sparkles className="w-4 h-4 text-[#4b5060] dark:text-[#a7acbb] group-hover:text-[#4f46e8] dark:group-hover:text-[#8183ff] transition-colors" />
+              <span>Activate Account</span>
+            </Link>
           </div>
+
+          <p className="text-center text-[11px] text-[#4b5060] dark:text-[#a7acbb]">
+            First time at {collegeDisplay}?{' '}
+            <Link
+              href={`/college/${slug}/activate`}
+              className="font-semibold text-[#4f46e8] dark:text-[#8183ff] hover:underline"
+            >
+              Activate your student account
+            </Link>
+          </p>
         </div>
+      }
+    >
+      <div className="space-y-4">
+        {activated && (
+          <AuthAlert variant="success" title="Account activated">
+            Your password has been configured. Sign in below to access your student account.
+          </AuthAlert>
+        )}
+
+        {errorMsg && (
+          <AuthAlert variant="error">
+            <p>{errorMsg}</p>
+            {errorMsg.toLowerCase().includes('not yet activated') && (
+              <Link
+                href={`/college/${slug}/activate`}
+                className="mt-2 inline-flex items-center gap-1 font-semibold text-[#4f46e8] dark:text-[#8183ff] hover:underline"
+              >
+                <span>Activate your student account now</span>
+                <ArrowRight className="w-3 h-3" />
+              </Link>
+            )}
+            {errorMsg.toLowerCase().includes('admin') && (
+              <Link
+                href={`/college/${slug}/login/admin`}
+                className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#16181d]/15 dark:border-white/15 bg-white dark:bg-[#14171f] text-[#16181d] dark:text-[#f2f3f7] font-semibold"
+              >
+                <Shield className="w-3.5 h-3.5 text-[#4f46e8]" />
+                <span>Go to College Admin Portal</span>
+                <ArrowRight className="w-3 h-3" />
+              </Link>
+            )}
+          </AuthAlert>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-1.5">
+            <label
+              htmlFor="identifier"
+              className="block text-[11px] font-bold uppercase tracking-[0.08em] text-[#4b5060] dark:text-[#a7acbb]"
+            >
+              Roll Number or Email
+            </label>
+            <input
+              id="identifier"
+              type="text"
+              value={identifier}
+              onChange={(e) => setIdentifier(e.target.value)}
+              placeholder="e.g. 21A91A0501 or user@lbrce.ac.in"
+              className={`${authInputBaseClass} px-3.5 py-2.5`}
+              autoComplete="username"
+              disabled={studentLoginMutation.isPending}
+              required
+            />
+          </div>
+
+          <AuthPasswordInput
+            id="password"
+            label="Password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            disabled={studentLoginMutation.isPending}
+            autoComplete="current-password"
+          />
+
+          <div className="pt-1">
+            <button
+              type="submit"
+              disabled={studentLoginMutation.isPending}
+              className={authPrimaryButtonClass}
+            >
+              {studentLoginMutation.isPending ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Signing in...</span>
+                </>
+              ) : (
+                <>
+                  <span>Sign in</span>
+                  <ArrowRight className="w-4 h-4" />
+                </>
+              )}
+            </button>
+          </div>
+        </form>
       </div>
-    </PublicLayout>
+    </AuthShell>
   );
 }
 

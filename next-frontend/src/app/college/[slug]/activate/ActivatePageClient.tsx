@@ -3,23 +3,27 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useTheme } from '@/context/ThemeContext';
 import {
   useStudentActivationRequestMutation,
   useStudentActivationConfirmMutation,
 } from '@/lib/api/auth';
-import PublicLayout from '@/components/public/PublicLayout';
 import {
-  Sparkles,
+  AuthShell,
+  AuthAlert,
+  AuthPasswordInput,
+  authInputBaseClass,
+  authInputWithIconClass,
+  authPrimaryButtonClass,
+} from '@/components/auth/AuthShell';
+import {
   KeyRound,
-  Lock,
   User,
-  AlertCircle,
   CheckCircle2,
   XCircle,
   ArrowRight,
-  RefreshCw,
-  Info,
+  Loader2,
+  Shield,
+  GraduationCap,
 } from 'lucide-react';
 
 export interface ActivatePageClientProps {
@@ -29,7 +33,6 @@ export interface ActivatePageClientProps {
 
 export function ActivatePageClient({ slug, initialRollNumber = '' }: ActivatePageClientProps) {
   const router = useRouter();
-  const { isDark } = useTheme();
   const collegeDisplay = slug.toUpperCase();
 
   // Wizard state: 1 = Request Code, 2 = Verify & Set Password
@@ -160,348 +163,298 @@ export function ActivatePageClient({ slug, initialRollNumber = '' }: ActivatePag
   };
 
   return (
-    <PublicLayout collegeSlug={slug} collegeName={collegeDisplay}>
-      <div className="college-scope min-h-[calc(100vh-200px)] bg-[var(--surface-page)] text-[var(--text-primary)] flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-        <div className="w-full max-w-lg space-y-6">
-          {/* Header */}
-          <div className="text-center space-y-2">
-            <div className="inline-flex items-center gap-1.5 rounded-full border-2 border-[var(--border-strong)] bg-[var(--surface-card)] px-3.5 py-1 text-xs font-bold uppercase tracking-wider text-[var(--accent-strong)] shadow-brutal-xs mb-2">
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>Student Activation</span>
-            </div>
-            <h1 className="font-campus text-4xl sm:text-5xl uppercase leading-[0.95] tracking-wide text-[var(--text-primary)]">
-              ACTIVATE YOUR <span className="text-[var(--accent-strong)]">ACCOUNT.</span>
-            </h1>
-            <p className="text-xs max-w-md mx-auto text-[var(--text-secondary)] font-medium">
-              First-time setup for enrolled students at {collegeDisplay}. Verify your identity and configure your account password.
-            </p>
+    <AuthShell
+      maxWidth="lg"
+      sectionIndex="02"
+      sectionLabel="ACCOUNT ACTIVATION"
+      collegeDisplay={collegeDisplay}
+      workspaceLabel={slug.toLowerCase()}
+      backHref={`/college/${slug}/login`}
+      backLabel="Back to Student Login"
+      badgeLabel="STUDENT ONBOARDING"
+      heroTitle={
+        <>
+          Verify your identity,{' '}
+          <span className="font-serif italic font-normal text-[#8183ff]">
+            unlock campus.
+          </span>
+        </>
+      }
+      heroDescription={`First-time setup for enrolled ${collegeDisplay} students. Confirm your institutional roll number with a one-time code and set your password.`}
+      title={
+        <>
+          Activate{' '}
+          <span className="font-serif italic font-normal text-[#4f46e8] dark:text-[#8183ff]">
+            account.
+          </span>
+        </>
+      }
+      subtitle={`Set up your ${collegeDisplay} student credentials in two quick steps.`}
+      footer={
+        <div className="space-y-4">
+          <div className="relative flex items-center justify-center">
+            <div className="w-full border-t border-[#16181d]/10 dark:border-white/10" />
+            <span className="bg-white dark:bg-[#14171f] px-3 text-[10px] font-bold uppercase tracking-[0.16em] text-[#4b5060]/70 dark:text-[#a7acbb]/70 whitespace-nowrap">
+              OTHER PORTALS
+            </span>
+            <div className="w-full border-t border-[#16181d]/10 dark:border-white/10" />
           </div>
 
-          {/* Stepper Indicator */}
-          <div className="flex items-center justify-center gap-3 text-xs font-bold uppercase tracking-wider">
-            <div
-              className={`flex items-center gap-2 px-4 py-1.5 rounded-full border-2 border-[var(--border-strong)] transition-all ${
-                step === 1
-                  ? 'bg-[var(--accent-strong)] text-[var(--surface-page)] dark:text-black shadow-brutal-xs font-extrabold'
-                  : 'bg-[var(--surface-tile)] text-[var(--text-secondary)] opacity-80'
-              }`}
+          <div className="grid grid-cols-2 gap-3">
+            <Link
+              href={`/college/${slug}/login`}
+              className="group flex flex-col items-center justify-center gap-1.5 py-3 px-3 rounded-xl border border-[#16181d]/12 dark:border-white/12 bg-white dark:bg-[#14171f] hover:border-[#4f46e8]/45 dark:hover:border-[#8183ff]/45 text-xs font-semibold text-[#16181d] dark:text-[#f2f3f7] shadow-xs transition-all"
             >
-              <span className="w-4 h-4 rounded-full flex items-center justify-center text-[10px] bg-black/20 font-mono">1</span>
-              <span>Request Code</span>
-            </div>
-            <div className="w-6 h-[2px] bg-[var(--border-strong)]" />
-            <div
-              className={`flex items-center gap-2 px-4 py-1.5 rounded-full border-2 border-[var(--border-strong)] transition-all ${
-                step === 2
-                  ? 'bg-[var(--accent-strong)] text-[var(--surface-page)] dark:text-black shadow-brutal-xs font-extrabold'
-                  : 'bg-[var(--surface-tile)] text-[var(--text-secondary)] opacity-80'
-              }`}
+              <GraduationCap className="w-4 h-4 text-[#4b5060] dark:text-[#a7acbb] group-hover:text-[#4f46e8] dark:group-hover:text-[#8183ff] transition-colors" />
+              <span>Student Portal</span>
+            </Link>
+            <Link
+              href={`/college/${slug}/login/manager`}
+              className="group flex flex-col items-center justify-center gap-1.5 py-3 px-3 rounded-xl border border-[#16181d]/12 dark:border-white/12 bg-white dark:bg-[#14171f] hover:border-[#4f46e8]/45 dark:hover:border-[#8183ff]/45 text-xs font-semibold text-[#16181d] dark:text-[#f2f3f7] shadow-xs transition-all"
             >
-              <span className="w-4 h-4 rounded-full flex items-center justify-center text-[10px] bg-black/20 font-mono">2</span>
-              <span>Verify & Password</span>
-            </div>
-          </div>
-
-          {/* Card Shell */}
-          <div className="p-6 sm:p-8 rounded-3xl border-2 border-[var(--border-strong)] bg-[var(--surface-card)] shadow-brutal-md transition-all">
-            {/* Error Message */}
-            {errorMessage && (
-              <div className="mb-6 p-4 rounded-2xl border-2 border-red-500/40 bg-red-500/10 flex items-start gap-3 text-red-700 dark:text-red-300 shadow-brutal-xs">
-                <AlertCircle className="w-5 h-5 shrink-0 text-red-500 mt-0.5" />
-                <div className="text-xs flex-1">
-                  <p className="font-bold">{errorMessage}</p>
-                  {attemptsRemaining !== null && (
-                    <p className="mt-1 font-bold text-red-600 dark:text-red-200">
-                      Remaining attempts before lockout: {attemptsRemaining}
-                    </p>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Success Notice from Step 1 */}
-            {requestNotice && (
-              <div className="mb-6 p-4 rounded-2xl border-2 border-[var(--border-strong)] bg-cyan-500/10 flex items-start gap-3 text-cyan-800 dark:text-cyan-200 shadow-brutal-xs">
-                <Info className="w-5 h-5 shrink-0 text-[var(--accent-strong)] mt-0.5" />
-                <p className="text-xs leading-relaxed font-medium">{requestNotice}</p>
-              </div>
-            )}
-
-            {/* STEP 1: Request Activation Code */}
-            {step === 1 && (
-              <form onSubmit={handleRequestCode} className="space-y-4">
-                <div className="space-y-1.5">
-                  <label
-                    htmlFor="rollNumber"
-                    className="block text-[11px] font-bold uppercase tracking-wider text-[var(--text-primary)]"
-                  >
-                    Institutional Roll Number
-                  </label>
-                  <div className="relative">
-                    <User className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
-                    <input
-                      id="rollNumber"
-                      type="text"
-                      value={rollNumber}
-                      onChange={(e) => setRollNumber(e.target.value.toUpperCase())}
-                      placeholder="e.g. 21A91A0501"
-                      className="w-full pl-10 pr-4 py-3 rounded-xl border-2 border-[var(--border-strong)] bg-[var(--surface-tile)] text-sm uppercase font-mono tracking-wider text-[var(--text-primary)] placeholder-[var(--text-muted)] transition-all focus:outline-hidden focus:border-[var(--accent-strong)] shadow-brutal-xs"
-                      required
-                    />
-                  </div>
-                  <p className="text-[11px] mt-1 text-[var(--text-secondary)] font-medium">
-                    Must match your student roster entry uploaded by your college administration.
-                  </p>
-                </div>
-
-                <div className="pt-2">
-                  <button
-                    type="submit"
-                    disabled={requestMutation.isPending}
-                    className="w-full py-3.5 px-4 rounded-xl border-2 border-[var(--border-strong)] bg-[var(--accent-strong)] hover:opacity-95 disabled:opacity-50 text-[var(--surface-page)] dark:text-black font-extrabold text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-brutal-sm active:translate-x-[1px] active:translate-y-[1px] cursor-pointer transition-all"
-                  >
-                    {requestMutation.isPending ? (
-                      <>
-                        <RefreshCw className="w-4 h-4 animate-spin" />
-                        <span>Generating Code...</span>
-                      </>
-                    ) : (
-                      <>
-                        <span>Send Activation Code</span>
-                        <ArrowRight className="w-4 h-4" />
-                      </>
-                    )}
-                  </button>
-                </div>
-              </form>
-            )}
-
-            {/* STEP 2: Verify Code and Configure Password */}
-            {step === 2 && (
-              <form onSubmit={handleConfirmActivation} className="space-y-4">
-                {/* Roll Number (Read-only or editable) */}
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <label
-                      htmlFor="step2Roll"
-                      className="block text-[11px] font-bold uppercase tracking-wider text-[var(--text-primary)]"
-                    >
-                      Roll Number
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() => setStep(1)}
-                      className="text-[11px] font-bold text-[var(--accent-strong)] hover:underline cursor-pointer"
-                    >
-                      Change
-                    </button>
-                  </div>
-                  <input
-                    id="step2Roll"
-                    type="text"
-                    value={rollNumber}
-                    onChange={(e) => setRollNumber(e.target.value.toUpperCase())}
-                    className="w-full px-4 py-2.5 rounded-xl border-2 border-[var(--border-strong)] bg-[var(--surface-tile)] text-sm font-mono uppercase tracking-wider text-[var(--text-primary)] opacity-90 shadow-brutal-xs"
-                    required
-                  />
-                </div>
-
-                {/* Verification Code */}
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <label
-                      htmlFor="code"
-                      className="block text-[11px] font-bold uppercase tracking-wider text-[var(--text-primary)]"
-                    >
-                      6-Digit Activation Code
-                    </label>
-                    {cooldownSeconds > 0 ? (
-                      <span className="text-[10px] text-[var(--text-secondary)] font-mono font-bold">
-                        Resend in {cooldownSeconds}s
-                      </span>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={handleRequestCode}
-                        className="text-[10px] font-bold text-[var(--accent-strong)] hover:underline cursor-pointer"
-                      >
-                        Resend Code
-                      </button>
-                    )}
-                  </div>
-                  <div className="relative">
-                    <KeyRound className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
-                    <input
-                      id="code"
-                      type="text"
-                      maxLength={6}
-                      value={code}
-                      onChange={(e) => setCode(e.target.value.replace(/[^0-9]/g, ''))}
-                      placeholder="123456"
-                      className="w-full pl-10 pr-4 py-3 rounded-xl border-2 border-[var(--border-strong)] bg-[var(--surface-tile)] text-base font-mono tracking-widest text-center font-bold text-[var(--accent-strong)] placeholder-[var(--text-muted)] transition-all focus:outline-hidden focus:border-[var(--accent-strong)] shadow-brutal-xs"
-                      autoComplete="one-time-code"
-                      required
-                    />
-                  </div>
-                </div>
-
-                {/* New Password */}
-                <div className="space-y-1.5">
-                  <label
-                    htmlFor="password"
-                    className="block text-[11px] font-bold uppercase tracking-wider text-[var(--text-primary)]"
-                  >
-                    New Account Password
-                  </label>
-                  <div className="relative">
-                    <Lock className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
-                    <input
-                      id="password"
-                      type="password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      placeholder="••••••••••••"
-                      className="w-full pl-10 pr-4 py-3 rounded-xl border-2 border-[var(--border-strong)] bg-[var(--surface-tile)] text-sm text-[var(--text-primary)] placeholder-[var(--text-muted)] transition-all focus:outline-hidden focus:border-[var(--accent-strong)] shadow-brutal-xs"
-                      autoComplete="new-password"
-                      required
-                    />
-                  </div>
-                </div>
-
-                {/* Confirm Password */}
-                <div className="space-y-1.5">
-                  <label
-                    htmlFor="confirmPassword"
-                    className="block text-[11px] font-bold uppercase tracking-wider text-[var(--text-primary)]"
-                  >
-                    Confirm Password
-                  </label>
-                  <div className="relative">
-                    <Lock className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
-                    <input
-                      id="confirmPassword"
-                      type="password"
-                      value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
-                      placeholder="••••••••••••"
-                      className="w-full pl-10 pr-4 py-3 rounded-xl border-2 border-[var(--border-strong)] bg-[var(--surface-tile)] text-sm text-[var(--text-primary)] placeholder-[var(--text-muted)] transition-all focus:outline-hidden focus:border-[var(--accent-strong)] shadow-brutal-xs"
-                      autoComplete="new-password"
-                      required
-                    />
-                  </div>
-                </div>
-
-                {/* Password Policy Checklist */}
-                <div className="p-3.5 rounded-2xl border-2 border-[var(--border-strong)] bg-[var(--surface-tile)] text-[11px] space-y-1.5 shadow-brutal-xs">
-                  <p className="font-bold uppercase tracking-wider text-[10px] mb-1 text-[var(--text-secondary)]">
-                    Security Requirements:
-                  </p>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-                    <div className="flex items-center gap-1.5">
-                      {passwordCriteria.length ? (
-                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                      ) : (
-                        <XCircle className="w-3.5 h-3.5 text-[var(--text-muted)] shrink-0" />
-                      )}
-                      <span className={passwordCriteria.length ? 'text-emerald-600 dark:text-emerald-400 font-bold' : 'text-[var(--text-muted)]'}>
-                        8+ characters
-                      </span>
-                    </div>
-
-                    <div className="flex items-center gap-1.5">
-                      {passwordCriteria.upper ? (
-                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                      ) : (
-                        <XCircle className="w-3.5 h-3.5 text-[var(--text-muted)] shrink-0" />
-                      )}
-                      <span className={passwordCriteria.upper ? 'text-emerald-600 dark:text-emerald-400 font-bold' : 'text-[var(--text-muted)]'}>
-                        1 uppercase letter (A-Z)
-                      </span>
-                    </div>
-
-                    <div className="flex items-center gap-1.5">
-                      {passwordCriteria.lower ? (
-                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                      ) : (
-                        <XCircle className="w-3.5 h-3.5 text-[var(--text-muted)] shrink-0" />
-                      )}
-                      <span className={passwordCriteria.lower ? 'text-emerald-600 dark:text-emerald-400 font-bold' : 'text-[var(--text-muted)]'}>
-                        1 lowercase letter (a-z)
-                      </span>
-                    </div>
-
-                    <div className="flex items-center gap-1.5">
-                      {passwordCriteria.number ? (
-                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                      ) : (
-                        <XCircle className="w-3.5 h-3.5 text-[var(--text-muted)] shrink-0" />
-                      )}
-                      <span className={passwordCriteria.number ? 'text-emerald-600 dark:text-emerald-400 font-bold' : 'text-[var(--text-muted)]'}>
-                        1 numeric digit (0-9)
-                      </span>
-                    </div>
-
-                    <div className="flex items-center gap-1.5">
-                      {passwordCriteria.special ? (
-                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                      ) : (
-                        <XCircle className="w-3.5 h-3.5 text-[var(--text-muted)] shrink-0" />
-                      )}
-                      <span className={passwordCriteria.special ? 'text-emerald-600 dark:text-emerald-400 font-bold' : 'text-[var(--text-muted)]'}>
-                        1 special character (!@#$)
-                      </span>
-                    </div>
-
-                    <div className="flex items-center gap-1.5">
-                      {passwordCriteria.noRoll ? (
-                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                      ) : (
-                        <XCircle className="w-3.5 h-3.5 text-red-500 shrink-0" />
-                      )}
-                      <span className={passwordCriteria.noRoll ? 'text-emerald-600 dark:text-emerald-400 font-bold' : 'text-red-600 dark:text-red-400 font-bold'}>
-                        No roll number in password
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Submit Confirmation */}
-                <div className="pt-2">
-                  <button
-                    type="submit"
-                    disabled={confirmMutation.isPending || !isPasswordValid || password !== confirmPassword}
-                    className="w-full py-3.5 px-4 rounded-xl border-2 border-[var(--border-strong)] bg-[var(--accent-strong)] hover:opacity-95 disabled:opacity-40 text-[var(--surface-page)] dark:text-black font-extrabold text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-brutal-sm active:translate-x-[1px] active:translate-y-[1px] cursor-pointer transition-all"
-                  >
-                    {confirmMutation.isPending ? (
-                      <>
-                        <RefreshCw className="w-4 h-4 animate-spin" />
-                        <span>Activating Account...</span>
-                      </>
-                    ) : (
-                      <>
-                        <span>Confirm & Complete Activation</span>
-                        <ArrowRight className="w-4 h-4" />
-                      </>
-                    )}
-                  </button>
-                </div>
-              </form>
-            )}
-
-            {/* Back to Login link */}
-            <div className="mt-6 pt-6 border-t-2 border-[var(--border-subtle)] text-center text-xs text-[var(--text-secondary)]">
-              <span>Already have a configured password?</span>{' '}
-              <Link
-                href={`/college/${slug}/login`}
-                className="font-bold text-[var(--accent-strong)] hover:underline"
-              >
-                Sign in here
-              </Link>
-            </div>
+              <Shield className="w-4 h-4 text-[#4b5060] dark:text-[#a7acbb] group-hover:text-[#4f46e8] dark:group-hover:text-[#8183ff] transition-colors" />
+              <span>Manager Portal</span>
+            </Link>
           </div>
         </div>
+      }
+    >
+      <div className="space-y-4">
+        {/* Clean Stepper Indicator */}
+        <div className="flex items-center justify-center gap-2.5 text-xs font-semibold pb-1">
+          <div
+            className={`flex items-center gap-2 px-3 py-1 rounded-full border transition-all ${
+              step === 1
+                ? 'bg-[#0c1322] dark:bg-[#4f46e8] border-transparent text-white shadow-xs'
+                : 'bg-white dark:bg-[#14171f] border-[#16181d]/12 dark:border-white/12 text-[#4b5060] dark:text-[#a7acbb]'
+            }`}
+          >
+            <span className="font-mono text-[10px]">1</span>
+            <span>Request Code</span>
+          </div>
+          <div className="w-6 h-px bg-[#16181d]/15 dark:bg-white/15" />
+          <div
+            className={`flex items-center gap-2 px-3 py-1 rounded-full border transition-all ${
+              step === 2
+                ? 'bg-[#0c1322] dark:bg-[#4f46e8] border-transparent text-white shadow-xs'
+                : 'bg-white dark:bg-[#14171f] border-[#16181d]/12 dark:border-white/12 text-[#4b5060] dark:text-[#a7acbb]'
+            }`}
+          >
+            <span className="font-mono text-[10px]">2</span>
+            <span>Verify & Password</span>
+          </div>
+        </div>
+
+        {errorMessage && (
+          <AuthAlert variant="error">
+            <p>{errorMessage}</p>
+            {attemptsRemaining !== null && (
+              <p className="mt-1 font-semibold">
+                Remaining attempts before lockout: {attemptsRemaining}
+              </p>
+            )}
+          </AuthAlert>
+        )}
+
+        {requestNotice && <AuthAlert variant="info">{requestNotice}</AuthAlert>}
+
+        {/* STEP 1: Request Activation Code */}
+        {step === 1 && (
+          <form onSubmit={handleRequestCode} className="space-y-4">
+            <div className="space-y-1.5">
+              <label
+                htmlFor="rollNumber"
+                className="block text-[11px] font-bold uppercase tracking-[0.08em] text-[#4b5060] dark:text-[#a7acbb]"
+              >
+                Institutional Roll Number
+              </label>
+              <div className="relative">
+                <User className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-[#4b5060]/70 dark:text-[#a7acbb]/70 pointer-events-none" />
+                <input
+                  id="rollNumber"
+                  type="text"
+                  value={rollNumber}
+                  onChange={(e) => setRollNumber(e.target.value.toUpperCase())}
+                  placeholder="e.g. 21A91A0501"
+                  className={`${authInputWithIconClass} uppercase font-mono tracking-wider`}
+                  disabled={requestMutation.isPending}
+                  required
+                />
+              </div>
+              <p className="text-[11px] text-[#4b5060] dark:text-[#a7acbb]">
+                Must match your student roster entry uploaded by your college administration.
+              </p>
+            </div>
+
+            <div className="pt-1">
+              <button
+                type="submit"
+                disabled={requestMutation.isPending}
+                className={authPrimaryButtonClass}
+              >
+                {requestMutation.isPending ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Generating Code...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Send Activation Code</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </>
+                )}
+              </button>
+            </div>
+          </form>
+        )}
+
+        {/* STEP 2: Verify Code and Configure Password */}
+        {step === 2 && (
+          <form onSubmit={handleConfirmActivation} className="space-y-4">
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label
+                  htmlFor="step2Roll"
+                  className="block text-[11px] font-bold uppercase tracking-[0.08em] text-[#4b5060] dark:text-[#a7acbb]"
+                >
+                  Roll Number
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setStep(1)}
+                  className="text-xs font-semibold text-[#4f46e8] dark:text-[#8183ff] hover:underline cursor-pointer"
+                >
+                  Change
+                </button>
+              </div>
+              <input
+                id="step2Roll"
+                type="text"
+                value={rollNumber}
+                onChange={(e) => setRollNumber(e.target.value.toUpperCase())}
+                className={`${authInputBaseClass} px-3.5 py-2.5 uppercase font-mono tracking-wider`}
+                required
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label
+                  htmlFor="code"
+                  className="block text-[11px] font-bold uppercase tracking-[0.08em] text-[#4b5060] dark:text-[#a7acbb]"
+                >
+                  6-Digit Activation Code
+                </label>
+                {cooldownSeconds > 0 ? (
+                  <span className="text-[11px] text-[#4b5060] dark:text-[#a7acbb] font-mono">
+                    Resend in {cooldownSeconds}s
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleRequestCode}
+                    className="text-[11px] font-semibold text-[#4f46e8] dark:text-[#8183ff] hover:underline cursor-pointer"
+                  >
+                    Resend Code
+                  </button>
+                )}
+              </div>
+              <div className="relative">
+                <KeyRound className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-[#4b5060]/70 dark:text-[#a7acbb]/70 pointer-events-none" />
+                <input
+                  id="code"
+                  type="text"
+                  maxLength={6}
+                  inputMode="numeric"
+                  value={code}
+                  onChange={(e) => setCode(e.target.value.replace(/[^0-9]/g, ''))}
+                  placeholder="123456"
+                  className={`${authInputWithIconClass} font-mono text-base tracking-[0.3em] text-center font-bold text-[#4f46e8] dark:text-[#8183ff]`}
+                  autoComplete="one-time-code"
+                  required
+                />
+              </div>
+            </div>
+
+            <AuthPasswordInput
+              id="password"
+              label="New Account Password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              autoComplete="new-password"
+            />
+
+            <AuthPasswordInput
+              id="confirmPassword"
+              label="Confirm Password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              autoComplete="new-password"
+            />
+
+            {/* Password Policy Checklist */}
+            <div className="p-3.5 rounded-xl border border-[#16181d]/10 dark:border-white/10 bg-white dark:bg-[#14171f] text-[11px] space-y-2">
+              <p className="font-bold uppercase tracking-wider text-[10px] text-[#4b5060] dark:text-[#a7acbb]">
+                Security Requirements
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                {[
+                  { ok: passwordCriteria.length, label: '8+ characters' },
+                  { ok: passwordCriteria.upper, label: '1 uppercase letter (A-Z)' },
+                  { ok: passwordCriteria.lower, label: '1 lowercase letter (a-z)' },
+                  { ok: passwordCriteria.number, label: '1 numeric digit (0-9)' },
+                  { ok: passwordCriteria.special, label: '1 special character (!@#$)' },
+                  { ok: passwordCriteria.noRoll, label: 'No roll number in password', warn: !passwordCriteria.noRoll },
+                ].map((item) => (
+                  <div key={item.label} className="flex items-center gap-1.5">
+                    {item.ok ? (
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                    ) : (
+                      <XCircle
+                        className={`w-3.5 h-3.5 shrink-0 ${
+                          item.warn ? 'text-red-500' : 'text-[#4b5060]/40 dark:text-[#a7acbb]/40'
+                        }`}
+                      />
+                    )}
+                    <span
+                      className={
+                        item.ok
+                          ? 'text-emerald-600 dark:text-emerald-400 font-semibold'
+                          : item.warn
+                            ? 'text-red-600 dark:text-red-400 font-semibold'
+                            : 'text-[#4b5060] dark:text-[#a7acbb]'
+                      }
+                    >
+                      {item.label}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="pt-1">
+              <button
+                type="submit"
+                disabled={confirmMutation.isPending || !isPasswordValid || password !== confirmPassword}
+                className={authPrimaryButtonClass}
+              >
+                {confirmMutation.isPending ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Activating Account...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Confirm & Complete Activation</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </>
+                )}
+              </button>
+            </div>
+          </form>
+        )}
       </div>
-    </PublicLayout>
+    </AuthShell>
   );
 }
 
