@@ -408,10 +408,11 @@ class PaymentOrderService {
     const transactionId = crypto.randomUUID();
     const idempotencyKey = crypto.randomUUID();
 
-    // Determine final order amount (handles flat team fee vs per-member team fee)
+    // Determine final order amount (handles flat team fee vs per-member team fee vs individual registration)
     let orderAmount = event.fee;
     const teamSettings = event.customFormDefinition && event.customFormDefinition.teamSettings;
-    if (teamSettings && teamSettings.enabled && teamSettings.feeModel === 'PER_MEMBER') {
+    const isTeam = Boolean(formAnswers && formAnswers.isTeamRegistration);
+    if (isTeam && teamSettings && teamSettings.enabled && teamSettings.feeModel === 'PER_MEMBER') {
       const teamSize = Number(formAnswers && (formAnswers.teamSize || (Array.isArray(formAnswers.teamMembers) && (formAnswers.teamMembers.length + 1))));
       if (!isNaN(teamSize) && teamSize >= (teamSettings.minTeamSize || 2)) {
         orderAmount = event.fee * teamSize;

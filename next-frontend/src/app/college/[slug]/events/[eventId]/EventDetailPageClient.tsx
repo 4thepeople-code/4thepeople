@@ -40,6 +40,7 @@ import {
   CreditCard,
   Hourglass,
   Users,
+  User,
   Plus,
   Trash2,
 } from 'lucide-react';
@@ -136,6 +137,7 @@ export function EventDetailPageClient({ slug, eventId, clubId: propClubId }: Eve
   const [teamValidationError, setTeamValidationError] = useState<string | null>(null);
   const [isSubmittingTeam, setIsSubmittingTeam] = useState(false);
   const [isEditingLeaderDetails, setIsEditingLeaderDetails] = useState(false);
+  const [participationType, setParticipationType] = useState<'INDIVIDUAL' | 'TEAM'>('INDIVIDUAL');
   const [shareNotice, setShareNotice] = useState(false);
   const [activeGalleryEvent, setActiveGalleryEvent] = useState<Event | null>(null);
   const [regError, setRegError] = useState<string | null>(null);
@@ -155,6 +157,11 @@ export function EventDetailPageClient({ slug, eventId, clubId: propClubId }: Eve
 
   useEffect(() => {
     if (showTeamModal && teamSettings) {
+      if (teamSettings.allowIndividual === false) {
+        setParticipationType('TEAM');
+      } else {
+        setParticipationType('INDIVIDUAL');
+      }
       const minAdditional = Math.max(1, (teamSettings.minTeamSize || 2) - 1);
       if (teamMembers.length < minAdditional) {
         setTeamMembers(
@@ -550,21 +557,6 @@ export function EventDetailPageClient({ slug, eventId, clubId: propClubId }: Eve
     setTeamValidationError(null);
     if (!event?.id) return;
 
-    const trimmedTeamName = teamName.trim();
-    if (!trimmedTeamName) {
-      setTeamValidationError('Please enter a team name.');
-      return;
-    }
-
-    const minSize = teamSettings?.minTeamSize || 2;
-    const maxSize = teamSettings?.maxTeamSize || 10;
-    const totalMembers = teamMembers.length + 1;
-
-    if (totalMembers < minSize || totalMembers > maxSize) {
-      setTeamValidationError(`Total team size must be between ${minSize} and ${maxSize} members.`);
-      return;
-    }
-
     const leaderName = user?.name || studentName.trim() || 'Leader';
     const leaderEmail = (user?.email || studentEmail || getStoredExternalUser()?.email || '').toLowerCase().trim();
     const leaderRoll = user?.rollNumber || studentRollNumber.trim() || '';
@@ -608,6 +600,94 @@ export function EventDetailPageClient({ slug, eventId, clubId: propClubId }: Eve
       return;
     }
 
+    // Custom form questions validation
+    const fields = event.customFormDefinition?.fields || [];
+    for (const f of fields) {
+      const key = f.id || f.name;
+      if (!key) continue;
+      const val = formAnswers[key];
+      if (f.required && (val === undefined || val === null || val === '')) {
+        setTeamValidationError(`"${f.label || key}" is required.`);
+        return;
+      }
+    }
+
+    // Individual (Solo) Registration Flow
+    if (participationType === 'INDIVIDUAL') {
+      const individualPayload = {
+        rollNumber: leaderRoll,
+        name: leaderName,
+        email: leaderEmail,
+        department: leaderDept,
+        gender: leaderGender,
+        yearOfStudy: leaderYear,
+        collegeName: leaderCollege,
+        institutionName: leaderCollege,
+        phone: leaderPhone,
+        isTeamRegistration: false,
+        formAnswers: {
+          ...formAnswers,
+          rollNumber: leaderRoll,
+          name: leaderName,
+          email: leaderEmail,
+          department: leaderDept,
+          gender: leaderGender,
+          yearOfStudy: leaderYear,
+          collegeName: leaderCollege,
+          institutionName: leaderCollege,
+          phone: leaderPhone,
+          isTeamRegistration: false,
+        },
+      };
+
+      const isExternalParticipant = user?.role === 'EXTERNAL' || (!user && Boolean(externalToken));
+      if (isExternalParticipant) {
+        setShowTeamModal(false);
+        await executeExternalRegistration(individualPayload);
+        return;
+      }
+
+      if (event.isPaid) {
+        setShowTeamModal(false);
+        await executePaidCheckout(individualPayload);
+        return;
+      }
+
+      try {
+        setIsSubmittingTeam(true);
+        await registerMutation.mutateAsync({
+          eventId: event.id,
+          formAnswers: individualPayload,
+        });
+        setShowTeamModal(false);
+        setShowModal(true);
+      } catch (err: unknown) {
+        const msg =
+          (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+          (err instanceof Error ? err.message : 'Failed to register.');
+        setTeamValidationError(msg);
+      } finally {
+        setIsSubmittingTeam(false);
+      }
+      return;
+    }
+
+    // Team Registration Flow
+    const trimmedTeamName = teamName.trim();
+    if (!trimmedTeamName) {
+      setTeamValidationError('Please enter a team name.');
+      return;
+    }
+
+    const minSize = teamSettings?.minTeamSize || 2;
+    const maxSize = teamSettings?.maxTeamSize || 10;
+    const totalMembers = teamMembers.length + 1;
+
+    if (totalMembers < minSize || totalMembers > maxSize) {
+      setTeamValidationError(`Total team size must be between ${minSize} and ${maxSize} members.`);
+      return;
+    }
+
     const emailSet = new Set<string>();
     if (leaderEmail) emailSet.add(leaderEmail);
 
@@ -638,18 +718,6 @@ export function EventDetailPageClient({ slug, eventId, clubId: propClubId }: Eve
         return;
       }
       emailSet.add(mEmail);
-    }
-
-    // Custom form questions validation
-    const fields = event.customFormDefinition?.fields || [];
-    for (const f of fields) {
-      const key = f.id || f.name;
-      if (!key) continue;
-      const val = formAnswers[key];
-      if (f.required && (val === undefined || val === null || val === '')) {
-        setTeamValidationError(`"${f.label || key}" is required.`);
-        return;
-      }
     }
 
     const teamPayload = {
@@ -1428,19 +1496,63 @@ export function EventDetailPageClient({ slug, eventId, clubId: propClubId }: Eve
             <div className="space-y-1">
               <div className="flex items-center gap-2">
                 <span className="px-2.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-400 text-[10px] font-black uppercase tracking-wider">
-                  Team Registration
+                  {participationType === 'INDIVIDUAL' ? 'Solo Registration' : 'Team Registration'}
                 </span>
-                <span className="text-[11px] text-slate-400 font-semibold">
-                  ({teamSettings?.minTeamSize} to {teamSettings?.maxTeamSize} Members)
-                </span>
+                {participationType === 'TEAM' && (
+                  <span className="text-[11px] text-slate-400 font-semibold">
+                    ({teamSettings?.minTeamSize} to {teamSettings?.maxTeamSize} Members)
+                  </span>
+                )}
               </div>
               <h3 className={`font-['Syne',sans-serif] text-xl font-extrabold uppercase ${isDark ? 'text-white' : 'text-[#0F172A]'}`}>
                 {event.title}
               </h3>
               <p className={`text-xs ${isDark ? 'text-gray-400' : 'text-slate-600'}`}>
-                Register your team. You will be listed as the primary team leader.
+                {participationType === 'INDIVIDUAL'
+                  ? 'Register as an individual participant.'
+                  : 'Register your team. You will be listed as the primary team leader.'}
               </p>
             </div>
+
+            {/* Mode Selection: Individual vs Team */}
+            {teamSettings?.allowIndividual !== false && (
+              <div className="grid grid-cols-2 gap-2 p-1.5 rounded-2xl bg-white/[0.04] border border-white/10 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setParticipationType('INDIVIDUAL');
+                    setTeamValidationError(null);
+                  }}
+                  className={`py-2 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer ${
+                    participationType === 'INDIVIDUAL'
+                      ? 'bg-[#00F0FF] text-black shadow-md font-extrabold'
+                      : isDark
+                      ? 'text-gray-300 hover:text-white'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <User className="w-3.5 h-3.5" />
+                  <span>Individual (Solo)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setParticipationType('TEAM');
+                    setTeamValidationError(null);
+                  }}
+                  className={`py-2 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer ${
+                    participationType === 'TEAM'
+                      ? 'bg-[#00F0FF] text-black shadow-md font-extrabold'
+                      : isDark
+                      ? 'text-gray-300 hover:text-white'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <Users className="w-3.5 h-3.5" />
+                  <span>Team ({teamSettings?.minTeamSize || 2}–{teamSettings?.maxTeamSize || 10})</span>
+                </button>
+              </div>
+            )}
 
             {teamValidationError && (
               <div className="p-3 rounded-xl bg-red-500/15 border border-red-500/30 text-xs font-semibold text-red-400 flex items-center gap-2 shrink-0">
@@ -1451,33 +1563,35 @@ export function EventDetailPageClient({ slug, eventId, clubId: propClubId }: Eve
 
             <form onSubmit={handleTeamFormSubmit} className="space-y-5 overflow-y-auto pr-1 flex-1">
               {/* Team Name */}
-              <div className="space-y-1.5">
-                <label className={`block text-xs font-bold uppercase tracking-wider ${isDark ? 'text-gray-200' : 'text-slate-700'}`}>
-                  Team Name <span className="text-red-400">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={teamName}
-                  onChange={(e) => setTeamName(e.target.value)}
-                  placeholder="e.g. Code Commanders"
-                  className={`w-full px-4 py-2.5 rounded-xl border text-sm transition-all focus:outline-hidden focus:border-[#00F0FF] ${
-                    isDark
-                      ? 'bg-[#0B0C10] border-white/10 text-white placeholder-gray-600'
-                      : 'bg-slate-50 border-slate-200 text-slate-900 placeholder-slate-400'
-                  }`}
-                  required
-                />
-              </div>
+              {participationType === 'TEAM' && (
+                <div className="space-y-1.5">
+                  <label className={`block text-xs font-bold uppercase tracking-wider ${isDark ? 'text-gray-200' : 'text-slate-700'}`}>
+                    Team Name <span className="text-red-400">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={teamName}
+                    onChange={(e) => setTeamName(e.target.value)}
+                    placeholder="e.g. Code Commanders"
+                    className={`w-full px-4 py-2.5 rounded-xl border text-sm transition-all focus:outline-hidden focus:border-[#00F0FF] ${
+                      isDark
+                        ? 'bg-[#0B0C10] border-white/10 text-white placeholder-gray-600'
+                        : 'bg-slate-50 border-slate-200 text-slate-900 placeholder-slate-400'
+                    }`}
+                    required={participationType === 'TEAM'}
+                  />
+                </div>
+              )}
 
               {/* Leader Snapshot & Profile Card */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <label className={`block text-xs font-bold uppercase tracking-wider ${isDark ? 'text-gray-200' : 'text-slate-700'}`}>
-                    Team Leader Details (You)
+                    {participationType === 'INDIVIDUAL' ? 'Participant Details (You)' : 'Team Leader Details (You)'}
                   </label>
                   <div className="flex items-center gap-2">
                     <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">
-                      Leader
+                      {participationType === 'INDIVIDUAL' ? 'Solo' : 'Leader'}
                     </span>
                     {(user || getStoredExternalUser()) && (
                       <button
@@ -1660,8 +1774,9 @@ export function EventDetailPageClient({ slug, eventId, clubId: propClubId }: Eve
                 )}
               </div>
 
-              {/* Teammates List */}
-              <div className="space-y-3">
+              {/* Teammates List (Only for Team Mode) */}
+              {participationType === 'TEAM' && (
+                <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <label className={`block text-xs font-bold uppercase tracking-wider ${isDark ? 'text-gray-200' : 'text-slate-700'}`}>
                     Additional Teammates ({teamMembers.length} added)
@@ -1777,6 +1892,7 @@ export function EventDetailPageClient({ slug, eventId, clubId: propClubId }: Eve
                   </button>
                 )}
               </div>
+            )}
 
               {/* Custom Form Questions if Defined */}
               {event.customFormDefinition?.fields && event.customFormDefinition.fields.length > 0 && (
@@ -1863,20 +1979,26 @@ export function EventDetailPageClient({ slug, eventId, clubId: propClubId }: Eve
                 <div className={`p-4 rounded-2xl border space-y-1.5 ${
                   isDark ? 'bg-purple-500/10 border-purple-500/20' : 'bg-purple-50 border-purple-200'
                 }`}>
-                  <div className="flex items-center justify-between text-xs font-semibold">
-                    <span className="text-slate-400">Pricing Model:</span>
-                    <span className="font-bold text-purple-400">
-                      {teamSettings?.feeModel === 'PER_MEMBER' ? 'Per Member' : 'Flat per Team'}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between text-xs font-semibold">
-                    <span className="text-slate-400">Team Size:</span>
-                    <span>{teamMembers.length + 1} members</span>
-                  </div>
+                  {participationType === 'TEAM' && (
+                    <>
+                      <div className="flex items-center justify-between text-xs font-semibold">
+                        <span className="text-slate-400">Pricing Model:</span>
+                        <span className="font-bold text-purple-400">
+                          {teamSettings?.feeModel === 'PER_MEMBER' ? 'Per Member' : 'Flat per Team'}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between text-xs font-semibold">
+                        <span className="text-slate-400">Team Size:</span>
+                        <span>{teamMembers.length + 1} members</span>
+                      </div>
+                    </>
+                  )}
                   <div className="flex items-center justify-between pt-2 border-t border-purple-500/20 text-sm font-extrabold">
                     <span>Total Amount Due:</span>
                     <span className="text-purple-400 text-base font-mono">
-                      ₹{teamSettings?.feeModel === 'PER_MEMBER'
+                      ₹{participationType === 'INDIVIDUAL'
+                        ? (event.fee || 0)
+                        : teamSettings?.feeModel === 'PER_MEMBER'
                         ? (event.fee || 0) * (teamMembers.length + 1)
                         : (event.fee || 0)}
                     </span>
@@ -1903,12 +2025,22 @@ export function EventDetailPageClient({ slug, eventId, clubId: propClubId }: Eve
                   {isSubmittingTeam || isCheckingOut || registerMutation.isPending ? (
                     <>
                       <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                      <span>{isCheckingOut ? 'Securing Checkout...' : 'Registering Team...'}</span>
+                      <span>
+                        {isCheckingOut
+                          ? 'Securing Checkout...'
+                          : participationType === 'INDIVIDUAL'
+                          ? 'Registering...'
+                          : 'Registering Team...'}
+                      </span>
                     </>
                   ) : (
                     <>
                       <span>
-                        {event.isPaid
+                        {participationType === 'INDIVIDUAL'
+                          ? event.isPaid
+                            ? `Pay ₹${event.fee || 0} & Register`
+                            : 'Confirm Registration'
+                          : event.isPaid
                           ? `Pay ₹${
                               teamSettings?.feeModel === 'PER_MEMBER'
                                 ? (event.fee || 0) * (teamMembers.length + 1)

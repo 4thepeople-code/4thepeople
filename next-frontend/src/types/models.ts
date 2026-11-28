@@ -122,6 +122,7 @@ export interface TeamSettings {
   minTeamSize: number;
   maxTeamSize: number;
   feeModel?: 'PER_TEAM' | 'PER_MEMBER';
+  allowIndividual?: boolean;
 }
 
 export interface TeamMember {

@@ -121,50 +121,56 @@ exports.registerForEvent = asyncHandler(async (req, res) => {
     // Handle team registration validation & payload preservation
     const teamSettings = event.customFormDefinition?.teamSettings;
     if (teamSettings && teamSettings.enabled) {
-      if (!answers.isTeamRegistration) {
-        throw new AppError('This event requires team registration. Please provide your team details.', 400);
-      }
-      const teamName = typeof answers.teamName === 'string' ? answers.teamName.trim() : '';
-      if (!teamName) {
-        throw new AppError('Team name is required', 400);
-      }
-      const minSize = teamSettings.minTeamSize || 2;
-      const maxSize = teamSettings.maxTeamSize || 10;
-      const teamMembers = Array.isArray(answers.teamMembers) ? answers.teamMembers : [];
-      const teamSize = Number(answers.teamSize || (teamMembers.length + 1));
-      if (isNaN(teamSize) || teamSize < minSize || teamSize > maxSize) {
-        throw new AppError(`Team size must be between ${minSize} and ${maxSize} members`, 400);
-      }
-
-      const memberEmails = new Set();
-      const leaderEmail = (req.user?.email || '').toLowerCase().trim();
-      if (leaderEmail) memberEmails.add(leaderEmail);
-
-      for (let i = 0; i < teamMembers.length; i++) {
-        const m = teamMembers[i];
-        if (!m || !m.name || !m.name.trim()) {
-          throw new AppError(`Teammate #${i + 2} name is required`, 400);
+      if (answers.isTeamRegistration) {
+        const teamName = typeof answers.teamName === 'string' ? answers.teamName.trim() : '';
+        if (!teamName) {
+          throw new AppError('Team name is required', 400);
         }
-        if (!m || !m.email || !m.email.trim()) {
-          throw new AppError(`Teammate #${i + 2} email is required`, 400);
+        const minSize = teamSettings.minTeamSize || 2;
+        const maxSize = teamSettings.maxTeamSize || 10;
+        const teamMembers = Array.isArray(answers.teamMembers) ? answers.teamMembers : [];
+        const teamSize = Number(answers.teamSize || (teamMembers.length + 1));
+        if (isNaN(teamSize) || teamSize < minSize || teamSize > maxSize) {
+          throw new AppError(`Team size must be between ${minSize} and ${maxSize} members`, 400);
         }
-        const mEmail = m.email.toLowerCase().trim();
-        if (memberEmails.has(mEmail)) {
-          throw new AppError(`Duplicate email "${mEmail}" found in team members`, 400);
-        }
-        memberEmails.add(mEmail);
-      }
 
-      if (!validatedAnswers) validatedAnswers = {};
-      validatedAnswers.isTeamRegistration = true;
-      validatedAnswers.teamName = teamName;
-      validatedAnswers.teamSize = teamSize;
-      validatedAnswers.teamLeader = {
-        name: req.user?.name || '',
-        email: req.user?.email || '',
-        rollNumber: req.user?.rollNumber || null,
-      };
-      validatedAnswers.teamMembers = teamMembers;
+        const memberEmails = new Set();
+        const leaderEmail = (req.user?.email || '').toLowerCase().trim();
+        if (leaderEmail) memberEmails.add(leaderEmail);
+
+        for (let i = 0; i < teamMembers.length; i++) {
+          const m = teamMembers[i];
+          if (!m || !m.name || !m.name.trim()) {
+            throw new AppError(`Teammate #${i + 2} name is required`, 400);
+          }
+          if (!m || !m.email || !m.email.trim()) {
+            throw new AppError(`Teammate #${i + 2} email is required`, 400);
+          }
+          const mEmail = m.email.toLowerCase().trim();
+          if (memberEmails.has(mEmail)) {
+            throw new AppError(`Duplicate email "${mEmail}" found in team members`, 400);
+          }
+          memberEmails.add(mEmail);
+        }
+
+        if (!validatedAnswers) validatedAnswers = {};
+        validatedAnswers.isTeamRegistration = true;
+        validatedAnswers.teamName = teamName;
+        validatedAnswers.teamSize = teamSize;
+        validatedAnswers.teamLeader = {
+          name: req.user?.name || '',
+          email: req.user?.email || '',
+          rollNumber: req.user?.rollNumber || null,
+        };
+        validatedAnswers.teamMembers = teamMembers;
+      } else {
+        // Individual registration allowed when teamSettings.allowIndividual !== false
+        if (teamSettings.allowIndividual === false && (teamSettings.minTeamSize || 2) > 1) {
+          throw new AppError('This event requires team registration. Please provide your team details.', 400);
+        }
+        if (!validatedAnswers) validatedAnswers = {};
+        validatedAnswers.isTeamRegistration = false;
+      }
     } else if (answers.isTeamRegistration) {
       if (!validatedAnswers) validatedAnswers = {};
       validatedAnswers.isTeamRegistration = true;

@@ -133,6 +133,7 @@ export function ManagerEventDetailClient({
   const [customMinTeamSize, setCustomMinTeamSize] = useState<string | null>(null);
   const [customMaxTeamSize, setCustomMaxTeamSize] = useState<string | null>(null);
   const [customFeeModel, setCustomFeeModel] = useState<'PER_TEAM' | 'PER_MEMBER' | null>(null);
+  const [customAllowIndividual, setCustomAllowIndividual] = useState<boolean | null>(null);
   const [viewingRosterAttendee, setViewingRosterAttendee] = useState<EventAttendeeItem | null>(null);
   const [isVisibilityConfirmOpen, setIsVisibilityConfirmOpen] = useState(false);
   const [formError, setFormError] = useState('');
@@ -158,6 +159,7 @@ export function ManagerEventDetailClient({
   const minTeamSize = customMinTeamSize ?? (existingTeamSettings?.minTeamSize?.toString() || '2');
   const maxTeamSize = customMaxTeamSize ?? (existingTeamSettings?.maxTeamSize?.toString() || '4');
   const feeModel = customFeeModel ?? (existingTeamSettings?.feeModel || 'PER_TEAM');
+  const allowIndividual = customAllowIndividual ?? (existingTeamSettings?.allowIndividual ?? true);
 
   // Cover Image State
   const [coverUploading, setCoverUploading] = useState(false);
@@ -228,8 +230,8 @@ export function ManagerEventDetailClient({
     if (isTeamEvent) {
       const min = parseInt(minTeamSize, 10);
       const max = parseInt(maxTeamSize, 10);
-      if (isNaN(min) || min < 2) {
-        setFormError('Minimum team size must be at least 2.');
+      if (isNaN(min) || min < 1) {
+        setFormError('Minimum team size must be at least 1.');
         return;
       }
       if (isNaN(max) || max < min) {
@@ -273,6 +275,7 @@ export function ManagerEventDetailClient({
                   minTeamSize: parseInt(minTeamSize, 10),
                   maxTeamSize: parseInt(maxTeamSize, 10),
                   feeModel: event?.isPaid ? feeModel : 'PER_TEAM',
+                  allowIndividual,
                 },
                 fields: event?.customFormDefinition?.fields || [],
               }
@@ -296,6 +299,7 @@ export function ManagerEventDetailClient({
       setCustomMinTeamSize(null);
       setCustomMaxTeamSize(null);
       setCustomFeeModel(null);
+      setCustomAllowIndividual(null);
       setIsVisibilityConfirmOpen(false);
       queryClient.invalidateQueries({
         queryKey: queryKeys.tenant(slug).events.detail(clubId, eventId),
@@ -854,6 +858,23 @@ export function ManagerEventDetailClient({
                               required={isTeamEvent}
                             />
                           </div>
+                        </div>
+
+                        <div>
+                          <label className="flex items-center gap-2.5 cursor-pointer mt-1">
+                            <input
+                              type="checkbox"
+                              checked={allowIndividual}
+                              onChange={(e) => setCustomAllowIndividual(e.target.checked)}
+                              className="rounded border-slate-700 text-[#00F0FF] focus:ring-[#00F0FF]"
+                            />
+                            <span className={`text-xs font-semibold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                              Allow Solo / Individual Registrations
+                            </span>
+                          </label>
+                          <p className="text-[11px] text-slate-400 mt-0.5 ml-6">
+                            Candidates can choose to register either as a single individual or form a team.
+                          </p>
                         </div>
 
                         {event?.isPaid && (
